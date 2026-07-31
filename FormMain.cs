@@ -1,0 +1,235 @@
+using System;
+using System.Drawing;
+using System.Windows.Forms;
+using SISTEMAACTUALIZADO.Models;
+
+namespace SISTEMAACTUALIZADO
+{
+    public class FormMain : Form
+    {
+        private Panel pnlSidebar = null!;
+        private Panel pnlHeader = null!;
+        private Panel pnlContent = null!;
+        private Label lblLogo = null!;
+        private Label lblTituloVista = null!;
+        private Label lblUsuarioInfo = null!;
+
+        private Button btnVentas = new Button();
+        private Button btnCaja = new Button();
+        private Button btnHistorial = new Button();
+        private Button btnClientes = new Button();
+        private Button btnProductos = new Button();
+        private Button btnUsuarios = new Button();
+        private Button btnReportes = new Button();
+        private Button btnCerrarSesion = new Button();
+        private Button btnSalir = new Button();
+
+        private Form? _formActivo = null;
+        private Usuario? _usuarioActual;
+
+        public bool EsCerrarSesion { get; private set; } = false;
+
+        public FormMain(Usuario? usuario = null)
+        {
+            _usuarioActual = usuario;
+            InitializeComponent();
+            AplicarPermisosPorRol();
+            AbrirFormEnContent(new FormVenta(_usuarioActual), "Punto de Venta", btnVentas);
+        }
+
+        private void InitializeComponent()
+        {
+            this.pnlSidebar = new Panel();
+            this.lblLogo = new Label();
+            this.pnlHeader = new Panel();
+            this.lblTituloVista = new Label();
+            this.pnlContent = new Panel();
+
+            this.SuspendLayout();
+
+            this.Text = "Sistema POS Moderno - Control de Ventas e Inventario";
+            this.Size = new Size(1300, 800);
+            this.StartPosition = FormStartPosition.CenterScreen;
+            this.MinimumSize = new Size(1100, 680);
+            this.BackColor = Color.FromArgb(244, 246, 249);
+
+            this.pnlSidebar.Dock = DockStyle.Left;
+            this.pnlSidebar.Width = 230;
+            this.pnlSidebar.BackColor = Color.FromArgb(24, 28, 36);
+
+            this.lblLogo.Text = "⚡ POS SYSTEM";
+            this.lblLogo.Dock = DockStyle.Top;
+            this.lblLogo.Height = 80;
+            this.lblLogo.Font = new Font("Segoe UI", 15, FontStyle.Bold);
+            this.lblLogo.ForeColor = Color.White;
+            this.lblLogo.TextAlign = ContentAlignment.MiddleCenter;
+
+            Panel pnlNav = new Panel
+            {
+                Dock = DockStyle.Top,
+                Height = 480,
+                BackColor = Color.Transparent
+            };
+
+            ConfigurarBotonSidebar(this.btnVentas, "🛒  Punto de Venta", 10);
+            ConfigurarBotonSidebar(this.btnCaja, "💵  Control de Caja", 65);
+            ConfigurarBotonSidebar(this.btnHistorial, "📜  Historial Ventas", 120);
+            ConfigurarBotonSidebar(this.btnClientes, "👥  Clientes", 175);
+            ConfigurarBotonSidebar(this.btnProductos, "📦  Productos", 230);
+            ConfigurarBotonSidebar(this.btnUsuarios, "👤  Usuarios", 285);
+            ConfigurarBotonSidebar(this.btnReportes, "📊  Reportes", 340);
+
+            pnlNav.Controls.Add(this.btnReportes);
+            pnlNav.Controls.Add(this.btnUsuarios);
+            pnlNav.Controls.Add(this.btnProductos);
+            pnlNav.Controls.Add(this.btnClientes);
+            pnlNav.Controls.Add(this.btnHistorial);
+            pnlNav.Controls.Add(this.btnCaja);
+            pnlNav.Controls.Add(this.btnVentas);
+
+            Panel pnlBottomNav = new Panel
+            {
+                Dock = DockStyle.Bottom,
+                Height = 120,
+                BackColor = Color.Transparent
+            };
+
+            ConfigurarBotonSidebar(this.btnCerrarSesion, "🔒  Cerrar Sesión", 10);
+            ConfigurarBotonSidebar(this.btnSalir, "🚪  Salir", 65);
+
+            this.btnVentas.Click += (s, e) => AbrirFormEnContent(new FormVenta(_usuarioActual), "Punto de Venta", btnVentas);
+            this.btnCaja.Click += (s, e) => AbrirFormEnContent(new FormCaja(_usuarioActual), "Apertura y Cierre de Caja", btnCaja);
+            this.btnHistorial.Click += (s, e) => AbrirFormEnContent(new FormHistorialVentas(), "Historial y Devoluciones de Ventas", btnHistorial);
+            this.btnClientes.Click += (s, e) => AbrirFormEnContent(new FormClientes(), "Gestión de Clientes (CRM)", btnClientes);
+            this.btnProductos.Click += (s, e) => AbrirFormEnContent(new FormProductos(), "Gestión de Productos e Inventario", btnProductos);
+            this.btnUsuarios.Click += (s, e) => AbrirFormEnContent(new FormUsuarios(), "Gestión de Cuentas de Usuarios", btnUsuarios);
+            this.btnReportes.Click += (s, e) => AbrirFormEnContent(new FormReportes(), "Reportes y Estadísticas de Ventas", btnReportes);
+
+            this.btnCerrarSesion.Click += (s, e) =>
+            {
+                var result = MessageBox.Show("¿Está seguro que desea cerrar sesión?", "Cerrar Sesión", MessageBoxButtons.YesNo, MessageBoxIcon.Question);
+                if (result == DialogResult.Yes)
+                {
+                    EsCerrarSesion = true;
+                    this.Close();
+                }
+            };
+
+            this.btnSalir.Click += (s, e) => Application.Exit();
+
+            pnlBottomNav.Controls.Add(this.btnCerrarSesion);
+            pnlBottomNav.Controls.Add(this.btnSalir);
+
+            this.pnlSidebar.Controls.Add(pnlNav);
+            this.pnlSidebar.Controls.Add(pnlBottomNav);
+            this.pnlSidebar.Controls.Add(this.lblLogo);
+
+            this.pnlHeader.Dock = DockStyle.Top;
+            this.pnlHeader.Height = 65;
+            this.pnlHeader.BackColor = Color.White;
+            this.pnlHeader.Padding = new Padding(25, 0, 20, 0);
+
+            this.lblTituloVista.Text = "Punto de Venta";
+            this.lblTituloVista.Font = new Font("Segoe UI", 18, FontStyle.Bold);
+            this.lblTituloVista.ForeColor = Color.FromArgb(30, 41, 59);
+            this.lblTituloVista.Dock = DockStyle.Left;
+            this.lblTituloVista.TextAlign = ContentAlignment.MiddleLeft;
+            this.lblTituloVista.AutoSize = true;
+
+            // Datos del usuario logueado visible en la cabecera
+            string nombreUser = _usuarioActual?.NombreCompleto ?? "Barbara";
+            string rolUser = _usuarioActual?.Rol ?? "Administrador";
+
+            this.lblUsuarioInfo = new Label
+            {
+                Text = $"👤 Sesión Activa: {nombreUser} ({rolUser})",
+                Font = new Font("Segoe UI", 10.5F, FontStyle.Bold),
+                ForeColor = Color.FromArgb(0, 102, 255),
+                Dock = DockStyle.Right,
+                TextAlign = ContentAlignment.MiddleRight,
+                AutoSize = true
+            };
+
+            this.pnlHeader.Controls.Add(this.lblTituloVista);
+            this.pnlHeader.Controls.Add(this.lblUsuarioInfo);
+
+            this.pnlContent.Dock = DockStyle.Fill;
+            this.pnlContent.BackColor = Color.FromArgb(244, 246, 249);
+            this.pnlContent.Padding = new Padding(15);
+
+            this.Controls.Add(this.pnlContent);
+            this.Controls.Add(this.pnlHeader);
+            this.Controls.Add(this.pnlSidebar);
+
+            this.ResumeLayout(false);
+        }
+
+        private void AplicarPermisosPorRol()
+        {
+            if (_usuarioActual != null && _usuarioActual.Rol.Equals("Cajero", StringComparison.OrdinalIgnoreCase))
+            {
+                btnUsuarios.Visible = false;
+                btnReportes.Visible = false;
+            }
+        }
+
+        private void ConfigurarBotonSidebar(Button btn, string texto, int top)
+        {
+            btn.Text = texto;
+            btn.Location = new Point(10, top);
+            btn.Size = new Size(210, 48);
+            btn.FlatStyle = FlatStyle.Flat;
+            btn.FlatAppearance.BorderSize = 0;
+            btn.Font = new Font("Segoe UI", 11, FontStyle.Bold);
+            btn.ForeColor = Color.FromArgb(160, 174, 192);
+            btn.BackColor = Color.Transparent;
+            btn.TextAlign = ContentAlignment.MiddleLeft;
+            btn.Padding = new Padding(15, 0, 0, 0);
+            btn.Cursor = Cursors.Hand;
+        }
+
+        private void AbrirFormEnContent(Form formHijo, string titulo, Button botonSeleccionado)
+        {
+            if (_formActivo != null)
+            {
+                _formActivo.Close();
+            }
+
+            ResaltarBotonActivo(botonSeleccionado);
+
+            _formActivo = formHijo;
+            lblTituloVista.Text = titulo;
+
+            formHijo.TopLevel = false;
+            formHijo.FormBorderStyle = FormBorderStyle.None;
+            formHijo.Dock = DockStyle.Fill;
+
+            pnlContent.Controls.Clear();
+            pnlContent.Controls.Add(formHijo);
+            pnlContent.Tag = formHijo;
+            formHijo.Show();
+        }
+
+        private void ResaltarBotonActivo(Button btn)
+        {
+            Button[] botones = new[] { btnVentas, btnCaja, btnHistorial, btnClientes, btnProductos, btnUsuarios, btnReportes, btnCerrarSesion };
+
+            foreach (var b in botones)
+            {
+                if (b != null)
+                {
+                    if (b == btn)
+                    {
+                        b.BackColor = Color.FromArgb(0, 102, 255);
+                        b.ForeColor = Color.White;
+                    }
+                    else
+                    {
+                        b.BackColor = Color.Transparent;
+                        b.ForeColor = Color.FromArgb(160, 174, 192);
+                    }
+                }
+            }
+        }
+    }
+}

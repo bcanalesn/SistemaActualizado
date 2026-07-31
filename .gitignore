@@ -1,0 +1,72 @@
+# Build output
+[Bb]in/
+[Oo]bj/
+build-validation/
+[Dd]ebug/
+[Rr]elease/
+publish/
+artifacts/
+
+# Visual Studio and VS Code local files
+.vs/
+.vscode/*
+!.vscode/extensions.json
+!.vscode/tasks.json
+!.vscode/launch.json
+*.suo
+*.user
+*.userosscache
+*.sln.docstates
+
+# NuGet and package manager files
+packages/
+*.nupkg
+*.snupkg
+
+# Test, coverage and profiler output
+TestResults/
+coverage/
+*.coverage
+*.coveragexml
+*.opencover.xml
+
+# Logs and temporary files
+*.log
+*.tmp
+*.temp
+*.swp
+*.bak
+*.cache
+
+# Local configuration and secrets
+.env
+.env.*
+!.env.example
+appsettings.Local.json
+appsettings.*.local.json
+secrets.json
+secrets.*.json
+
+# Local databases and database exports
+*.db
+*.db-shm
+*.db-wal
+*.sqlite
+*.sqlite3
+*.mdf
+*.ndf
+*.ldf
+*.bak.sql
+*.dump
+database-*.sql
+backup-*.sql
+
+# OS files
+.DS_Store
+Thumbs.db
+ehthumbs.db
+Desktop.ini
+
+# Crash dumps
+*.dmp
+*.stackdump
