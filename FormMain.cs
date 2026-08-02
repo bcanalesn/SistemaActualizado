@@ -17,6 +17,7 @@ namespace SISTEMAACTUALIZADO
         private Button btnVentas = new Button();
         private Button btnCaja = new Button();
         private Button btnHistorial = new Button();
+        private Button btnFolios = new Button(); // Módulo de Folios SII
         private Button btnClientes = new Button();
         private Button btnProductos = new Button();
         private Button btnUsuarios = new Button();
@@ -34,7 +35,7 @@ namespace SISTEMAACTUALIZADO
             _usuarioActual = usuario;
             InitializeComponent();
             AplicarPermisosPorRol();
-            AbrirFormEnContent(new FormVenta(_usuarioActual), "Punto de Venta", btnVentas);
+            AbrirFormEnContent(new FormVenta(_usuarioActual), "Punto de Venta DTE", btnVentas);
         }
 
         private void InitializeComponent()
@@ -47,8 +48,8 @@ namespace SISTEMAACTUALIZADO
 
             this.SuspendLayout();
 
-            this.Text = "Sistema POS Moderno - Control de Ventas e Inventario";
-            this.Size = new Size(1300, 800);
+            this.Text = "Sistema POS Moderno - Control DTE e Inventario";
+            this.Size = new Size(1340, 820);
             this.StartPosition = FormStartPosition.CenterScreen;
             this.MinimumSize = new Size(1100, 680);
             this.BackColor = Color.FromArgb(244, 246, 249);
@@ -59,7 +60,7 @@ namespace SISTEMAACTUALIZADO
 
             this.lblLogo.Text = "⚡ POS SYSTEM";
             this.lblLogo.Dock = DockStyle.Top;
-            this.lblLogo.Height = 80;
+            this.lblLogo.Height = 75;
             this.lblLogo.Font = new Font("Segoe UI", 15, FontStyle.Bold);
             this.lblLogo.ForeColor = Color.White;
             this.lblLogo.TextAlign = ContentAlignment.MiddleCenter;
@@ -67,22 +68,24 @@ namespace SISTEMAACTUALIZADO
             Panel pnlNav = new Panel
             {
                 Dock = DockStyle.Top,
-                Height = 480,
+                Height = 520,
                 BackColor = Color.Transparent
             };
 
             ConfigurarBotonSidebar(this.btnVentas, "🛒  Punto de Venta", 10);
             ConfigurarBotonSidebar(this.btnCaja, "💵  Control de Caja", 65);
             ConfigurarBotonSidebar(this.btnHistorial, "📜  Historial Ventas", 120);
-            ConfigurarBotonSidebar(this.btnClientes, "👥  Clientes", 175);
-            ConfigurarBotonSidebar(this.btnProductos, "📦  Productos", 230);
-            ConfigurarBotonSidebar(this.btnUsuarios, "👤  Usuarios", 285);
-            ConfigurarBotonSidebar(this.btnReportes, "📊  Reportes", 340);
+            ConfigurarBotonSidebar(this.btnFolios, "📄  Control de Folios", 175);
+            ConfigurarBotonSidebar(this.btnClientes, "👥  Clientes", 230);
+            ConfigurarBotonSidebar(this.btnProductos, "📦  Productos", 285);
+            ConfigurarBotonSidebar(this.btnUsuarios, "👤  Usuarios", 340);
+            ConfigurarBotonSidebar(this.btnReportes, "📊  Reportes", 395);
 
             pnlNav.Controls.Add(this.btnReportes);
             pnlNav.Controls.Add(this.btnUsuarios);
             pnlNav.Controls.Add(this.btnProductos);
             pnlNav.Controls.Add(this.btnClientes);
+            pnlNav.Controls.Add(this.btnFolios);
             pnlNav.Controls.Add(this.btnHistorial);
             pnlNav.Controls.Add(this.btnCaja);
             pnlNav.Controls.Add(this.btnVentas);
@@ -97,9 +100,10 @@ namespace SISTEMAACTUALIZADO
             ConfigurarBotonSidebar(this.btnCerrarSesion, "🔒  Cerrar Sesión", 10);
             ConfigurarBotonSidebar(this.btnSalir, "🚪  Salir", 65);
 
-            this.btnVentas.Click += (s, e) => AbrirFormEnContent(new FormVenta(_usuarioActual), "Punto de Venta", btnVentas);
+            this.btnVentas.Click += (s, e) => AbrirFormEnContent(new FormVenta(_usuarioActual), "Punto de Venta DTE", btnVentas);
             this.btnCaja.Click += (s, e) => AbrirFormEnContent(new FormCaja(_usuarioActual), "Apertura y Cierre de Caja", btnCaja);
             this.btnHistorial.Click += (s, e) => AbrirFormEnContent(new FormHistorialVentas(), "Historial y Devoluciones de Ventas", btnHistorial);
+            this.btnFolios.Click += (s, e) => AbrirFormEnContent(new FormFolios(), "Control de Folios Autorizados (SII)", btnFolios);
             this.btnClientes.Click += (s, e) => AbrirFormEnContent(new FormClientes(), "Gestión de Clientes (CRM)", btnClientes);
             this.btnProductos.Click += (s, e) => AbrirFormEnContent(new FormProductos(), "Gestión de Productos e Inventario", btnProductos);
             this.btnUsuarios.Click += (s, e) => AbrirFormEnContent(new FormUsuarios(), "Gestión de Cuentas de Usuarios", btnUsuarios);
@@ -129,14 +133,13 @@ namespace SISTEMAACTUALIZADO
             this.pnlHeader.BackColor = Color.White;
             this.pnlHeader.Padding = new Padding(25, 0, 20, 0);
 
-            this.lblTituloVista.Text = "Punto de Venta";
+            this.lblTituloVista.Text = "Punto de Venta DTE";
             this.lblTituloVista.Font = new Font("Segoe UI", 18, FontStyle.Bold);
             this.lblTituloVista.ForeColor = Color.FromArgb(30, 41, 59);
             this.lblTituloVista.Dock = DockStyle.Left;
             this.lblTituloVista.TextAlign = ContentAlignment.MiddleLeft;
             this.lblTituloVista.AutoSize = true;
 
-            // Datos del usuario logueado visible en la cabecera
             string nombreUser = _usuarioActual?.NombreCompleto ?? "Barbara";
             string rolUser = _usuarioActual?.Rol ?? "Administrador";
 
@@ -170,6 +173,7 @@ namespace SISTEMAACTUALIZADO
             {
                 btnUsuarios.Visible = false;
                 btnReportes.Visible = false;
+                btnFolios.Visible = false;
             }
         }
 
@@ -190,13 +194,9 @@ namespace SISTEMAACTUALIZADO
 
         private void AbrirFormEnContent(Form formHijo, string titulo, Button botonSeleccionado)
         {
-            if (_formActivo != null)
-            {
-                _formActivo.Close();
-            }
+            if (_formActivo != null) _formActivo.Close();
 
             ResaltarBotonActivo(botonSeleccionado);
-
             _formActivo = formHijo;
             lblTituloVista.Text = titulo;
 
@@ -212,22 +212,13 @@ namespace SISTEMAACTUALIZADO
 
         private void ResaltarBotonActivo(Button btn)
         {
-            Button[] botones = new[] { btnVentas, btnCaja, btnHistorial, btnClientes, btnProductos, btnUsuarios, btnReportes, btnCerrarSesion };
-
+            Button[] botones = new[] { btnVentas, btnCaja, btnHistorial, btnFolios, btnClientes, btnProductos, btnUsuarios, btnReportes, btnCerrarSesion };
             foreach (var b in botones)
             {
                 if (b != null)
                 {
-                    if (b == btn)
-                    {
-                        b.BackColor = Color.FromArgb(0, 102, 255);
-                        b.ForeColor = Color.White;
-                    }
-                    else
-                    {
-                        b.BackColor = Color.Transparent;
-                        b.ForeColor = Color.FromArgb(160, 174, 192);
-                    }
+                    b.BackColor = (b == btn) ? Color.FromArgb(0, 102, 255) : Color.Transparent;
+                    b.ForeColor = (b == btn) ? Color.White : Color.FromArgb(160, 174, 192);
                 }
             }
         }

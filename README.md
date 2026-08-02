@@ -7,7 +7,7 @@ Manual de instalación, arquitectura y uso del sistema de ventas.
 | Componente | Tecnología |
 | --- | --- |
 | Lenguaje | C# |
-| Framework | .NET 10 |
+| Framework | .NET 8.0 SDK o .NET 10.0 SDK.
 | Tipo de aplicación | Windows Forms (WinForms) |
 | Base de datos | MySQL 8.0+ o MariaDB |
 | Acceso a datos | Entity Framework Core con Pomelo MySQL |
@@ -20,10 +20,10 @@ Manual de instalación, arquitectura y uso del sistema de ventas.
 - **C# Dev Kit** (Microsoft): gestión de proyectos .NET.
 - **MySQL / Database Client**: administración de la base de datos desde el editor.
 
-## 3. Requisitos previos
+## 3. Requisitos previos importantes
 
 - Windows.
-- .NET 10 SDK.
+- .NET 8.0 SDK o .NET 10.0 SDK.
 - XAMPP con MySQL, o un servidor MySQL/MariaDB equivalente.
 - Visual Studio Code o Visual Studio.
 
