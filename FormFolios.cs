@@ -212,7 +212,7 @@ namespace SISTEMAACTUALIZADO
 
             Label lblTipo = new Label { Text = "Tipo de Documento Tributario:", Location = new Point(25, 60), AutoSize = true, Font = new Font("Segoe UI", 9F, FontStyle.Bold) };
             ComboBox cbTipo = new ComboBox { Location = new Point(25, 82), Size = new Size(310, 30), DropDownStyle = ComboBoxStyle.DropDownList, Font = new Font("Segoe UI", 10F) };
-            cbTipo.Items.AddRange(new string[] { "Boleta Electrónica", "Factura Electrónica", "Guía de Despacho" });
+            cbTipo.Items.AddRange(new string[] { "Boleta Electrónica", "Factura Electrónica", "Guía de Despacho", "Nota de Crédito Electrónica" });
             cbTipo.SelectedItem = string.IsNullOrEmpty(f.TipoDocumento) ? "Boleta Electrónica" : f.TipoDocumento;
 
             Label lblDesde = new Label { Text = "Folio Desde:", Location = new Point(25, 122), AutoSize = true, Font = new Font("Segoe UI", 9F, FontStyle.Bold) };

@@ -5,6 +5,7 @@ using System.Linq;
 using System.Windows.Forms;
 using SISTEMAACTUALIZADO.Data;
 using SISTEMAACTUALIZADO.Models;
+using SISTEMAACTUALIZADO.Services;
 
 namespace SISTEMAACTUALIZADO
 {
@@ -314,8 +315,14 @@ namespace SISTEMAACTUALIZADO
 
                 if (dgvVentas.Columns["VentaID"] != null) dgvVentas.Columns["VentaID"].HeaderText = "N° Ticket";
                 if (dgvVentas.Columns["Fecha"] != null) { dgvVentas.Columns["Fecha"].HeaderText = "Fecha / Hora"; dgvVentas.Columns["Fecha"].DefaultCellStyle.Format = "dd/MM/yyyy HH:mm"; }
+                if (dgvVentas.Columns["TipoDocumento"] != null) dgvVentas.Columns["TipoDocumento"].HeaderText = "Tipo DTE";
+                if (dgvVentas.Columns["FolioDTE"] != null) dgvVentas.Columns["FolioDTE"].HeaderText = "Folio DTE";
                 if (dgvVentas.Columns["MedioPago"] != null) dgvVentas.Columns["MedioPago"].HeaderText = "Medio Pago";
                 if (dgvVentas.Columns["Total"] != null) { dgvVentas.Columns["Total"].HeaderText = "Total"; dgvVentas.Columns["Total"].DefaultCellStyle.Format = "$#,##0"; }
+                if (dgvVentas.Columns["EstadoDTE"] != null) dgvVentas.Columns["EstadoDTE"].HeaderText = "Estado DTE";
+                if (dgvVentas.Columns["nroREF"] != null) dgvVentas.Columns["nroREF"].HeaderText = "Ref. Folio";
+
+                AplicarIndicadoresEstado();
             }
             catch (Exception ex)
             {
@@ -365,36 +372,61 @@ namespace SISTEMAACTUALIZADO
 
         private void CargarDetalleVenta(Venta venta)
         {
-            // Vista limpia con resumen de comprobante
-            var resumen = new List<object>
-            {
-                new { Item = "Ticket #", Detalle = $"#{venta.VentaID:D6}" },
-                new { Item = "Fecha Emisión", Detalle = venta.Fecha.ToString("dd/MM/yyyy HH:mm:ss") },
-                new { Item = "Medio de Pago", Detalle = venta.MedioPago },
-                new { Item = "Total Pagado", Detalle = $"$ {venta.Total:N0}" }
-            };
+            var detalles = _db.VentaDetalles
+                .Where(d => d.VentaID == venta.VentaID)
+                .Select(d => new
+                {
+                    Producto = d.NombreProducto,
+                    Cantidad = d.Cantidad,
+                    Precio = d.PrecioUnitario,
+                    Subtotal = d.Subtotal
+                })
+                .ToList();
 
-            dgvDetalle.DataSource = resumen;
+            if (detalles.Count > 0)
+            {
+                dgvDetalle.DataSource = detalles;
+
+                if (dgvDetalle.Columns["Producto"] != null) dgvDetalle.Columns["Producto"].HeaderText = "Producto";
+                if (dgvDetalle.Columns["Cantidad"] != null) dgvDetalle.Columns["Cantidad"].HeaderText = "Cant.";
+                if (dgvDetalle.Columns["Precio"] != null) { dgvDetalle.Columns["Precio"].HeaderText = "Precio"; dgvDetalle.Columns["Precio"].DefaultCellStyle.Format = "$#,##0"; }
+                if (dgvDetalle.Columns["Subtotal"] != null) { dgvDetalle.Columns["Subtotal"].HeaderText = "Subtotal"; dgvDetalle.Columns["Subtotal"].DefaultCellStyle.Format = "$#,##0"; }
+            }
+            else
+            {
+                var resumen = new List<object>
+                {
+                    new { Item = "Ticket #", Detalle = $"#{venta.VentaID:D6}" },
+                    new { Item = "Fecha Emisión", Detalle = venta.Fecha.ToString("dd/MM/yyyy HH:mm:ss") },
+                    new { Item = "Medio de Pago", Detalle = venta.MedioPago },
+                    new { Item = "Total Pagado", Detalle = $"$ {venta.Total:N0}" }
+                };
+
+                dgvDetalle.DataSource = resumen;
+            }
         }
 
         private void BtnReimprimir_Click(object? sender, EventArgs e)
         {
             if (_ventaSeleccionada == null) return;
 
-            var itemsEjemplo = new List<DetalleCarrito>
-            {
-                new DetalleCarrito { ProductoID = 1, Nombre = "Venta Ticket #" + _ventaSeleccionada.VentaID, PrecioUnitario = _ventaSeleccionada.Total, Cantidad = 1 }
-            };
+            var detalles = _db.VentaDetalles.Where(d => d.VentaID == _ventaSeleccionada.VentaID).ToList();
+            var itemsEjemplo = detalles
+                .Select(d => new DetalleCarrito
+                {
+                    ProductoID = d.ProductoID,
+                    Nombre = d.NombreProducto,
+                    PrecioUnitario = d.PrecioUnitario,
+                    Cantidad = d.Cantidad
+                })
+                .ToList();
 
-            FormTicket formTicket = new FormTicket(
-                _ventaSeleccionada.VentaID,
-                _ventaSeleccionada.Fecha,
-                itemsEjemplo,
-                _ventaSeleccionada.Total,
-                _ventaSeleccionada.Total,
-                0,
-                _ventaSeleccionada.MedioPago
-            );
+            if (itemsEjemplo.Count == 0)
+            {
+                itemsEjemplo.Add(new DetalleCarrito { ProductoID = 1, Nombre = "Venta Ticket #" + _ventaSeleccionada.VentaID, PrecioUnitario = _ventaSeleccionada.Total, Cantidad = 1 });
+            }
+
+            FormTicket formTicket = new FormTicket(_ventaSeleccionada, itemsEjemplo, _ventaSeleccionada.Total, 0);
 
             formTicket.ShowDialog();
         }
@@ -403,27 +435,156 @@ namespace SISTEMAACTUALIZADO
         {
             if (_ventaSeleccionada == null) return;
 
-            var confirm = MessageBox.Show(
-                $"¿Está seguro de anular la venta del Ticket #{_ventaSeleccionada.VentaID:D6} por un total de ${_ventaSeleccionada.Total:N0}?\n\nEsta acción revertirá la transacción.",
-                "Confirmar Devolución / Anulación",
-                MessageBoxButtons.YesNo,
-                MessageBoxIcon.Warning
-            );
+            MostrarModalNotaCredito(_ventaSeleccionada);
+        }
 
-            if (confirm == DialogResult.Yes)
+        private void MostrarModalNotaCredito(Venta ventaOrigen)
+        {
+            Form modal = new Form
             {
+                Text = $"Emitir Nota de Crédito - Ticket #{ventaOrigen.VentaID:D6}",
+                Size = new Size(420, 300),
+                StartPosition = FormStartPosition.CenterParent,
+                FormBorderStyle = FormBorderStyle.FixedDialog,
+                MaximizeBox = false,
+                MinimizeBox = false,
+                BackColor = Color.White
+            };
+
+            Label lblCausa = new Label
+            {
+                Text = "Causa SII:",
+                Location = new Point(20, 20),
+                AutoSize = true,
+                Font = new Font("Segoe UI", 9F, FontStyle.Bold)
+            };
+
+            ComboBox cbCausa = new ComboBox
+            {
+                Location = new Point(20, 42),
+                Size = new Size(360, 30),
+                DropDownStyle = ComboBoxStyle.DropDownList,
+                Font = new Font("Segoe UI", 9.5F)
+            };
+            cbCausa.Items.AddRange(new object[]
+            {
+                "1 - Anula Documento de Referencia",
+                "2 - Corregir Texto en Documento",
+                "3 - Corregir Montos / Descuento Parcial"
+            });
+            cbCausa.SelectedIndex = 0;
+
+            Label lblGlosa = new Label
+            {
+                Text = "Motivo / Glosa:",
+                Location = new Point(20, 80),
+                AutoSize = true,
+                Font = new Font("Segoe UI", 9F, FontStyle.Bold)
+            };
+
+            TextBox txtGlosa = new TextBox
+            {
+                Location = new Point(20, 102),
+                Size = new Size(360, 50),
+                Multiline = true,
+                Font = new Font("Segoe UI", 9F)
+            };
+
+            CheckBox chkReintegrar = new CheckBox
+            {
+                Text = "Reintegrar productos al stock",
+                Location = new Point(20, 160),
+                AutoSize = true,
+                Font = new Font("Segoe UI", 9F)
+            };
+
+            Button btnEmitir = new Button
+            {
+                Text = "Emitir Nota de Crédito",
+                Location = new Point(20, 200),
+                Size = new Size(175, 36),
+                BackColor = Color.FromArgb(220, 38, 38),
+                ForeColor = Color.White,
+                FlatStyle = FlatStyle.Flat,
+                Font = new Font("Segoe UI", 9F, FontStyle.Bold)
+            };
+            btnEmitir.FlatAppearance.BorderSize = 0;
+
+            Button btnCancelar = new Button
+            {
+                Text = "Cancelar",
+                Location = new Point(205, 200),
+                Size = new Size(100, 36),
+                BackColor = Color.FromArgb(241, 245, 249),
+                ForeColor = Color.FromArgb(51, 65, 85),
+                FlatStyle = FlatStyle.Flat,
+                Font = new Font("Segoe UI", 9F, FontStyle.Bold)
+            };
+            btnCancelar.FlatAppearance.BorderSize = 0;
+
+            btnEmitir.Click += (s, e) =>
+            {
+                if (string.IsNullOrWhiteSpace(txtGlosa.Text))
+                {
+                    MessageBox.Show("Debe ingresar un motivo o glosa para la Nota de Crédito.", "Validación", MessageBoxButtons.OK, MessageBoxIcon.Warning);
+                    return;
+                }
+
+                string codigoCausa = cbCausa.SelectedItem?.ToString()?.Split(' ')[0] ?? "1";
+
                 try
                 {
-                    _db.Ventas.Remove(_ventaSeleccionada);
-                    _db.SaveChanges();
+                    NotaCreditoService.ProcesarNotaCredito(
+                        _db,
+                        ventaOrigen.VentaID,
+                        codigoCausa,
+                        txtGlosa.Text.Trim(),
+                        chkReintegrar.Checked,
+                        ventaOrigen.Usuario);
 
-                    MessageBox.Show($"La venta #{_ventaSeleccionada.VentaID:D6} ha sido anulada exitosamente.", "Anulación Completa", MessageBoxButtons.OK, MessageBoxIcon.Information);
-
+                    MessageBox.Show("La Nota de Crédito fue emitida correctamente.", "Éxito", MessageBoxButtons.OK, MessageBoxIcon.Information);
+                    modal.Close();
                     CargarVentas(dtpDesde.Value.Date, dtpHasta.Value.Date.AddDays(1).AddTicks(-1));
                 }
                 catch (Exception ex)
                 {
-                    MessageBox.Show($"Error al anular la venta: {ex.Message}", "Error DB", MessageBoxButtons.OK, MessageBoxIcon.Error);
+                    MessageBox.Show($"No se pudo emitir la Nota de Crédito: {ex.Message}", "Error", MessageBoxButtons.OK, MessageBoxIcon.Error);
+                }
+            };
+
+            btnCancelar.Click += (s, e) => modal.Close();
+
+            modal.Controls.Add(lblCausa);
+            modal.Controls.Add(cbCausa);
+            modal.Controls.Add(lblGlosa);
+            modal.Controls.Add(txtGlosa);
+            modal.Controls.Add(chkReintegrar);
+            modal.Controls.Add(btnEmitir);
+            modal.Controls.Add(btnCancelar);
+            modal.ShowDialog();
+        }
+
+        private void AplicarIndicadoresEstado()
+        {
+            foreach (DataGridViewRow row in dgvVentas.Rows)
+            {
+                if (row.DataBoundItem is Venta venta)
+                {
+                    if (string.Equals(venta.EstadoDTE, "Anulado_NC", StringComparison.OrdinalIgnoreCase))
+                    {
+                        row.DefaultCellStyle.BackColor = Color.FromArgb(254, 242, 242);
+                        row.DefaultCellStyle.ForeColor = Color.FromArgb(153, 27, 27);
+                    }
+                    else if (string.Equals(venta.TipoDocumento, NotaCreditoService.TipoDocumentoNotaCredito, StringComparison.OrdinalIgnoreCase))
+                    {
+                        row.DefaultCellStyle.BackColor = Color.FromArgb(240, 249, 255);
+                        row.DefaultCellStyle.ForeColor = Color.FromArgb(2, 132, 199);
+                    }
+                    else
+                    {
+                        row.DefaultCellStyle.BackColor = Color.White;
+                        row.DefaultCellStyle.ForeColor = Color.FromArgb(51, 65, 85);
+                    }
                 }
             }
         }
