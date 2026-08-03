@@ -17,6 +17,7 @@ namespace SISTEMAACTUALIZADO
         private Button btnVentas = new Button();
         private Button btnCaja = new Button();
         private Button btnHistorial = new Button();
+        private Button btnLibroVentas = new Button(); // Módulo Libro de Ventas LVE F29
         private Button btnFolios = new Button(); // Módulo de Folios SII
         private Button btnClientes = new Button();
         private Button btnProductos = new Button();
@@ -73,19 +74,21 @@ namespace SISTEMAACTUALIZADO
             };
 
             ConfigurarBotonSidebar(this.btnVentas, "🛒  Punto de Venta", 10);
-            ConfigurarBotonSidebar(this.btnCaja, "💵  Control de Caja", 65);
-            ConfigurarBotonSidebar(this.btnHistorial, "📜  Historial Ventas", 120);
-            ConfigurarBotonSidebar(this.btnFolios, "📄  Control de Folios", 175);
-            ConfigurarBotonSidebar(this.btnClientes, "👥  Clientes", 230);
-            ConfigurarBotonSidebar(this.btnProductos, "📦  Productos", 285);
-            ConfigurarBotonSidebar(this.btnUsuarios, "👤  Usuarios", 340);
-            ConfigurarBotonSidebar(this.btnReportes, "📊  Reportes", 395);
+            ConfigurarBotonSidebar(this.btnCaja, "💵  Control de Caja", 60);
+            ConfigurarBotonSidebar(this.btnHistorial, "📜  Historial Ventas", 110);
+            ConfigurarBotonSidebar(this.btnLibroVentas, "📚  Libro Ventas LVE", 160);
+            ConfigurarBotonSidebar(this.btnFolios, "📄  Control de Folios", 210);
+            ConfigurarBotonSidebar(this.btnClientes, "👥  Clientes", 260);
+            ConfigurarBotonSidebar(this.btnProductos, "📦  Productos", 310);
+            ConfigurarBotonSidebar(this.btnUsuarios, "👤  Usuarios", 360);
+            ConfigurarBotonSidebar(this.btnReportes, "📊  Reportes", 410);
 
             pnlNav.Controls.Add(this.btnReportes);
             pnlNav.Controls.Add(this.btnUsuarios);
             pnlNav.Controls.Add(this.btnProductos);
             pnlNav.Controls.Add(this.btnClientes);
             pnlNav.Controls.Add(this.btnFolios);
+            pnlNav.Controls.Add(this.btnLibroVentas);
             pnlNav.Controls.Add(this.btnHistorial);
             pnlNav.Controls.Add(this.btnCaja);
             pnlNav.Controls.Add(this.btnVentas);
@@ -103,6 +106,7 @@ namespace SISTEMAACTUALIZADO
             this.btnVentas.Click += (s, e) => AbrirFormEnContent(new FormVenta(_usuarioActual), "Punto de Venta DTE", btnVentas);
             this.btnCaja.Click += (s, e) => AbrirFormEnContent(new FormCaja(_usuarioActual), "Apertura y Cierre de Caja", btnCaja);
             this.btnHistorial.Click += (s, e) => AbrirFormEnContent(new FormHistorialVentas(), "Historial y Devoluciones de Ventas", btnHistorial);
+            this.btnLibroVentas.Click += (s, e) => AbrirFormEnContent(new FormLibroVentas(), "Libro de Ventas Electrónico (LVE) y Formulario F29", btnLibroVentas);
             this.btnFolios.Click += (s, e) => AbrirFormEnContent(new FormFolios(), "Control de Folios Autorizados (SII)", btnFolios);
             this.btnClientes.Click += (s, e) => AbrirFormEnContent(new FormClientes(), "Gestión de Clientes (CRM)", btnClientes);
             this.btnProductos.Click += (s, e) => AbrirFormEnContent(new FormProductos(), "Gestión de Productos e Inventario", btnProductos);
@@ -174,6 +178,7 @@ namespace SISTEMAACTUALIZADO
                 btnUsuarios.Visible = false;
                 btnReportes.Visible = false;
                 btnFolios.Visible = false;
+                btnLibroVentas.Visible = false;
             }
         }
 
@@ -212,7 +217,7 @@ namespace SISTEMAACTUALIZADO
 
         private void ResaltarBotonActivo(Button btn)
         {
-            Button[] botones = new[] { btnVentas, btnCaja, btnHistorial, btnFolios, btnClientes, btnProductos, btnUsuarios, btnReportes, btnCerrarSesion };
+            Button[] botones = new[] { btnVentas, btnCaja, btnHistorial, btnLibroVentas, btnFolios, btnClientes, btnProductos, btnUsuarios, btnReportes, btnCerrarSesion };
             foreach (var b in botones)
             {
                 if (b != null)
