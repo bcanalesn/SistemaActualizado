@@ -5,6 +5,7 @@ using System.Linq;
 using System.Windows.Forms;
 using SISTEMAACTUALIZADO.Data;
 using SISTEMAACTUALIZADO.Models;
+using SISTEMAACTUALIZADO.Services;
 
 namespace SISTEMAACTUALIZADO
 {
@@ -684,10 +685,20 @@ namespace SISTEMAACTUALIZADO
                     RutCliente = txtRutFactura.Text.Trim(),
                     RazonSocial = txtRazonSocialFactura.Text.Trim(),
                     Giro = txtGiroFactura.Text.Trim(),
-                    Usuario = _usuarioActual?.NombreUsuario ?? "admin"
+                    Usuario = _usuarioActual?.NombreUsuario ?? "admin",
+                    EstadoDTE = "Aceptado_SII"
                 };
 
                 _db.Ventas.Add(nuevaVenta);
+                nuevaVenta.Detalles = _carrito.Select(item => new VentaDetalle
+                {
+                    ProductoID = item.ProductoID,
+                    CodigoBarra = _productosCache.FirstOrDefault(p => p.ProductoID == item.ProductoID)?.CodigoBarra ?? string.Empty,
+                    NombreProducto = item.Nombre,
+                    PrecioUnitario = item.PrecioUnitario,
+                    Cantidad = item.Cantidad,
+                    Subtotal = item.Subtotal
+                }).ToList();
                 _db.SaveChanges();
 
                 FormTicket ticket = new FormTicket(nuevaVenta, _carrito, pagaCon, vuelto);

@@ -1,4 +1,5 @@
 using System;
+using System.Collections.Generic;
 
 namespace SISTEMAACTUALIZADO.Models
 {
@@ -18,10 +19,17 @@ namespace SISTEMAACTUALIZADO.Models
         public string RutCliente { get; set; } = string.Empty;
         public string RazonSocial { get; set; } = string.Empty;
         public string Giro { get; set; } = string.Empty;
+        public string Direccion { get; set; } = string.Empty;
+        public string Comuna { get; set; } = string.Empty;
+        public string Ciudad { get; set; } = string.Empty;
+        public string EstadoDTE { get; set; } = "Aceptado_SII";
 
         // Referencias para Notas de Crédito / Anulaciones
         public int? idREF { get; set; }
         public int? nroREF { get; set; }
         public string? codigoREF { get; set; }
+        public string? GlosaREF { get; set; }
+
+        public ICollection<VentaDetalle> Detalles { get; set; } = new List<VentaDetalle>();
     }
 }
