@@ -11,6 +11,7 @@ namespace SISTEMAACTUALIZADO
     {
         private AppDbContext _db = new AppDbContext();
         private static CajaTurno? _turnoActual = null;
+        private Usuario? _usuarioActual;
 
         private Label lblEstadoCaja = null!;
         private Label lblMontoInicial = null!;
@@ -24,6 +25,7 @@ namespace SISTEMAACTUALIZADO
 
         public FormCaja(Usuario? usuario = null)
         {
+            _usuarioActual = usuario;
             InitializeComponent();
             ActualizarEstadoVista();
         }
@@ -41,7 +43,6 @@ namespace SISTEMAACTUALIZADO
                 BackColor = Color.FromArgb(244, 246, 249)
             };
 
-            // Header Banner
             Panel pnlHeader = new Panel
             {
                 Dock = DockStyle.Top,
@@ -60,7 +61,6 @@ namespace SISTEMAACTUALIZADO
             };
             pnlHeader.Controls.Add(lblEstadoCaja);
 
-            // 1. PANEL CAJA CERRADA (Formulario de Apertura)
             pnlCajaCerrada = new Panel
             {
                 Dock = DockStyle.Top,
@@ -127,7 +127,6 @@ namespace SISTEMAACTUALIZADO
             pnlCajaCerrada.Controls.Add(txtMontoInicial);
             pnlCajaCerrada.Controls.Add(btnAbrirCaja);
 
-            // 2. PANEL CAJA ABIERTA (Resumen en Tiempo Real)
             pnlCajaAbierta = new Panel
             {
                 Dock = DockStyle.Top,
@@ -158,7 +157,6 @@ namespace SISTEMAACTUALIZADO
             gridMetricas.Controls.Add(card3, 2, 0);
             gridMetricas.Controls.Add(card4, 3, 0);
 
-            // Panel de Acciones de Caja
             Panel pnlAcciones = new Panel
             {
                 Dock = DockStyle.Top,
@@ -257,18 +255,19 @@ namespace SISTEMAACTUALIZADO
         {
             if (_turnoActual != null && _turnoActual.Estado == "Abierta")
             {
-                lblEstadoCaja.Text = $"🟢 CAJA ABIERTA - Turno iniciado el {_turnoActual.FechaApertura:dd/MM/yyyy HH:mm}";
+                string cajero = _turnoActual.Usuario;
+                lblEstadoCaja.Text = $"🟢 CAJA ABIERTA ({cajero}) - Turno iniciado el {_turnoActual.FechaApertura:dd/MM/yyyy HH:mm}";
                 lblEstadoCaja.ForeColor = Color.FromArgb(16, 185, 129);
 
                 pnlCajaCerrada.Visible = false;
                 pnlCajaAbierta.Visible = true;
 
-                // Calcular ventas desde la apertura
                 decimal ventasEfectivo = 0;
                 try
                 {
-                    ventasEfectivo = _db.Ventas
-                        .Where(v => v.Fecha >= _turnoActual.FechaApertura && v.MedioPago.ToLower() == "efectivo")
+                    // Consulta directamente sobre la tabla estandarizada TVE2607
+                    ventasEfectivo = _db.TVE2607
+                        .Where(v => v.FecDoc >= _turnoActual.FechaApertura)
                         .Sum(v => (decimal?)v.Total) ?? 0;
                 }
                 catch { }
@@ -302,13 +301,13 @@ namespace SISTEMAACTUALIZADO
             _turnoActual = new CajaTurno
             {
                 CajaTurnoID = 1,
-                Usuario = "admin",
+                Usuario = _usuarioActual?.NombreUsuario ?? "admin",
                 FechaApertura = DateTime.Now,
                 MontoInicial = montoInicial,
                 Estado = "Abierta"
             };
 
-            MessageBox.Show($"¡Caja abierta exitosamente con ${montoInicial:N0} de fondo inicial!", "Apertura de Caja", MessageBoxButtons.OK, MessageBoxIcon.Information);
+            MessageBox.Show($"¡Caja abierta exitosamente por el usuario '{_turnoActual.Usuario}' con ${_turnoActual.MontoInicial:N0} de fondo!", "Apertura de Caja", MessageBoxButtons.OK, MessageBoxIcon.Information);
             ActualizarEstadoVista();
         }
 
@@ -412,6 +411,7 @@ namespace SISTEMAACTUALIZADO
                     _turnoActual.Estado = "Cerrada";
 
                     string resMensaje = $"--- RESUMEN DE CIERRE DE CAJA (ARQUEO Z) ---\n\n" +
+                                        $"• Cajero de Turno: {_turnoActual.Usuario}\n" +
                                         $"• Fondo Inicial: ${_turnoActual.MontoInicial:N0}\n" +
                                         $"• Ventas Efectivo: ${_turnoActual.MontoEfectivoVentas:N0}\n" +
                                         $"• Total Esperado: ${esperado:N0}\n" +
