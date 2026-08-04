@@ -14,11 +14,14 @@ namespace SISTEMAACTUALIZADO
         private Label lblTituloVista = null!;
         private Label lblUsuarioInfo = null!;
 
-        private Button btnVentas = new Button();
+        // Botones del Menú Lateral (Orden Lógico de Operación)
         private Button btnCaja = new Button();
+        private Button btnVentas = new Button();
         private Button btnHistorial = new Button();
-        private Button btnLibroVentas = new Button(); // Módulo Libro de Ventas LVE F29
-        private Button btnFolios = new Button(); // Módulo de Folios SII
+        private Button btnLibroVentas = new Button();
+        private Button btnFolios = new Button();
+        private Button btnProveedores = new Button();
+        private Button btnCompras = new Button();
         private Button btnClientes = new Button();
         private Button btnProductos = new Button();
         private Button btnUsuarios = new Button();
@@ -36,7 +39,9 @@ namespace SISTEMAACTUALIZADO
             _usuarioActual = usuario;
             InitializeComponent();
             AplicarPermisosPorRol();
-            AbrirFormEnContent(new FormVenta(_usuarioActual), "Punto de Venta DTE", btnVentas);
+
+            // Inicio lógico: Abrir Control de Caja primero para aperturar turno
+            AbrirFormEnContent(new FormCaja(_usuarioActual), "Apertura y Cierre de Caja", btnCaja);
         }
 
         private void InitializeComponent()
@@ -50,64 +55,76 @@ namespace SISTEMAACTUALIZADO
             this.SuspendLayout();
 
             this.Text = "Sistema POS Moderno - Control DTE e Inventario";
-            this.Size = new Size(1340, 820);
+            this.Size = new Size(1360, 850);
             this.StartPosition = FormStartPosition.CenterScreen;
-            this.MinimumSize = new Size(1100, 680);
+            this.MinimumSize = new Size(1150, 700);
             this.BackColor = Color.FromArgb(244, 246, 249);
 
+            // Panel de Navegación Lateral (Sidebar)
             this.pnlSidebar.Dock = DockStyle.Left;
-            this.pnlSidebar.Width = 230;
+            this.pnlSidebar.Width = 240;
             this.pnlSidebar.BackColor = Color.FromArgb(24, 28, 36);
 
+            // Logotipo de Cabecera
             this.lblLogo.Text = "⚡ POS SYSTEM";
             this.lblLogo.Dock = DockStyle.Top;
-            this.lblLogo.Height = 75;
+            this.lblLogo.Height = 70;
             this.lblLogo.Font = new Font("Segoe UI", 15, FontStyle.Bold);
             this.lblLogo.ForeColor = Color.White;
             this.lblLogo.TextAlign = ContentAlignment.MiddleCenter;
 
             Panel pnlNav = new Panel
             {
-                Dock = DockStyle.Top,
-                Height = 520,
-                BackColor = Color.Transparent
+                Dock = DockStyle.Fill,
+                BackColor = Color.Transparent,
+                AutoScroll = true
             };
 
-            ConfigurarBotonSidebar(this.btnVentas, "🛒  Punto de Venta", 10);
-            ConfigurarBotonSidebar(this.btnCaja, "💵  Control de Caja", 60);
-            ConfigurarBotonSidebar(this.btnHistorial, "📜  Historial Ventas", 110);
-            ConfigurarBotonSidebar(this.btnLibroVentas, "📚  Libro Ventas LVE", 160);
-            ConfigurarBotonSidebar(this.btnFolios, "📄  Control de Folios", 210);
-            ConfigurarBotonSidebar(this.btnClientes, "👥  Clientes", 260);
-            ConfigurarBotonSidebar(this.btnProductos, "📦  Productos", 310);
-            ConfigurarBotonSidebar(this.btnUsuarios, "👤  Usuarios", 360);
-            ConfigurarBotonSidebar(this.btnReportes, "📊  Reportes", 410);
+            // Configuración del Orden Operativo de Botones (Caja Primero)
+            int yPos = 10;
+            int espaciado = 48;
+
+            ConfigurarBotonSidebar(this.btnCaja, "💵  Control de Caja", yPos); yPos += espaciado;
+            ConfigurarBotonSidebar(this.btnVentas, "🛒  Punto de Venta", yPos); yPos += espaciado;
+            ConfigurarBotonSidebar(this.btnHistorial, "📜  Historial Ventas", yPos); yPos += espaciado;
+            ConfigurarBotonSidebar(this.btnLibroVentas, "📚  Libro Ventas LVE", yPos); yPos += espaciado;
+            ConfigurarBotonSidebar(this.btnFolios, "📄  Control de Folios", yPos); yPos += espaciado;
+            ConfigurarBotonSidebar(this.btnProveedores, "🚚  Proveedores", yPos); yPos += espaciado;
+            ConfigurarBotonSidebar(this.btnCompras, "📥  Recepción Compras", yPos); yPos += espaciado;
+            ConfigurarBotonSidebar(this.btnClientes, "👥  Clientes", yPos); yPos += espaciado;
+            ConfigurarBotonSidebar(this.btnProductos, "📦  Productos", yPos); yPos += espaciado;
+            ConfigurarBotonSidebar(this.btnUsuarios, "👤  Usuarios", yPos); yPos += espaciado;
+            ConfigurarBotonSidebar(this.btnReportes, "📊  Reportes", yPos);
 
             pnlNav.Controls.Add(this.btnReportes);
             pnlNav.Controls.Add(this.btnUsuarios);
             pnlNav.Controls.Add(this.btnProductos);
             pnlNav.Controls.Add(this.btnClientes);
+            pnlNav.Controls.Add(this.btnCompras);
+            pnlNav.Controls.Add(this.btnProveedores);
             pnlNav.Controls.Add(this.btnFolios);
             pnlNav.Controls.Add(this.btnLibroVentas);
             pnlNav.Controls.Add(this.btnHistorial);
-            pnlNav.Controls.Add(this.btnCaja);
             pnlNav.Controls.Add(this.btnVentas);
+            pnlNav.Controls.Add(this.btnCaja);
 
             Panel pnlBottomNav = new Panel
             {
                 Dock = DockStyle.Bottom,
-                Height = 120,
+                Height = 115,
                 BackColor = Color.Transparent
             };
 
             ConfigurarBotonSidebar(this.btnCerrarSesion, "🔒  Cerrar Sesión", 10);
-            ConfigurarBotonSidebar(this.btnSalir, "🚪  Salir", 65);
+            ConfigurarBotonSidebar(this.btnSalir, "🚪  Salir", 60);
 
-            this.btnVentas.Click += (s, e) => AbrirFormEnContent(new FormVenta(_usuarioActual), "Punto de Venta DTE", btnVentas);
             this.btnCaja.Click += (s, e) => AbrirFormEnContent(new FormCaja(_usuarioActual), "Apertura y Cierre de Caja", btnCaja);
+            this.btnVentas.Click += (s, e) => AbrirFormEnContent(new FormVenta(_usuarioActual), "Punto de Venta DTE", btnVentas);
             this.btnHistorial.Click += (s, e) => AbrirFormEnContent(new FormHistorialVentas(), "Historial y Devoluciones de Ventas", btnHistorial);
             this.btnLibroVentas.Click += (s, e) => AbrirFormEnContent(new FormLibroVentas(), "Libro de Ventas Electrónico (LVE) y Formulario F29", btnLibroVentas);
             this.btnFolios.Click += (s, e) => AbrirFormEnContent(new FormFolios(), "Control de Folios Autorizados (SII)", btnFolios);
+            this.btnProveedores.Click += (s, e) => AbrirFormEnContent(new FormProveedores(), "Gestión de Proveedores (Catálogo)", btnProveedores);
+            this.btnCompras.Click += (s, e) => AbrirFormEnContent(new FormCompras(), "Recepción de Compras e Incremento de Stock", btnCompras);
             this.btnClientes.Click += (s, e) => AbrirFormEnContent(new FormClientes(), "Gestión de Clientes (CRM)", btnClientes);
             this.btnProductos.Click += (s, e) => AbrirFormEnContent(new FormProductos(), "Gestión de Productos e Inventario", btnProductos);
             this.btnUsuarios.Click += (s, e) => AbrirFormEnContent(new FormUsuarios(), "Gestión de Cuentas de Usuarios", btnUsuarios);
@@ -137,7 +154,7 @@ namespace SISTEMAACTUALIZADO
             this.pnlHeader.BackColor = Color.White;
             this.pnlHeader.Padding = new Padding(25, 0, 20, 0);
 
-            this.lblTituloVista.Text = "Punto de Venta DTE";
+            this.lblTituloVista.Text = "Apertura y Cierre de Caja";
             this.lblTituloVista.Font = new Font("Segoe UI", 18, FontStyle.Bold);
             this.lblTituloVista.ForeColor = Color.FromArgb(30, 41, 59);
             this.lblTituloVista.Dock = DockStyle.Left;
@@ -179,6 +196,8 @@ namespace SISTEMAACTUALIZADO
                 btnReportes.Visible = false;
                 btnFolios.Visible = false;
                 btnLibroVentas.Visible = false;
+                btnProveedores.Visible = false;
+                btnCompras.Visible = false;
             }
         }
 
@@ -186,14 +205,14 @@ namespace SISTEMAACTUALIZADO
         {
             btn.Text = texto;
             btn.Location = new Point(10, top);
-            btn.Size = new Size(210, 48);
+            btn.Size = new Size(215, 42);
             btn.FlatStyle = FlatStyle.Flat;
             btn.FlatAppearance.BorderSize = 0;
-            btn.Font = new Font("Segoe UI", 11, FontStyle.Bold);
+            btn.Font = new Font("Segoe UI", 10F, FontStyle.Bold);
             btn.ForeColor = Color.FromArgb(160, 174, 192);
             btn.BackColor = Color.Transparent;
             btn.TextAlign = ContentAlignment.MiddleLeft;
-            btn.Padding = new Padding(15, 0, 0, 0);
+            btn.Padding = new Padding(12, 0, 0, 0);
             btn.Cursor = Cursors.Hand;
         }
 
@@ -217,7 +236,11 @@ namespace SISTEMAACTUALIZADO
 
         private void ResaltarBotonActivo(Button btn)
         {
-            Button[] botones = new[] { btnVentas, btnCaja, btnHistorial, btnLibroVentas, btnFolios, btnClientes, btnProductos, btnUsuarios, btnReportes, btnCerrarSesion };
+            Button[] botones = new[] { 
+                btnCaja, btnVentas, btnHistorial, btnLibroVentas, btnFolios, 
+                btnProveedores, btnCompras, btnClientes, btnProductos, 
+                btnUsuarios, btnReportes, btnCerrarSesion 
+            };
             foreach (var b in botones)
             {
                 if (b != null)

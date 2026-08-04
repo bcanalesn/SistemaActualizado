@@ -41,7 +41,6 @@ namespace SISTEMAACTUALIZADO
                 BackColor = Color.FromArgb(244, 246, 249)
             };
 
-            // 1. BARRA SUPERIOR DE FILTROS POR FECHA
             Panel pnlFiltros = new Panel
             {
                 Dock = DockStyle.Top,
@@ -129,7 +128,6 @@ namespace SISTEMAACTUALIZADO
             pnlFiltros.Controls.Add(btnFiltrar);
             pnlFiltros.Controls.Add(btnHoy);
 
-            // 2. PANEL DE TARJETAS KPI (MÉTRICAS RÁPIDAS)
             TableLayoutPanel pnlMetricas = new TableLayoutPanel
             {
                 Dock = DockStyle.Top,
@@ -142,18 +140,14 @@ namespace SISTEMAACTUALIZADO
             pnlMetricas.ColumnStyles.Add(new ColumnStyle(SizeType.Percent, 33.33F));
             pnlMetricas.ColumnStyles.Add(new ColumnStyle(SizeType.Percent, 33.34F));
 
-            // Tarjeta 1: Total Ingresos
             Panel card1 = CrearTarjetaMetrica("💰 Total Recaudado", "$ 0", Color.FromArgb(16, 185, 129), out lblMontoTotal);
-            // Tarjeta 2: Número de Ventas
             Panel card2 = CrearTarjetaMetrica("🧾 Transacciones", "0", Color.FromArgb(2, 132, 199), out lblCantVentas);
-            // Tarjeta 3: Ticket Promedio
             Panel card3 = CrearTarjetaMetrica("📊 Ticket Promedio", "$ 0", Color.FromArgb(139, 92, 246), out lblTicketPromedio);
 
             pnlMetricas.Controls.Add(card1, 0, 0);
             pnlMetricas.Controls.Add(card2, 1, 0);
             pnlMetricas.Controls.Add(card3, 2, 0);
 
-            // 3. TABLA DE HISTORIAL DE VENTAS
             dgvVentas = new DataGridView
             {
                 Dock = DockStyle.Fill,
@@ -242,9 +236,9 @@ namespace SISTEMAACTUALIZADO
         {
             try
             {
-                var ventasList = _db.Ventas
-                    .Where(v => v.Fecha >= desde && v.Fecha <= hasta)
-                    .OrderByDescending(v => v.Fecha)
+                var ventasList = _db.TVE2607
+                    .Where(v => v.FecDoc >= desde && v.FecDoc <= hasta)
+                    .OrderByDescending(v => v.FecDoc)
                     .ToList();
 
                 decimal totalRecaudado = ventasList.Sum(v => v.Total);
@@ -257,14 +251,20 @@ namespace SISTEMAACTUALIZADO
 
                 dgvVentas.DataSource = ventasList;
 
-                if (dgvVentas.Columns["VentaID"] != null) dgvVentas.Columns["VentaID"].HeaderText = "N° Ticket";
-                if (dgvVentas.Columns["Fecha"] != null) { dgvVentas.Columns["Fecha"].HeaderText = "Fecha y Hora"; dgvVentas.Columns["Fecha"].DefaultCellStyle.Format = "dd/MM/yyyy HH:mm"; }
-                if (dgvVentas.Columns["MedioPago"] != null) dgvVentas.Columns["MedioPago"].HeaderText = "Medio de Pago";
+                if (dgvVentas.Columns["nroDTE"] != null) dgvVentas.Columns["nroDTE"].HeaderText = "N° Folio DTE";
+                if (dgvVentas.Columns["FecDoc"] != null) { dgvVentas.Columns["FecDoc"].HeaderText = "Fecha y Hora"; dgvVentas.Columns["FecDoc"].DefaultCellStyle.Format = "dd/MM/yyyy HH:mm"; }
+                if (dgvVentas.Columns["Documento"] != null) dgvVentas.Columns["Documento"].HeaderText = "Tipo Documento";
                 if (dgvVentas.Columns["Total"] != null) { dgvVentas.Columns["Total"].HeaderText = "Total Venta"; dgvVentas.Columns["Total"].DefaultCellStyle.Format = "$#,##0"; }
+
+                string[] ocultar = new string[] { "idTve", "idLocal", "nmbLocal", "iddocDTE", "nroInT", "SubTotal", "Descuento", "Neto", "Impto1", "Impto2", "Impto3", "IvA", "UserDTE", "Vendedor", "nroZ", "Url", "nPAX", "Idcliente", "DNI", "RuT", "dv", "RazonSocial", "Giro", "Direccion", "idcomuna", "nComuna", "idCiudad", "nCiudad", "Fono1", "Fono2", "email", "status", "idREF", "nroREF", "codigoREF", "FechaREF", "HoraDoc", "Detalles" };
+                foreach (var col in ocultar)
+                {
+                    if (dgvVentas.Columns[col] != null) dgvVentas.Columns[col].Visible = false;
+                }
             }
             catch (Exception ex)
             {
-                MessageBox.Show($"Error al cargar el reporte de ventas: {ex.Message}", "Error DB", MessageBoxButtons.OK, MessageBoxIcon.Error);
+                MessageBox.Show($"Error al cargar el reporte de ventas desde TVE2607: {ex.Message}", "Error DB", MessageBoxButtons.OK, MessageBoxIcon.Error);
             }
         }
     }
