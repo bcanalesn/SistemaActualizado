@@ -265,10 +265,10 @@ namespace SISTEMAACTUALIZADO
                 decimal ventasEfectivo = 0;
                 try
                 {
-                    // Consulta directamente sobre la tabla estandarizada TVE2607
+                    // Consulta sobre TVE2607 restando las Notas de Crédito (iddocDTE == 61)
                     ventasEfectivo = _db.TVE2607
-                        .Where(v => v.FecDoc >= _turnoActual.FechaApertura)
-                        .Sum(v => (decimal?)v.Total) ?? 0;
+                        .Where(v => v.FecDoc >= _turnoActual.FechaApertura && v.status != "Anulado")
+                        .Sum(v => (decimal?)(v.iddocDTE == 61 ? -v.Total : v.Total)) ?? 0;
                 }
                 catch { }
 

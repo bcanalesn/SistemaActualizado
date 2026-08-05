@@ -1,143 +1,103 @@
 using System;
 using System.Collections.Generic;
 using System.Linq;
-using Microsoft.EntityFrameworkCore;
 using SISTEMAACTUALIZADO.Data;
 using SISTEMAACTUALIZADO.Models;
 
 namespace SISTEMAACTUALIZADO.Services
 {
-    public static class NotaCreditoService
+    public class NotaCreditoService
     {
-        public const string TipoDocumentoNotaCredito = "Nota de Crédito Electrónica";
+        private readonly AppDbContext _db;
 
-        public static Venta ProcesarNotaCredito(
-            AppDbContext db,
-            int ventaOrigenId,
-            string codigoCausa,
-            string glosa,
-            bool reintegrarInventario,
-            string usuarioActual)
+        public NotaCreditoService(AppDbContext db)
         {
-            var ventaOrigen = db.Ventas
-                .Include(v => v.Detalles)
-                .FirstOrDefault(v => v.VentaID == ventaOrigenId)
-                ?? throw new InvalidOperationException($"No se encontró la venta origen #{ventaOrigenId}.");
-
-            if (string.Equals(ventaOrigen.TipoDocumento, TipoDocumentoNotaCredito, StringComparison.OrdinalIgnoreCase))
-            {
-                throw new InvalidOperationException("La venta seleccionada ya corresponde a una Nota de Crédito.");
-            }
-
-            bool yaPoseeNotaCredito = db.Ventas.Any(v =>
-                v.idREF == ventaOrigen.VentaID &&
-                string.Equals(v.TipoDocumento, TipoDocumentoNotaCredito, StringComparison.OrdinalIgnoreCase));
-
-            if (yaPoseeNotaCredito)
-            {
-                throw new InvalidOperationException("La venta seleccionada ya posee una Nota de Crédito asociada.");
-            }
-
-            using var transaccion = db.Database.BeginTransaction();
-
-            int folioNotaCredito = ObtenerSiguienteFolio(db, TipoDocumentoNotaCredito);
-
-            var notaCredito = new Venta
-            {
-                Fecha = DateTime.Now,
-                Total = ventaOrigen.Total,
-                Neto = ventaOrigen.Neto,
-                IVA = ventaOrigen.IVA,
-                MedioPago = "Nota de Crédito",
-                Usuario = usuarioActual,
-                TipoDocumento = TipoDocumentoNotaCredito,
-                FolioDTE = folioNotaCredito,
-                RutCliente = ventaOrigen.RutCliente,
-                RazonSocial = ventaOrigen.RazonSocial,
-                Giro = ventaOrigen.Giro,
-                Direccion = ventaOrigen.Direccion,
-                Comuna = ventaOrigen.Comuna,
-                Ciudad = ventaOrigen.Ciudad,
-                EstadoDTE = "Aceptado_SII",
-                idREF = ventaOrigen.VentaID,
-                nroREF = ventaOrigen.FolioDTE,
-                codigoREF = codigoCausa,
-                GlosaREF = glosa
-            };
-
-            db.Ventas.Add(notaCredito);
-            db.SaveChanges();
-
-            var detallesNC = new List<VentaDetalle>();
-            foreach (var detalleOrigen in ventaOrigen.Detalles)
-            {
-                detallesNC.Add(new VentaDetalle
-                {
-                    VentaID = notaCredito.VentaID,
-                    ProductoID = detalleOrigen.ProductoID,
-                    CodigoBarra = detalleOrigen.CodigoBarra,
-                    NombreProducto = detalleOrigen.NombreProducto,
-                    PrecioUnitario = detalleOrigen.PrecioUnitario,
-                    Cantidad = detalleOrigen.Cantidad,
-                    Subtotal = detalleOrigen.Subtotal
-                });
-            }
-
-            if (detallesNC.Count > 0)
-            {
-                db.VentaDetalles.AddRange(detallesNC);
-            }
-
-            ventaOrigen.EstadoDTE = "Anulado_NC";
-            ventaOrigen.idREF = notaCredito.VentaID;
-            ventaOrigen.nroREF = notaCredito.FolioDTE;
-            ventaOrigen.codigoREF = codigoCausa;
-            ventaOrigen.GlosaREF = glosa;
-
-            if (reintegrarInventario && string.Equals(codigoCausa, "1", StringComparison.OrdinalIgnoreCase))
-            {
-                ReintegrarInventario(db, ventaOrigen.Detalles);
-            }
-
-            db.SaveChanges();
-            transaccion.Commit();
-
-            return notaCredito;
+            _db = db;
         }
 
-        private static int ObtenerSiguienteFolio(AppDbContext db, string tipoDocumento)
+        /// <summary>
+        /// Emite una Nota de Crédito Electrónica (DTE 61) devolviendo el stock exacto según las cantidades vendidas.
+        /// </summary>
+        public bool EmitirNotaCredito(int idTveOrigen, string motivo, string codigoREF, bool reponerStock)
         {
-            var rangoFolio = db.Folios.FirstOrDefault(f => f.TipoDocumento == tipoDocumento && f.Activo);
-
-            if (rangoFolio == null)
+            using var transaction = _db.Database.BeginTransaction();
+            try
             {
-                throw new InvalidOperationException($"No existe un rango activo de folios para {tipoDocumento}.");
-            }
+                // 1. Obtener la venta de origen en TVE2607
+                var ventaOrigen = _db.TVE2607.FirstOrDefault(v => v.idTve == idTveOrigen);
+                if (ventaOrigen == null || ventaOrigen.status == "Anulado") return false;
 
-            int folioAsignado = rangoFolio.FolioActual;
-            if (folioAsignado < rangoFolio.FolioDesde || folioAsignado > rangoFolio.FolioHasta)
-            {
-                throw new InvalidOperationException($"El rango de folios para {tipoDocumento} está fuera de límites.");
-            }
+                // 2. Obtener los detalles asociados desde TVD2607
+                var detallesOrigen = _db.TVD2607.Where(d => d.idTve == idTveOrigen).ToList();
 
-            rangoFolio.FolioActual += 1;
-            if (rangoFolio.FolioActual > rangoFolio.FolioHasta)
-            {
-                rangoFolio.Activo = false;
-            }
-
-            return folioAsignado;
-        }
-
-        private static void ReintegrarInventario(AppDbContext db, IEnumerable<VentaDetalle> detalles)
-        {
-            foreach (var detalle in detalles)
-            {
-                var producto = db.Productos.FirstOrDefault(p => p.ProductoID == detalle.ProductoID);
-                if (producto != null)
+                // 3. Crear el nuevo encabezado DTE para la Nota de Crédito (DTE 61)
+                var ncHeader = new TVE2607
                 {
-                    producto.Stock += detalle.Cantidad;
+                    idLocal = ventaOrigen.idLocal,
+                    nmbLocal = ventaOrigen.nmbLocal,
+                    iddocDTE = 61, // 61 = Nota de Crédito Electrónica (SII)
+                    Documento = "Nota de Crédito Electrónica",
+                    nroDTE = (int)(DateTime.Now.Ticks % 1000000),
+                    FecDoc = DateTime.Now,
+                    SubTotal = ventaOrigen.SubTotal,
+                    Descuento = ventaOrigen.Descuento,
+                    Neto = ventaOrigen.Neto,
+                    IvA = ventaOrigen.IvA,
+                    Total = ventaOrigen.Total,
+                    UserDTE = ventaOrigen.UserDTE,
+                    Vendedor = ventaOrigen.Vendedor,
+                    RuT = ventaOrigen.RuT,
+                    RazonSocial = ventaOrigen.RazonSocial,
+                    Giro = ventaOrigen.Giro,
+                    status = "Emitido",
+                    idREF = ventaOrigen.idTve,
+                    nroREF = ventaOrigen.nroDTE,
+                    codigoREF = codigoREF
+                };
+
+                // Marcar la venta original con referencia a la anulacion/correccion
+                ventaOrigen.status = "Nota de Crédito Emitida";
+
+                _db.TVE2607.Add(ncHeader);
+                _db.SaveChanges(); // Persistir para obtener idTve
+
+                // 4. Copiar cada ítem conservando la CANTIDAD EXACTA vendida
+                foreach (var det in detallesOrigen)
+                {
+                    var ncDetalle = new TVD2607
+                    {
+                        idTve = ncHeader.idTve,
+                        idLocal = det.idLocal,
+                        iddocDTE = 61,
+                        Documento = "Nota de Crédito Electrónica",
+                        IdProducto = det.IdProducto,
+                        NmbProducto = det.NmbProducto,
+                        Cantidad = det.Cantidad, // Se respeta la cantidad original (ej: 3 unidades)
+                        Precio = det.Precio,
+                        SubTotal = det.SubTotal
+                    };
+
+                    _db.TVD2607.Add(ncDetalle);
+
+                    // 5. Reintegrar la CANTIDAD COMPLETA al stock en la tabla productos
+                    if (reponerStock)
+                    {
+                        var producto = _db.Productos.FirstOrDefault(p => p.ProductoID == det.IdProducto);
+                        if (producto != null)
+                        {
+                            producto.Stock += det.Cantidad; // Devuelve las 3 unidades completas al inventario
+                        }
+                    }
                 }
+
+                _db.SaveChanges();
+                transaction.Commit();
+                return true;
+            }
+            catch (Exception)
+            {
+                transaction.Rollback();
+                throw;
             }
         }
     }

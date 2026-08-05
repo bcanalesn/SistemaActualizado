@@ -488,7 +488,6 @@ namespace SISTEMAACTUALIZADO
             if (dgvVentas.Columns["RuT"] != null) dgvVentas.Columns["RuT"].HeaderText = "Cliente / RUT";
             if (dgvVentas.Columns["RazonSocial"] != null) dgvVentas.Columns["RazonSocial"].HeaderText = "Razón Social";
 
-            // Ocultar columnas internas
             string[] ocultar = new string[] { "idLocal", "nmbLocal", "iddocDTE", "nroInT", "SubTotal", "Descuento", "Neto", "Impto1", "Impto2", "Impto3", "IvA", "Vendedor", "nroZ", "Url", "nPAX", "Idcliente", "DNI", "dv", "Giro", "Direccion", "idcomuna", "nComuna", "idCiudad", "nCiudad", "Fono1", "Fono2", "email", "status", "idREF", "nroREF", "codigoREF", "FechaREF", "HoraDoc", "Detalles" };
             foreach (var col in ocultar)
             {
@@ -504,7 +503,7 @@ namespace SISTEMAACTUALIZADO
             {
                 _ventaSeleccionada = venta;
                 btnReimprimir.Enabled = true;
-                btnNotaCredito.Enabled = !venta.Documento.Equals("Nota de Crédito Electrónica", StringComparison.OrdinalIgnoreCase);
+                btnNotaCredito.Enabled = !venta.Documento.Equals("Nota de Crédito Electrónica", StringComparison.OrdinalIgnoreCase) && !venta.status.Equals("Anulado NC", StringComparison.OrdinalIgnoreCase);
 
                 lblDetTipoDoc.Text = venta.Documento;
                 lblDetFolio.Text = $"#{venta.nroDTE:D6}";
@@ -586,14 +585,21 @@ namespace SISTEMAACTUALIZADO
 
                 try
                 {
+                    // 1. Crear el Encabezado DTE Nota de Crédito asignando iddocDTE = 61
                     TVE2607 nc = new TVE2607
                     {
+                        idLocal = _ventaSeleccionada.idLocal,
+                        nmbLocal = _ventaSeleccionada.nmbLocal,
+                        iddocDTE = 61, // 61 = Nota de Crédito Electrónica según SII
                         Documento = "Nota de Crédito Electrónica",
                         nroDTE = (int)(DateTime.Now.Ticks % 100000),
                         FecDoc = DateTime.Now,
-                        Total = _ventaSeleccionada.Total,
+                        HoraDoc = DateTime.Now.ToString("HH:mm:ss"),
+                        SubTotal = _ventaSeleccionada.SubTotal,
+                        Descuento = _ventaSeleccionada.Descuento,
                         Neto = _ventaSeleccionada.Neto,
                         IvA = _ventaSeleccionada.IvA,
+                        Total = _ventaSeleccionada.Total,
                         RuT = _ventaSeleccionada.RuT,
                         RazonSocial = _ventaSeleccionada.RazonSocial,
                         Giro = _ventaSeleccionada.Giro,
@@ -601,20 +607,56 @@ namespace SISTEMAACTUALIZADO
                         nroREF = _ventaSeleccionada.nroDTE,
                         codigoREF = (cbCausa.SelectedIndex + 1).ToString(),
                         UserDTE = _ventaSeleccionada.UserDTE,
+                        Vendedor = _ventaSeleccionada.Vendedor,
                         status = "Emitido"
                     };
 
                     _db.TVE2607.Add(nc);
+                    _db.SaveChanges(); // Genera nc.idTve
 
-                    if (chkRestock.Checked)
+                    // 2. Obtener los detalles de la venta original desde TVD2607
+                    var detallesOrigen = _db.TVD2607.Where(d => d.idTve == _ventaSeleccionada.idTve).ToList();
+
+                    foreach (var item in detallesOrigen)
                     {
-                        var prods = _db.Productos.ToList();
-                        foreach (var p in prods) p.Stock += 1;
+                        // Registrar el detalle de la Nota de Crédito
+                        TVD2607 ncDetalle = new TVD2607
+                        {
+                            idTve = nc.idTve,
+                            idLocal = item.idLocal,
+                            iddocDTE = 61, // 61 = Nota de Crédito
+                            Documento = "Nota de Crédito Electrónica",
+                            NroDTE = nc.nroDTE,
+                            FecMoV = DateTime.Now,
+                            HoraMoV = DateTime.Now.ToString("HH:mm:ss"),
+                            IdProducto = item.IdProducto,
+                            NmbProducto = item.NmbProducto,
+                            Cantidad = item.Cantidad,
+                            Precio = item.Precio,
+                            PneTo = item.PneTo,
+                            SubTotal = item.SubTotal,
+                            SubNeto = item.SubNeto,
+                            nmbVendedor = item.nmbVendedor
+                        };
+                        _db.TVD2607.Add(ncDetalle);
+
+                        // 3. RESTAURAR STOCK EXACTO de cada producto (ej: si eran 5 unidades, devuelve 5)
+                        if (chkRestock.Checked)
+                        {
+                            var prod = _db.Productos.FirstOrDefault(p => p.ProductoID == item.IdProducto);
+                            if (prod != null)
+                            {
+                                prod.Stock += item.Cantidad; // Devuelve las N unidades reales compradas
+                            }
+                        }
                     }
+
+                    // Marcar estado del documento original
+                    _ventaSeleccionada.status = "Anulado NC";
 
                     _db.SaveChanges();
 
-                    MessageBox.Show($"¡Nota de Crédito N° {nc.nroDTE} emitida con éxito!", "DTE Emitido", MessageBoxButtons.OK, MessageBoxIcon.Information);
+                    MessageBox.Show($"¡Nota de Crédito N° {nc.nroDTE} emitida con éxito!\nSe devolvieron los productos al stock y se restó el monto del Control de Caja.", "DTE Emitido", MessageBoxButtons.OK, MessageBoxIcon.Information);
                     modalNC.Close();
                     AplicarFiltroFecha(dtpDesde.Value.Date, dtpHasta.Value.Date.AddDays(1).AddTicks(-1));
                 }
