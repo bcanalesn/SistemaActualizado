@@ -537,15 +537,31 @@ namespace SISTEMAACTUALIZADO
                 ControlPaint.DrawBorder(e.Graphics, card.ClientRectangle, Color.FromArgb(226, 232, 240), ButtonBorderStyle.Solid);
             };
 
-            Label lblImgBox = new Label
+            Control ctrlImagen;
+            if (!string.IsNullOrEmpty(prod.ImagenPath) && System.IO.File.Exists(prod.ImagenPath))
             {
-                Text = "📦",
-                Font = new Font("Segoe UI", 18F),
-                Location = new Point(10, 10),
-                Size = new Size(40, 40),
-                TextAlign = ContentAlignment.MiddleCenter,
-                BackColor = Color.FromArgb(241, 245, 249)
-            };
+                PictureBox pb = new PictureBox
+                {
+                    Location = new Point(8, 8),
+                    Size = new Size(42, 42),
+                    SizeMode = PictureBoxSizeMode.Zoom,
+                    BackColor = Color.Transparent
+                };
+                try { pb.Image = Image.FromFile(prod.ImagenPath); } catch { }
+                ctrlImagen = pb;
+            }
+            else
+            {
+                ctrlImagen = new Label
+                {
+                    Text = "📦",
+                    Font = new Font("Segoe UI", 18F),
+                    Location = new Point(10, 10),
+                    Size = new Size(40, 40),
+                    TextAlign = ContentAlignment.MiddleCenter,
+                    BackColor = Color.FromArgb(241, 245, 249)
+                };
+            }
 
             Label lblNombre = new Label
             {
@@ -588,13 +604,13 @@ namespace SISTEMAACTUALIZADO
             Action onClick = () => SolicitarCantidadYAgregar(prod);
 
             card.Click += (s, e) => onClick();
-            lblImgBox.Click += (s, e) => onClick();
+            ctrlImagen.Click += (s, e) => onClick();
             lblNombre.Click += (s, e) => onClick();
             lblPrecio.Click += (s, e) => onClick();
             lblCodigo.Click += (s, e) => onClick();
             lblStock.Click += (s, e) => onClick();
 
-            card.Controls.Add(lblImgBox);
+            card.Controls.Add(ctrlImagen);
             card.Controls.Add(lblNombre);
             card.Controls.Add(lblPrecio);
             card.Controls.Add(lblCodigo);
@@ -635,7 +651,7 @@ namespace SISTEMAACTUALIZADO
             var itemExistente = cart.FirstOrDefault(c => c.ProductoID == prod.ProductoID);
             int cantidadInicial = itemExistente != null ? itemExistente.Cantidad : 1;
 
-            using (FormCantidadModal modal = new FormCantidadModal(prod.Nombre, prod.PrecioUnitario, cantidadInicial, prod.Stock))
+            using (FormCantidadModal modal = new FormCantidadModal(prod.Nombre, prod.PrecioUnitario, cantidadInicial, prod.Stock, prod.ImagenPath))
             {
                 if (modal.ShowDialog(this) == DialogResult.OK)
                 {
@@ -912,6 +928,9 @@ namespace SISTEMAACTUALIZADO
     // =========================================================================
     // MODAL DE SELECCIÓN DE CANTIDAD (CON TECLADO FÍSICO Y PANTALLA TÁCTIL)
     // =========================================================================
+// =========================================================================
+    // MODAL DE SELECCIÓN DE CANTIDAD (CON TECLADO FÍSICO Y PANTALLA TÁCTIL)
+    // =========================================================================
     public class FormCantidadModal : Form
     {
         private int _cantidad = 1;
@@ -926,7 +945,8 @@ namespace SISTEMAACTUALIZADO
 
         public int CantidadSeleccionada => _cantidad;
 
-        public FormCantidadModal(string nombreProducto, decimal precioUnitario, int cantidadInicial, int stockDisponible = 9999)
+        // 1. SE AGREGA EL PARÁMETRO OPCIONAL 'imagenPath' MANTENIENDO TODOS LOS DEMÁS PARÁMETROS IGUALES
+        public FormCantidadModal(string nombreProducto, decimal precioUnitario, int cantidadInicial, int stockDisponible = 9999, string? imagenPath = null)
         {
             _cantidad = cantidadInicial > 0 ? cantidadInicial : 1;
             _precioUnitario = precioUnitario;
@@ -934,10 +954,10 @@ namespace SISTEMAACTUALIZADO
 
             if (_cantidad > _stockDisponible) _cantidad = _stockDisponible;
 
-            InitializeComponent(nombreProducto);
+            InitializeComponent(nombreProducto, imagenPath);
         }
 
-        private void InitializeComponent(string nombreProducto)
+        private void InitializeComponent(string nombreProducto, string? imagenPath)
         {
             this.SuspendLayout();
             this.Text = "Agregar a la Venta";
@@ -958,13 +978,37 @@ namespace SISTEMAACTUALIZADO
                 Location = new Point(345, 12),
                 Size = new Size(28, 28),
                 FlatStyle = FlatStyle.Flat,
-                TabStop = false, // Evita capturar el foco del teclado al presionar Enter
+                TabStop = false,
                 Cursor = Cursors.Hand
             };
             btnClose.FlatAppearance.BorderSize = 0;
             btnClose.Click += (s, e) => { this.DialogResult = DialogResult.Cancel; this.Close(); };
 
-            Label lblIcon = new Label { Text = "📦", Font = new Font("Segoe UI", 22F), Location = new Point(25, 18), Size = new Size(45, 45) };
+            // 2. CONTROL DE IMAGEN: Si el producto tiene foto, la muestra; si no, muestra el ícono 📦
+            Control ctrlIcono;
+            if (!string.IsNullOrEmpty(imagenPath) && System.IO.File.Exists(imagenPath))
+            {
+                PictureBox pb = new PictureBox
+                {
+                    Location = new Point(25, 18),
+                    Size = new Size(45, 45),
+                    SizeMode = PictureBoxSizeMode.Zoom,
+                    BackColor = Color.Transparent
+                };
+                try { pb.Image = Image.FromFile(imagenPath); } catch { }
+                ctrlIcono = pb;
+            }
+            else
+            {
+                ctrlIcono = new Label 
+                { 
+                    Text = "📦", 
+                    Font = new Font("Segoe UI", 22F), 
+                    Location = new Point(25, 18), 
+                    Size = new Size(45, 45) 
+                };
+            }
+
             Label lblTitle = new Label { Text = nombreProducto, Font = new Font("Segoe UI", 11F, FontStyle.Bold), ForeColor = Color.FromArgb(15, 23, 42), Location = new Point(75, 18), AutoSize = true };
             Label lblSub = new Label { Text = $"Precio: ${_precioUnitario:N0}  |  Stock disp: {_stockDisponible} un.", Font = new Font("Segoe UI", 8.5F, FontStyle.Bold), ForeColor = Color.FromArgb(2, 132, 199), Location = new Point(75, 40), AutoSize = true };
 
@@ -1124,7 +1168,7 @@ namespace SISTEMAACTUALIZADO
             this.Shown += (s, e) => btnAgregarAccion.Focus();
 
             this.Controls.Add(btnClose);
-            this.Controls.Add(lblIcon);
+            this.Controls.Add(ctrlIcono); // 3. SE AGREGA EL CONTROL DE LA FOTO / ÍCONO AQUÍ
             this.Controls.Add(lblTitle);
             this.Controls.Add(lblSub);
             this.Controls.Add(lblDivider);
@@ -1184,7 +1228,7 @@ namespace SISTEMAACTUALIZADO
                         FlatStyle = FlatStyle.Flat,
                         Font = new Font("Segoe UI", 11F, FontStyle.Bold),
                         Cursor = Cursors.Hand,
-                        TabStop = false, // Evita capturar Enter como pulsación repetida de este botón
+                        TabStop = false,
                         BackColor = (label == "C" || label == "⌫") ? Color.FromArgb(254, 226, 226) : Color.White,
                         ForeColor = (label == "C" || label == "⌫") ? Color.FromArgb(185, 28, 28) : Color.FromArgb(15, 23, 42)
                     };
@@ -1297,7 +1341,6 @@ namespace SISTEMAACTUALIZADO
             btnAgregarAccion.Text = $"🛒 Agregar {_cantidad} a la venta";
         }
     }
-
     // =========================================================================
     // MODAL DE SELECCIÓN RÁPIDA DE CLIENTE
     // =========================================================================

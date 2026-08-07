@@ -1,6 +1,7 @@
 using System;
 using System.Collections.Generic;
 using System.Drawing;
+using System.IO;
 using System.Linq;
 using System.Windows.Forms;
 using SISTEMAACTUALIZADO.Data;
@@ -42,7 +43,6 @@ namespace SISTEMAACTUALIZADO
                 BackColor = Color.FromArgb(244, 246, 249)
             };
 
-            // 1. BARRA SUPERIOR DE ACCIONES Y BÚSQUEDA
             Panel pnlHeader = new Panel
             {
                 Dock = DockStyle.Top,
@@ -97,7 +97,6 @@ namespace SISTEMAACTUALIZADO
             btnRefrescar.FlatAppearance.BorderSize = 0;
             btnRefrescar.Click += (s, e) => { txtBuscar.Clear(); CargarProductos(); };
 
-            // Botones de gestión alineados a la derecha
             btnNuevo = new Button
             {
                 Text = "➕ Nuevo Producto",
@@ -147,7 +146,7 @@ namespace SISTEMAACTUALIZADO
                 Text = "✨ Cargar Productos Demo",
                 Dock = DockStyle.Right,
                 Width = 175,
-                BackColor = Color.FromArgb(124, 58, 237), // Violeta vibrante
+                BackColor = Color.FromArgb(124, 58, 237),
                 ForeColor = Color.White,
                 FlatStyle = FlatStyle.Flat,
                 Font = new Font("Segoe UI", 8.5F, FontStyle.Bold),
@@ -165,7 +164,6 @@ namespace SISTEMAACTUALIZADO
             pnlHeader.Controls.Add(btnEditar);
             pnlHeader.Controls.Add(btnNuevo);
 
-            // 2. TABLA DE PRODUCTOS
             dgvProductos = new DataGridView
             {
                 Dock = DockStyle.Fill,
@@ -224,7 +222,7 @@ namespace SISTEMAACTUALIZADO
 
                 if (!string.IsNullOrWhiteSpace(filtro))
                 {
-                    query = query.Where(p => p.Nombre.Contains(filtro) || p.CodigoBarra.Contains(filtro));
+                    query = query.Where(p => (p.Nombre != null && p.Nombre.Contains(filtro)) || (p.CodigoBarra != null && p.CodigoBarra.Contains(filtro)));
                 }
 
                 var productos = query.OrderBy(p => p.Nombre).ToList();
@@ -240,6 +238,7 @@ namespace SISTEMAACTUALIZADO
                 }
                 if (dgvProductos.Columns["Stock"] != null) dgvProductos.Columns["Stock"].HeaderText = "Stock Disponible";
                 if (dgvProductos.Columns["Estado"] != null) dgvProductos.Columns["Estado"].HeaderText = "Estado";
+                if (dgvProductos.Columns["ImagenPath"] != null) dgvProductos.Columns["ImagenPath"].HeaderText = "Ruta Imagen";
             }
             catch (Exception ex)
             {
@@ -348,11 +347,12 @@ namespace SISTEMAACTUALIZADO
         {
             bool esNuevo = (producto == null);
             Producto p = producto ?? new Producto();
+            string rutaImagenTemporal = p.ImagenPath ?? string.Empty;
 
             Form modal = new Form
             {
                 Text = esNuevo ? "Registrar Nuevo Producto" : "Editar Producto",
-                Size = new Size(400, 420),
+                Size = new Size(420, 560),
                 StartPosition = FormStartPosition.CenterParent,
                 FormBorderStyle = FormBorderStyle.FixedDialog,
                 MaximizeBox = false,
@@ -360,25 +360,86 @@ namespace SISTEMAACTUALIZADO
                 BackColor = Color.White
             };
 
-            Label lblTitle = new Label { Text = esNuevo ? "📦 Nuevo Producto" : "✏️ Editar Producto", Location = new Point(25, 20), Font = new Font("Segoe UI", 12F, FontStyle.Bold), AutoSize = true, ForeColor = Color.FromArgb(15, 23, 42) };
+            Label lblTitle = new Label { Text = esNuevo ? "📦 Nuevo Producto" : "✏️ Editar Producto", Location = new Point(25, 15), Font = new Font("Segoe UI", 12F, FontStyle.Bold), AutoSize = true, ForeColor = Color.FromArgb(15, 23, 42) };
 
-            Label lblCodigo = new Label { Text = "Código de Barra:", Location = new Point(25, 60), AutoSize = true, Font = new Font("Segoe UI", 9F, FontStyle.Bold) };
-            TextBox txtCodigo = new TextBox { Text = p.CodigoBarra, Location = new Point(25, 82), Size = new Size(330, 30), Font = new Font("Segoe UI", 10F) };
+            PictureBox pbImagen = new PictureBox
+            {
+                Location = new Point(25, 50),
+                Size = new Size(90, 90),
+                BorderStyle = BorderStyle.FixedSingle,
+                SizeMode = PictureBoxSizeMode.Zoom,
+                BackColor = Color.FromArgb(248, 250, 252)
+            };
 
-            Label lblNombre = new Label { Text = "Nombre del Producto:", Location = new Point(25, 122), AutoSize = true, Font = new Font("Segoe UI", 9F, FontStyle.Bold) };
-            TextBox txtNombre = new TextBox { Text = p.Nombre, Location = new Point(25, 144), Size = new Size(330, 30), Font = new Font("Segoe UI", 10F) };
+            if (!string.IsNullOrEmpty(p.ImagenPath) && File.Exists(p.ImagenPath))
+            {
+                try { pbImagen.Image = Image.FromFile(p.ImagenPath); } catch { }
+            }
 
-            Label lblPrecio = new Label { Text = "Precio Unitario ($):", Location = new Point(25, 184), AutoSize = true, Font = new Font("Segoe UI", 9F, FontStyle.Bold) };
-            TextBox txtPrecio = new TextBox { Text = p.PrecioUnitario.ToString("0"), Location = new Point(25, 206), Size = new Size(155, 30), Font = new Font("Segoe UI", 10F) };
+            Button btnCargarFoto = new Button
+            {
+                Text = "📷 Seleccionar Foto",
+                Location = new Point(130, 75),
+                Size = new Size(150, 35),
+                BackColor = Color.FromArgb(241, 245, 249),
+                ForeColor = Color.FromArgb(30, 41, 59),
+                FlatStyle = FlatStyle.Flat,
+                Font = new Font("Segoe UI", 8.5F, FontStyle.Bold),
+                Cursor = Cursors.Hand
+            };
+            btnCargarFoto.FlatAppearance.BorderSize = 0;
 
-            Label lblStock = new Label { Text = "Stock Inicial:", Location = new Point(200, 184), AutoSize = true, Font = new Font("Segoe UI", 9F, FontStyle.Bold) };
-            NumericUpDown numStock = new NumericUpDown { Value = p.Stock, Location = new Point(200, 206), Size = new Size(155, 30), Font = new Font("Segoe UI", 10F), Maximum = 100000 };
+            btnCargarFoto.Click += (s, e) =>
+            {
+                using (OpenFileDialog ofd = new OpenFileDialog())
+                {
+                    ofd.Title = "Seleccionar Imagen del Producto";
+                    ofd.Filter = "Archivos de Imagen|*.jpg;*.jpeg;*.png;*.bmp;*.webp;*.jfif;*.JPG;*.PNG;*.JFIF|Todos los archivos (*.*)|*.*";
+                    if (ofd.ShowDialog() == DialogResult.OK)
+                    {
+                        try
+                        {
+                            string carpetaDestino = Path.Combine(Application.StartupPath, "Imagenes");
+                            if (!Directory.Exists(carpetaDestino))
+                            {
+                                Directory.CreateDirectory(carpetaDestino);
+                            }
+
+                            string extension = Path.GetExtension(ofd.FileName);
+                            string nombreArchivo = $"prod_{DateTime.Now.Ticks}{extension}";
+                            string rutaFinal = Path.Combine(carpetaDestino, nombreArchivo);
+
+                            File.Copy(ofd.FileName, rutaFinal, true);
+                            rutaImagenTemporal = rutaFinal;
+
+                            if (pbImagen.Image != null) pbImagen.Image.Dispose();
+                            pbImagen.Image = Image.FromFile(rutaFinal);
+                        }
+                        catch (Exception ex)
+                        {
+                            MessageBox.Show($"Error al cargar imagen: {ex.Message}", "Error", MessageBoxButtons.OK, MessageBoxIcon.Error);
+                        }
+                    }
+                }
+            };
+
+            Label lblCodigo = new Label { Text = "Código de Barra:", Location = new Point(25, 155), AutoSize = true, Font = new Font("Segoe UI", 9F, FontStyle.Bold) };
+            TextBox txtCodigo = new TextBox { Text = p.CodigoBarra ?? string.Empty, Location = new Point(25, 177), Size = new Size(350, 30), Font = new Font("Segoe UI", 10F) };
+
+            Label lblNombre = new Label { Text = "Nombre del Producto:", Location = new Point(25, 217), AutoSize = true, Font = new Font("Segoe UI", 9F, FontStyle.Bold) };
+            TextBox txtNombre = new TextBox { Text = p.Nombre ?? string.Empty, Location = new Point(25, 239), Size = new Size(350, 30), Font = new Font("Segoe UI", 10F) };
+
+            Label lblPrecio = new Label { Text = "Precio Unitario ($):", Location = new Point(25, 279), AutoSize = true, Font = new Font("Segoe UI", 9F, FontStyle.Bold) };
+            TextBox txtPrecio = new TextBox { Text = p.PrecioUnitario.ToString("0"), Location = new Point(25, 301), Size = new Size(165, 30), Font = new Font("Segoe UI", 10F) };
+
+            Label lblStock = new Label { Text = "Stock Inicial:", Location = new Point(210, 279), AutoSize = true, Font = new Font("Segoe UI", 9F, FontStyle.Bold) };
+            NumericUpDown numStock = new NumericUpDown { Value = p.Stock, Location = new Point(210, 301), Size = new Size(165, 30), Font = new Font("Segoe UI", 10F), Maximum = 100000 };
 
             Button btnGuardar = new Button
             {
                 Text = esNuevo ? "💾 Guardar Producto" : "💾 Guardar Cambios",
-                Location = new Point(25, 300),
-                Size = new Size(330, 42),
+                Location = new Point(25, 440),
+                Size = new Size(350, 42),
                 BackColor = Color.FromArgb(0, 102, 255),
                 ForeColor = Color.White,
                 FlatStyle = FlatStyle.Flat,
@@ -386,6 +447,7 @@ namespace SISTEMAACTUALIZADO
                 Cursor = Cursors.Hand
             };
             btnGuardar.FlatAppearance.BorderSize = 0;
+
             btnGuardar.Click += (s, e) =>
             {
                 if (string.IsNullOrWhiteSpace(txtNombre.Text))
@@ -404,6 +466,7 @@ namespace SISTEMAACTUALIZADO
                 p.Nombre = txtNombre.Text.Trim();
                 p.PrecioUnitario = precio;
                 p.Stock = (int)numStock.Value;
+                p.ImagenPath = rutaImagenTemporal;
 
                 try
                 {
@@ -423,7 +486,7 @@ namespace SISTEMAACTUALIZADO
                 }
             };
 
-            modal.Controls.AddRange(new Control[] { lblTitle, lblCodigo, txtCodigo, lblNombre, txtNombre, lblPrecio, txtPrecio, lblStock, numStock, btnGuardar });
+            modal.Controls.AddRange(new Control[] { lblTitle, pbImagen, btnCargarFoto, lblCodigo, txtCodigo, lblNombre, txtNombre, lblPrecio, txtPrecio, lblStock, numStock, btnGuardar });
             modal.ShowDialog();
         }
     }
