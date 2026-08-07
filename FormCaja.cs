@@ -407,7 +407,8 @@ namespace SISTEMAACTUALIZADO
                     _ticketSeleccionado.Giro = txtGiro.Text.Trim();
                 }
 
-                // Descontar Stock de los productos en BD
+                // Cargar detalles para construir carrito de previsualización
+                // (Nota: El stock ya fue descontado al generar el Ticket de Atención en FormVenta.cs)
                 var detalles = _db.TVD2607.Where(d => d.idTve == _ticketSeleccionado.idTve).ToList();
                 List<DetalleCarrito> itemsCarrito = new List<DetalleCarrito>();
 
@@ -416,12 +417,6 @@ namespace SISTEMAACTUALIZADO
                     item.iddocDTE = iddoc;
                     item.Documento = tipoDoc;
                     item.NroDTE = folioOficial;
-
-                    var prod = _db.Productos.FirstOrDefault(p => p.ProductoID == item.IdProducto);
-                    if (prod != null)
-                    {
-                        prod.Stock -= item.Cantidad; // Descuenta stock
-                    }
 
                     itemsCarrito.Add(new DetalleCarrito
                     {
