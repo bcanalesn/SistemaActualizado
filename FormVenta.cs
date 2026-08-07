@@ -13,52 +13,26 @@ namespace SISTEMAACTUALIZADO
         private AppDbContext _db = new AppDbContext();
         private List<DetalleCarrito> _carrito = new List<DetalleCarrito>();
         private List<Producto> _productosCache = new List<Producto>();
-        private Usuario? _usuarioActual;
 
-        private TextBox txtCodigoBarra = null!;
-        private NumericUpDown numCantidad = null!;
+        private TextBox txtBuscar = null!;
         private Button btnBuscar = null!;
-        private Button btnAgregar = null!;
         private DataGridView dgvCarrito = null!;
 
-        private FlowLayoutPanel pnlCategorias = null!;
-        private Panel pnlProdContainer = null!;
+        private Label lblTotal = null!;
+        private ComboBox cbVendedor = null!;
+        private Button btnGenerarTicket = null!;
+        private Button btnLimpiarCarro = null!;
+
         private FlowLayoutPanel pnlProductosGrid = null!;
+        private Panel pnlProdContainer = null!;
 
-        private Label lblTotalPagar = null!;
-        private Label lblNetoPagar = null!;
-        private Label lblIvaPagar = null!;
-
-        private ComboBox cbMedioPago = null!;
-        private ComboBox cbTipoDocumento = null!;
-
-        // Panel de Datos Factura / Guía
-        private Panel pnlDatosFactura = null!;
-        private TextBox txtRutFactura = null!;
-        private TextBox txtRazonSocialFactura = null!;
-        private TextBox txtGiroFactura = null!;
-
-        // Panel de pago en Efectivo
-        private Panel pnlPagoEfectivo = null!;
-        private TextBox txtPagoCon = null!;
-        private Label lblVuelto = null!;
-
-        // Panel de pago con Tarjeta (Cuotas)
-        private Panel pnlPagoTarjeta = null!;
-        private ComboBox cbCuotas = null!;
-        private Label lblValorCuota = null!;
-
-        private Button btnProcesarCobro = null!;
-        private Button btnCancelarVenta = null!;
-
-        private string _categoriaSeleccionada = "";
+        private Usuario? _usuarioActual;
 
         public FormVenta(Usuario? usuario = null)
         {
             _usuarioActual = usuario;
             InitializeComponent();
-            CargarProductosEInventario();
-            GenerarBotonesCategorias();
+            CargarProductosDesdeBD();
         }
 
         private void InitializeComponent()
@@ -67,432 +41,244 @@ namespace SISTEMAACTUALIZADO
             this.BackColor = Color.FromArgb(244, 246, 249);
             this.Font = new Font("Segoe UI", 9.5F, FontStyle.Regular, GraphicsUnit.Point);
 
-            Panel pnlMain = new Panel
+            // Panel Principal dividido en 2 columnas (Izquierda: Catálogo | Derecha: Pre-ticket / Carrito)
+            TableLayoutPanel pnlLayout = new TableLayoutPanel
             {
                 Dock = DockStyle.Fill,
-                Padding = new Padding(8),
-                BackColor = Color.FromArgb(244, 246, 249)
+                ColumnCount = 2,
+                RowCount = 1,
+                Padding = new Padding(10)
             };
+            pnlLayout.ColumnStyles.Add(new ColumnStyle(SizeType.Percent, 60F));
+            pnlLayout.ColumnStyles.Add(new ColumnStyle(SizeType.Percent, 40F));
 
-            Panel pnlDerechoCard = new Panel
+            // ==========================================
+            // COLUMNA IZQUIERDA: BÚSQUEDA Y PRODUCTOS
+            // ==========================================
+            Panel pnlIzquierda = new Panel { Dock = DockStyle.Fill, Padding = new Padding(0, 0, 10, 0) };
+
+            // 1. BARRA SUPERIOR DE BÚSQUEDA Y VENDEDOR
+            Panel pnlTopBar = new Panel
             {
-                Dock = DockStyle.Right,
-                Width = 280,
+                Dock = DockStyle.Top,
+                Height = 65,
                 BackColor = Color.White,
-                Padding = new Padding(12),
-                AutoScroll = true
+                Padding = new Padding(12)
             };
 
-            Label lblTituloResumen = new Label
+            Label lblVendedorTag = new Label
             {
-                Text = "RESUMEN DE VENTA",
-                Font = new Font("Segoe UI", 10.5F, FontStyle.Bold),
+                Text = "👤 Vendedor:",
+                Location = new Point(12, 22),
+                AutoSize = true,
+                Font = new Font("Segoe UI", 9F, FontStyle.Bold),
+                ForeColor = Color.FromArgb(51, 65, 85)
+            };
+
+            cbVendedor = new ComboBox
+            {
+                Location = new Point(90, 18),
+                Size = new Size(130, 28),
+                DropDownStyle = ComboBoxStyle.DropDownList,
+                Font = new Font("Segoe UI", 9.5F)
+            };
+            cbVendedor.Items.AddRange(new string[] { "Bárbara", "Víctor", "Juan", "María" });
+            cbVendedor.SelectedItem = _usuarioActual?.NombreCompleto ?? "Bárbara";
+
+            txtBuscar = new TextBox
+            {
+                Location = new Point(230, 18),
+                Size = new Size(240, 28),
+                Font = new Font("Segoe UI", 10.5F),
+                BorderStyle = BorderStyle.FixedSingle
+            };
+            txtBuscar.KeyDown += (s, e) => { if (e.KeyCode == Keys.Enter) { BuscarYAgregarProducto(); e.SuppressKeyPress = true; } };
+
+            btnBuscar = new Button
+            {
+                Text = "🔍 Buscar",
+                Location = new Point(478, 17),
+                Size = new Size(90, 30),
+                BackColor = Color.FromArgb(30, 41, 59),
+                ForeColor = Color.White,
+                FlatStyle = FlatStyle.Flat,
+                Font = new Font("Segoe UI", 9F, FontStyle.Bold),
+                Cursor = Cursors.Hand
+            };
+            btnBuscar.FlatAppearance.BorderSize = 0;
+            btnBuscar.Click += (s, e) => BuscarYAgregarProducto();
+
+            pnlTopBar.Controls.Add(lblVendedorTag);
+            pnlTopBar.Controls.Add(cbVendedor);
+            pnlTopBar.Controls.Add(txtBuscar);
+            pnlTopBar.Controls.Add(btnBuscar);
+
+            // 2. CATEGORÍAS RÁPIDAS
+            Panel pnlCategorias = new Panel { Dock = DockStyle.Top, Height = 45, Padding = new Padding(0, 8, 0, 8) };
+            FlowLayoutPanel flowCat = new FlowLayoutPanel { Dock = DockStyle.Fill, AutoScroll = false };
+
+            flowCat.Controls.Add(CrearBotonCategoria("🥛 Lácteos", Color.FromArgb(224, 242, 254), Color.FromArgb(3, 105, 161)));
+            flowCat.Controls.Add(CrearBotonCategoria("🥩 Cecinas", Color.FromArgb(254, 226, 226), Color.FromArgb(185, 28, 28)));
+            flowCat.Controls.Add(CrearBotonCategoria("🌾 Abarrotes", Color.FromArgb(254, 243, 199), Color.FromArgb(180, 83, 9)));
+            flowCat.Controls.Add(CrearBotonCategoria("🥤 Bebidas", Color.FromArgb(220, 252, 231), Color.FromArgb(21, 128, 61)));
+            flowCat.Controls.Add(CrearBotonCategoria("🧹 Aseo", Color.FromArgb(243, 232, 255), Color.FromArgb(126, 34, 206)));
+
+            pnlCategorias.Controls.Add(flowCat);
+
+            // 3. GRILLA DE PRODUCTOS
+            pnlProdContainer = new Panel { Dock = DockStyle.Fill, BackColor = Color.White, Padding = new Padding(10) };
+            pnlProductosGrid = new FlowLayoutPanel
+            {
+                Dock = DockStyle.Fill,
+                AutoScroll = true,
+                BackColor = Color.Transparent
+            };
+            pnlProdContainer.Controls.Add(pnlProductosGrid);
+
+            pnlIzquierda.Controls.Add(pnlProdContainer);
+            pnlIzquierda.Controls.Add(pnlCategorias);
+            pnlIzquierda.Controls.Add(pnlTopBar);
+
+            // ==========================================
+            // COLUMNA DERECHA: CARRITO Y BOTOÓN TICKET
+            // ==========================================
+            Panel pnlDerecha = new Panel { Dock = DockStyle.Fill, BackColor = Color.White, Padding = new Padding(15) };
+
+            Label lblTituloCarro = new Label
+            {
+                Text = "📋 TICKET DE ATENCIÓN (PRE-VENTA)",
+                Font = new Font("Segoe UI", 12F, FontStyle.Bold),
                 ForeColor = Color.FromArgb(15, 23, 42),
                 Dock = DockStyle.Top,
-                Height = 26
+                Height = 30
             };
 
-            Panel pnlCardTotal = new Panel
+            dgvCarrito = new DataGridView
+            {
+                Dock = DockStyle.Fill,
+                BackgroundColor = Color.White,
+                BorderStyle = BorderStyle.None,
+                CellBorderStyle = DataGridViewCellBorderStyle.SingleHorizontal,
+                ColumnHeadersBorderStyle = DataGridViewHeaderBorderStyle.None,
+                SelectionMode = DataGridViewSelectionMode.FullRowSelect,
+                MultiSelect = false,
+                AllowUserToAddRows = false,
+                ReadOnly = true,
+                RowHeadersVisible = false,
+                AutoSizeColumnsMode = DataGridViewAutoSizeColumnsMode.Fill
+            };
+            ConfigurarEstiloTabla(dgvCarrito);
+
+            // Botones de Modificación del Carrito
+            Panel pnlAccionesCarro = new Panel { Dock = DockStyle.Bottom, Height = 42, Padding = new Padding(0, 5, 0, 5) };
+            Button btnMas = CrearBotonAccionItem("➕ Sumar", Color.FromArgb(241, 245, 249), Color.FromArgb(15, 23, 42), 0);
+            Button btnMenos = CrearBotonAccionItem("➖ Restar", Color.FromArgb(241, 245, 249), Color.FromArgb(15, 23, 42), 95);
+            Button btnQuitar = CrearBotonAccionItem("🗑️ Eliminar", Color.FromArgb(254, 226, 226), Color.FromArgb(185, 28, 28), 190);
+
+            btnMas.Click += (s, e) => ModificarCantidadSeleccionada(1);
+            btnMenos.Click += (s, e) => ModificarCantidadSeleccionada(-1);
+            btnQuitar.Click += (s, e) => EliminarItemSeleccionado();
+
+            pnlAccionesCarro.Controls.Add(btnMas);
+            pnlAccionesCarro.Controls.Add(btnMenos);
+            pnlAccionesCarro.Controls.Add(btnQuitar);
+
+            // PANEL INFERIOR DE TOTAL Y GENERACIÓN DE TICKET
+            Panel pnlBottomCheckout = new Panel { Dock = DockStyle.Bottom, Height = 140, Padding = new Padding(0, 10, 0, 0) };
+
+            Panel pnlTotalCard = new Panel
             {
                 Dock = DockStyle.Top,
-                Height = 110,
-                BackColor = Color.FromArgb(15, 23, 42),
-                Margin = new Padding(0, 6, 0, 6),
+                Height = 55,
+                BackColor = Color.FromArgb(240, 249, 255),
                 Padding = new Padding(10)
             };
 
-            Label lblTotalLabel = new Label
+            Label lblTotalCap = new Label { Text = "TOTAL ESTIMADO:", Font = new Font("Segoe UI", 9F, FontStyle.Bold), ForeColor = Color.FromArgb(3, 105, 161), Location = new Point(10, 16), AutoSize = true };
+            lblTotal = new Label { Text = "$ 0", Font = new Font("Segoe UI", 18F, FontStyle.Bold), ForeColor = Color.FromArgb(2, 132, 199), Location = new Point(140, 10), AutoSize = true };
+            pnlTotalCard.Controls.Add(lblTotalCap);
+            pnlTotalCard.Controls.Add(lblTotal);
+
+            btnGenerarTicket = new Button
             {
-                Text = "TOTAL A PAGAR",
-                Font = new Font("Segoe UI", 8F, FontStyle.Bold),
-                ForeColor = Color.FromArgb(148, 163, 184),
-                Dock = DockStyle.Top,
-                Height = 16
-            };
-
-            lblTotalPagar = new Label
-            {
-                Text = "$ 0",
-                Font = new Font("Segoe UI", 18F, FontStyle.Bold),
-                ForeColor = Color.FromArgb(34, 197, 94),
-                Dock = DockStyle.Top,
-                Height = 36,
-                TextAlign = ContentAlignment.MiddleLeft
-            };
-
-            lblNetoPagar = new Label
-            {
-                Text = "Neto: $ 0",
-                Font = new Font("Segoe UI", 8.5F),
-                ForeColor = Color.FromArgb(226, 232, 240),
-                Dock = DockStyle.Top,
-                Height = 18
-            };
-
-            lblIvaPagar = new Label
-            {
-                Text = "IVA (19%): $ 0",
-                Font = new Font("Segoe UI", 8.5F),
-                ForeColor = Color.FromArgb(226, 232, 240),
-                Dock = DockStyle.Top,
-                Height = 18
-            };
-
-            pnlCardTotal.Controls.Add(lblIvaPagar);
-            pnlCardTotal.Controls.Add(lblNetoPagar);
-            pnlCardTotal.Controls.Add(lblTotalPagar);
-            pnlCardTotal.Controls.Add(lblTotalLabel);
-
-            Label lblTipoDoc = new Label
-            {
-                Text = "Tipo de Documento (DTE):",
-                Font = new Font("Segoe UI", 8.5F, FontStyle.Bold),
-                ForeColor = Color.FromArgb(51, 65, 85),
-                Location = new Point(12, 155),
-                AutoSize = true
-            };
-
-            cbTipoDocumento = new ComboBox
-            {
-                Location = new Point(12, 175),
-                Size = new Size(250, 26),
-                DropDownStyle = ComboBoxStyle.DropDownList,
-                Font = new Font("Segoe UI", 9F)
-            };
-            cbTipoDocumento.Items.AddRange(new string[] { "Boleta Electrónica", "Factura Electrónica", "Guía de Despacho" });
-            cbTipoDocumento.SelectedIndex = 0;
-            cbTipoDocumento.SelectedIndexChanged += (s, e) => ToggleTipoDocumento();
-
-            pnlDatosFactura = new Panel
-            {
-                Location = new Point(12, 210),
-                Size = new Size(250, 115),
-                BackColor = Color.FromArgb(240, 249, 255),
-                Visible = false
-            };
-
-            Label lblRut = new Label { Text = "RUT Cliente / Empresa:", Location = new Point(6, 4), AutoSize = true, Font = new Font("Segoe UI", 7.5F, FontStyle.Bold) };
-            txtRutFactura = new TextBox { Location = new Point(6, 20), Size = new Size(238, 22), Font = new Font("Segoe UI", 8.5F) };
-
-            Label lblRazon = new Label { Text = "Razón Social:", Location = new Point(6, 44), AutoSize = true, Font = new Font("Segoe UI", 7.5F, FontStyle.Bold) };
-            txtRazonSocialFactura = new TextBox { Location = new Point(6, 60), Size = new Size(238, 22), Font = new Font("Segoe UI", 8.5F) };
-
-            Label lblGiro = new Label { Text = "Giro:", Location = new Point(6, 84), AutoSize = true, Font = new Font("Segoe UI", 7.5F, FontStyle.Bold) };
-            txtGiroFactura = new TextBox { Location = new Point(6, 98), Size = new Size(238, 22), Font = new Font("Segoe UI", 8.5F) };
-
-            pnlDatosFactura.Controls.AddRange(new Control[] { lblRut, txtRutFactura, lblRazon, txtRazonSocialFactura, lblGiro, txtGiroFactura });
-
-            Label lblMedioPago = new Label
-            {
-                Text = "Medio de Pago:",
-                Font = new Font("Segoe UI", 8.5F, FontStyle.Bold),
-                ForeColor = Color.FromArgb(51, 65, 85),
-                Location = new Point(12, 335),
-                AutoSize = true
-            };
-
-            cbMedioPago = new ComboBox
-            {
-                Location = new Point(12, 355),
-                Size = new Size(250, 26),
-                DropDownStyle = ComboBoxStyle.DropDownList,
-                Font = new Font("Segoe UI", 9F)
-            };
-            cbMedioPago.Items.AddRange(new string[] { "Efectivo", "Tarjeta Débito / Crédito", "Transferencia / QR" });
-            cbMedioPago.SelectedIndex = 0;
-            cbMedioPago.SelectedIndexChanged += (s, e) => ToggleMedioPago();
-
-            pnlPagoEfectivo = new Panel
-            {
-                Location = new Point(12, 390),
-                Size = new Size(250, 85),
-                BackColor = Color.FromArgb(248, 250, 252)
-            };
-
-            Label lblPagoCon = new Label { Text = "PAGA CON ($):", Location = new Point(8, 6), AutoSize = true, Font = new Font("Segoe UI", 8F, FontStyle.Bold) };
-            txtPagoCon = new TextBox { Location = new Point(8, 24), Size = new Size(234, 26), Font = new Font("Segoe UI", 10F, FontStyle.Bold) };
-            txtPagoCon.TextChanged += (s, e) => CalcularVuelto();
-
-            Label lblVueltoLabel = new Label { Text = "VUELTO:", Location = new Point(8, 56), AutoSize = true, Font = new Font("Segoe UI", 8F, FontStyle.Bold), ForeColor = Color.FromArgb(100, 116, 139) };
-            lblVuelto = new Label { Text = "$ 0", Location = new Point(70, 54), AutoSize = true, Font = new Font("Segoe UI", 10F, FontStyle.Bold), ForeColor = Color.FromArgb(16, 185, 129) };
-
-            pnlPagoEfectivo.Controls.AddRange(new Control[] { lblPagoCon, txtPagoCon, lblVueltoLabel, lblVuelto });
-
-            pnlPagoTarjeta = new Panel
-            {
-                Location = new Point(12, 390),
-                Size = new Size(250, 85),
-                BackColor = Color.FromArgb(248, 250, 252),
-                Visible = false
-            };
-
-            Label lblCuotasLabel = new Label { Text = "OPCIONES DE CUOTAS:", Location = new Point(8, 6), AutoSize = true, Font = new Font("Segoe UI", 8F, FontStyle.Bold) };
-            cbCuotas = new ComboBox
-            {
-                Location = new Point(8, 24),
-                Size = new Size(234, 26),
-                DropDownStyle = ComboBoxStyle.DropDownList,
-                Font = new Font("Segoe UI", 8.5F)
-            };
-            cbCuotas.Items.AddRange(new string[] { "Sin cuotas (1 cuota / Débito)", "3 cuotas sin interés", "6 cuotas sin interés", "12 cuotas sin interés", "24 cuotas" });
-            cbCuotas.SelectedIndex = 0;
-            cbCuotas.SelectedIndexChanged += (s, e) => CalcularMontoCuota();
-
-            lblValorCuota = new Label
-            {
-                Text = "Pago al contado / 1 cuota",
-                Location = new Point(8, 56),
-                AutoSize = true,
-                Font = new Font("Segoe UI", 8.5F, FontStyle.Bold),
-                ForeColor = Color.FromArgb(2, 132, 199)
-            };
-
-            pnlPagoTarjeta.Controls.AddRange(new Control[] { lblCuotasLabel, cbCuotas, lblValorCuota });
-
-            btnProcesarCobro = new Button
-            {
-                Text = "💳 PROCESAR COBRO",
-                Location = new Point(12, 485),
-                Size = new Size(250, 46),
+                Text = "🎟️ GENERAR TICKET DE ATENCIÓN",
+                Dock = DockStyle.Bottom,
+                Height = 48,
                 BackColor = Color.FromArgb(16, 185, 129),
                 ForeColor = Color.White,
                 FlatStyle = FlatStyle.Flat,
-                Font = new Font("Segoe UI", 10F, FontStyle.Bold),
+                Font = new Font("Segoe UI", 11F, FontStyle.Bold),
                 Cursor = Cursors.Hand
             };
-            btnProcesarCobro.FlatAppearance.BorderSize = 0;
-            btnProcesarCobro.Click += BtnProcesarCobro_Click;
+            btnGenerarTicket.FlatAppearance.BorderSize = 0;
+            btnGenerarTicket.Click += BtnGenerarTicket_Click;
 
-            btnCancelarVenta = new Button
+            btnLimpiarCarro = new Button
             {
-                Text = "❌ Cancelar Venta",
-                Location = new Point(12, 538),
-                Size = new Size(250, 30),
+                Text = "🔄 Limpiar Carro",
+                Dock = DockStyle.Bottom,
+                Height = 32,
                 BackColor = Color.FromArgb(241, 245, 249),
-                ForeColor = Color.FromArgb(220, 38, 38),
+                ForeColor = Color.FromArgb(71, 85, 105),
                 FlatStyle = FlatStyle.Flat,
                 Font = new Font("Segoe UI", 8.5F, FontStyle.Bold),
                 Cursor = Cursors.Hand
             };
-            btnCancelarVenta.FlatAppearance.BorderSize = 0;
-            btnCancelarVenta.Click += (s, e) => LimpiarCarrito();
+            btnLimpiarCarro.FlatAppearance.BorderSize = 0;
+            btnLimpiarCarro.Click += (s, e) => LimpiarCarrito();
 
-            pnlDerechoCard.Controls.Add(btnCancelarVenta);
-            pnlDerechoCard.Controls.Add(btnProcesarCobro);
-            pnlDerechoCard.Controls.Add(pnlPagoTarjeta);
-            pnlDerechoCard.Controls.Add(pnlPagoEfectivo);
-            pnlDerechoCard.Controls.Add(cbMedioPago);
-            pnlDerechoCard.Controls.Add(lblMedioPago);
-            pnlDerechoCard.Controls.Add(pnlDatosFactura);
-            pnlDerechoCard.Controls.Add(cbTipoDocumento);
-            pnlDerechoCard.Controls.Add(lblTipoDoc);
-            pnlDerechoCard.Controls.Add(pnlCardTotal);
-            pnlDerechoCard.Controls.Add(lblTituloResumen);
+            pnlBottomCheckout.Controls.Add(btnGenerarTicket);
+            pnlBottomCheckout.Controls.Add(btnLimpiarCarro);
+            pnlBottomCheckout.Controls.Add(pnlTotalCard);
 
-            Panel pnlIzquierdo = new Panel { Dock = DockStyle.Fill, Padding = new Padding(0, 0, 8, 0) };
+            pnlDerecha.Controls.Add(dgvCarrito);
+            pnlDerecha.Controls.Add(pnlAccionesCarro);
+            pnlDerecha.Controls.Add(pnlBottomCheckout);
+            pnlDerecha.Controls.Add(lblTituloCarro);
 
-            FlowLayoutPanel pnlBusquedaCard = new FlowLayoutPanel
-            {
-                Dock = DockStyle.Top,
-                Height = 52,
-                BackColor = Color.White,
-                Padding = new Padding(8, 10, 8, 8),
-                WrapContents = false
-            };
+            pnlLayout.Controls.Add(pnlIzquierda, 0, 0);
+            pnlLayout.Controls.Add(pnlDerecha, 1, 0);
 
-            Label lblEscaneo = new Label { Text = "🔍 BÚSQUEDA:", Font = new Font("Segoe UI", 8.5F, FontStyle.Bold), ForeColor = Color.FromArgb(100, 116, 139), Margin = new Padding(2, 6, 4, 0), AutoSize = true };
-            txtCodigoBarra = new TextBox { Size = new Size(160, 28), Font = new Font("Segoe UI", 9.5F), BorderStyle = BorderStyle.FixedSingle, Margin = new Padding(0, 2, 4, 0) };
-            txtCodigoBarra.KeyDown += (s, e) => { if (e.KeyCode == Keys.Enter) { AgregarProductoAlCarrito(txtCodigoBarra.Text.Trim(), (int)numCantidad.Value); e.SuppressKeyPress = true; } };
-
-            btnBuscar = new Button { Text = "🔍 Buscar", Size = new Size(75, 28), BackColor = Color.FromArgb(51, 65, 85), ForeColor = Color.White, FlatStyle = FlatStyle.Flat, Font = new Font("Segoe UI", 8F, FontStyle.Bold), Cursor = Cursors.Hand, Margin = new Padding(0, 2, 8, 0) };
-            btnBuscar.FlatAppearance.BorderSize = 0;
-            btnBuscar.Click += (s, e) => AgregarProductoAlCarrito(txtCodigoBarra.Text.Trim(), (int)numCantidad.Value);
-
-            Label lblCant = new Label { Text = "CANT:", Font = new Font("Segoe UI", 8.5F, FontStyle.Bold), ForeColor = Color.FromArgb(100, 116, 139), Margin = new Padding(2, 6, 4, 0), AutoSize = true };
-            numCantidad = new NumericUpDown { Size = new Size(50, 28), Font = new Font("Segoe UI", 9.5F), Value = 1, Minimum = 1, Maximum = 100, Margin = new Padding(0, 2, 6, 0) };
-
-            btnAgregar = new Button { Text = "➕ Agregar", Size = new Size(85, 28), BackColor = Color.FromArgb(15, 23, 42), ForeColor = Color.White, FlatStyle = FlatStyle.Flat, Font = new Font("Segoe UI", 8F, FontStyle.Bold), Cursor = Cursors.Hand, Margin = new Padding(0, 2, 0, 0) };
-            btnAgregar.FlatAppearance.BorderSize = 0;
-            btnAgregar.Click += (s, e) => AgregarProductoAlCarrito(txtCodigoBarra.Text.Trim(), (int)numCantidad.Value);
-
-            pnlBusquedaCard.Controls.AddRange(new Control[] { lblEscaneo, txtCodigoBarra, btnBuscar, lblCant, numCantidad, btnAgregar });
-
-            Panel pnlCatContainer = new Panel { Dock = DockStyle.Top, Height = 44, Margin = new Padding(0, 6, 0, 0), BackColor = Color.Transparent };
-            pnlCategorias = new FlowLayoutPanel { Dock = DockStyle.Fill, AutoScroll = true, WrapContents = false, Padding = new Padding(0, 4, 0, 4) };
-            pnlCatContainer.Controls.Add(pnlCategorias);
-
-            pnlProdContainer = new Panel { Dock = DockStyle.Top, Height = 120, BackColor = Color.White, Padding = new Padding(6), Visible = false };
-            pnlProductosGrid = new FlowLayoutPanel { Dock = DockStyle.Fill, AutoScroll = true, WrapContents = true, BackColor = Color.FromArgb(248, 250, 252) };
-            pnlProdContainer.Controls.Add(pnlProductosGrid);
-
-            Panel pnlGridCard = new Panel { Dock = DockStyle.Fill, BackColor = Color.White, Padding = new Padding(1), Margin = new Padding(0, 6, 0, 0) };
-            dgvCarrito = new DataGridView { Dock = DockStyle.Fill, BackgroundColor = Color.White, BorderStyle = BorderStyle.None, CellBorderStyle = DataGridViewCellBorderStyle.SingleHorizontal, ColumnHeadersBorderStyle = DataGridViewHeaderBorderStyle.None, SelectionMode = DataGridViewSelectionMode.FullRowSelect, MultiSelect = false, AllowUserToAddRows = false, ReadOnly = true, RowHeadersVisible = false, AutoSizeColumnsMode = DataGridViewAutoSizeColumnsMode.Fill };
-            ConfigurarEstiloTabla(dgvCarrito);
-
-            Panel pnlAccionesCarrito = new Panel { Dock = DockStyle.Bottom, Height = 38, BackColor = Color.Transparent, Padding = new Padding(0, 4, 0, 0) };
-            Button btnSumar = new Button { Text = "➕ Sumar 1", Location = new Point(0, 4), Size = new Size(95, 30), BackColor = Color.FromArgb(224, 242, 254), ForeColor = Color.FromArgb(3, 105, 161), FlatStyle = FlatStyle.Flat, Font = new Font("Segoe UI", 8.5F, FontStyle.Bold), Cursor = Cursors.Hand };
-            btnSumar.FlatAppearance.BorderSize = 0;
-            btnSumar.Click += (s, e) => ModificarCantidadSeleccionada(1);
-
-            Button btnRestar = new Button { Text = "➖ Restar 1", Location = new Point(102, 4), Size = new Size(95, 30), BackColor = Color.FromArgb(254, 243, 199), ForeColor = Color.FromArgb(180, 83, 9), FlatStyle = FlatStyle.Flat, Font = new Font("Segoe UI", 8.5F, FontStyle.Bold), Cursor = Cursors.Hand };
-            btnRestar.FlatAppearance.BorderSize = 0;
-            btnRestar.Click += (s, e) => ModificarCantidadSeleccionada(-1);
-
-            Button btnQuitar = new Button { Text = "🗑️ Eliminar", Location = new Point(204, 4), Size = new Size(95, 30), BackColor = Color.FromArgb(254, 226, 226), ForeColor = Color.FromArgb(185, 28, 28), FlatStyle = FlatStyle.Flat, Font = new Font("Segoe UI", 8.5F, FontStyle.Bold), Cursor = Cursors.Hand };
-            btnQuitar.FlatAppearance.BorderSize = 0;
-            btnQuitar.Click += (s, e) => ModificarCantidadSeleccionada(-999);
-
-            pnlAccionesCarrito.Controls.AddRange(new Control[] { btnSumar, btnRestar, btnQuitar });
-            pnlGridCard.Controls.Add(dgvCarrito);
-            pnlGridCard.Controls.Add(pnlAccionesCarrito);
-
-            pnlIzquierdo.Controls.Add(pnlGridCard);
-            pnlIzquierdo.Controls.Add(pnlProdContainer);
-            pnlIzquierdo.Controls.Add(pnlCatContainer);
-            pnlIzquierdo.Controls.Add(pnlBusquedaCard);
-
-            pnlMain.Controls.Add(pnlIzquierdo);
-            pnlMain.Controls.Add(pnlDerechoCard);
-
-            this.Controls.Add(pnlMain);
+            this.Controls.Add(pnlLayout);
             this.ResumeLayout(false);
         }
 
-        private void ToggleTipoDocumento()
+        private Button CrearBotonCategoria(string texto, Color back, Color fore)
         {
-            string docSeleccionado = cbTipoDocumento.SelectedItem?.ToString() ?? "";
-            pnlDatosFactura.Visible = (docSeleccionado == "Factura Electrónica" || docSeleccionado == "Guía de Despacho");
-        }
-
-        private void ToggleMedioPago()
-        {
-            string opcion = cbMedioPago.SelectedItem?.ToString() ?? "";
-            pnlPagoEfectivo.Visible = (opcion == "Efectivo");
-            pnlPagoTarjeta.Visible = (opcion == "Tarjeta Débito / Crédito");
-            if (pnlPagoTarjeta.Visible) CalcularMontoCuota();
-        }
-
-        private void GenerarBotonesCategorias()
-        {
-            pnlCategorias.Controls.Clear();
-            var categorias = new List<(string Nombre, string Icono, Color ColorInactivo, Color ColorTexto, Color ColorActivo)>
+            Button btn = new Button
             {
-                ("Lácteos", "🥛", Color.FromArgb(224, 242, 254), Color.FromArgb(3, 105, 161), Color.FromArgb(2, 132, 199)),
-                ("Cecinas", "🥓", Color.FromArgb(254, 226, 226), Color.FromArgb(185, 28, 28), Color.FromArgb(220, 38, 38)),
-                ("Abarrotes", "🌾", Color.FromArgb(254, 243, 199), Color.FromArgb(180, 83, 9), Color.FromArgb(217, 119, 6)),
-                ("Bebidas", "🥤", Color.FromArgb(220, 252, 231), Color.FromArgb(21, 128, 61), Color.FromArgb(22, 163, 74)),
-                ("Aseo", "🧹", Color.FromArgb(243, 232, 255), Color.FromArgb(126, 34, 206), Color.FromArgb(147, 51, 234))
+                Text = texto,
+                Size = new Size(110, 32),
+                BackColor = back,
+                ForeColor = fore,
+                FlatStyle = FlatStyle.Flat,
+                Font = new Font("Segoe UI", 8.5F, FontStyle.Bold),
+                Cursor = Cursors.Hand,
+                Margin = new Padding(0, 0, 6, 0)
             };
-
-            foreach (var cat in categorias)
-            {
-                Button btn = new Button
-                {
-                    Text = $"{cat.Icono} {cat.Nombre}",
-                    Size = new Size(110, 34),
-                    FlatStyle = FlatStyle.Flat,
-                    Font = new Font("Segoe UI", 8.5F, FontStyle.Bold),
-                    Cursor = Cursors.Hand,
-                    Margin = new Padding(3, 0, 3, 0),
-                    Tag = cat
-                };
-                btn.FlatAppearance.BorderSize = 0;
-                ActualizarEstiloBotonCategoria(btn, false);
-
-                btn.Click += (s, e) =>
-                {
-                    if (_categoriaSeleccionada == cat.Nombre)
-                    {
-                        _categoriaSeleccionada = "";
-                        pnlProdContainer.Visible = false;
-                    }
-                    else
-                    {
-                        _categoriaSeleccionada = cat.Nombre;
-                        pnlProdContainer.Visible = true;
-                        FiltrarProductosPorCategoria(_categoriaSeleccionada);
-                    }
-
-                    foreach (Control ctrl in pnlCategorias.Controls)
-                    {
-                        if (ctrl is Button b && b.Tag is ValueTuple<string, string, Color, Color, Color> tuple)
-                        {
-                            ActualizarEstiloBotonCategoria(b, tuple.Item1 == _categoriaSeleccionada);
-                        }
-                    }
-                };
-                pnlCategorias.Controls.Add(btn);
-            }
+            btn.FlatAppearance.BorderSize = 0;
+            btn.Click += (s, e) => FiltrarProductosPorCategoria(texto.Split(' ')[1], back);
+            return btn;
         }
 
-        private void ActualizarEstiloBotonCategoria(Button btn, bool esSeleccionado)
+        private Button CrearBotonAccionItem(string texto, Color back, Color fore, int left)
         {
-            if (btn.Tag is ValueTuple<string, string, Color, Color, Color> cat)
+            Button btn = new Button
             {
-                btn.BackColor = esSeleccionado ? cat.Item5 : cat.Item3;
-                btn.ForeColor = esSeleccionado ? Color.White : cat.Item4;
-            }
+                Text = texto,
+                Location = new Point(left, 4),
+                Size = new Size(88, 32),
+                BackColor = back,
+                ForeColor = fore,
+                FlatStyle = FlatStyle.Flat,
+                Font = new Font("Segoe UI", 8.5F, FontStyle.Bold),
+                Cursor = Cursors.Hand
+            };
+            btn.FlatAppearance.BorderSize = 0;
+            return btn;
         }
 
-        private void FiltrarProductosPorCategoria(string categoria)
-        {
-            pnlProductosGrid.Controls.Clear();
-
-            if (_productosCache.Count == 0)
-            {
-                CargarProductosFallbackDemo();
-            }
-
-            List<Producto> filtrados = _productosCache
-                .Where(p => p.Nombre.ToLower().Contains(categoria.ToLower()) ||
-                            (categoria == "Lácteos" && (p.Nombre.Contains("Leche") || p.Nombre.Contains("Yogurt") || p.Nombre.Contains("Queso"))) ||
-                            (categoria == "Cecinas" && (p.Nombre.Contains("Jamón") || p.Nombre.Contains("Queso"))) ||
-                            (categoria == "Bebidas" && (p.Nombre.Contains("Bebida") || p.Nombre.Contains("Sprite") || p.Nombre.Contains("Coca"))) ||
-                            (categoria == "Abarrotes" && (p.Nombre.Contains("Azúcar") || p.Nombre.Contains("Aceite") || p.Nombre.Contains("Café") || p.Nombre.Contains("Galletas") || p.Nombre.Contains("Papas"))))
-                .ToList();
-
-            if (filtrados.Count == 0)
-            {
-                filtrados = _productosCache.Take(4).ToList();
-            }
-
-            foreach (var prod in filtrados)
-            {
-                Button btnCard = new Button
-                {
-                    Text = $"{prod.Nombre}\n${prod.PrecioUnitario:N0}",
-                    Size = new Size(115, 52),
-                    BackColor = Color.White,
-                    ForeColor = Color.FromArgb(15, 23, 42),
-                    FlatStyle = FlatStyle.Flat,
-                    Font = new Font("Segoe UI", 8F, FontStyle.Bold),
-                    Cursor = Cursors.Hand,
-                    Margin = new Padding(3)
-                };
-                btnCard.FlatAppearance.BorderColor = Color.FromArgb(226, 232, 240);
-                btnCard.FlatAppearance.BorderSize = 1;
-                btnCard.Click += (s, e) => AgregarProductoDirecto(prod, 1);
-                pnlProductosGrid.Controls.Add(btnCard);
-            }
-        }
-
-        private void ConfigurarEstiloTabla(DataGridView dgv)
-        {
-            dgv.EnableHeadersVisualStyles = false;
-            dgv.ColumnHeadersDefaultCellStyle.BackColor = Color.FromArgb(30, 41, 59);
-            dgv.ColumnHeadersDefaultCellStyle.ForeColor = Color.White;
-            dgv.ColumnHeadersDefaultCellStyle.Font = new Font("Segoe UI", 9F, FontStyle.Bold);
-            dgv.ColumnHeadersHeight = 32;
-            dgv.DefaultCellStyle.Font = new Font("Segoe UI", 9F);
-            dgv.DefaultCellStyle.ForeColor = Color.FromArgb(51, 65, 85);
-            dgv.DefaultCellStyle.SelectionBackColor = Color.FromArgb(224, 242, 254);
-            dgv.DefaultCellStyle.SelectionForeColor = Color.FromArgb(15, 23, 42);
-            dgv.RowTemplate.Height = 28;
-            dgv.AlternatingRowsDefaultCellStyle.BackColor = Color.FromArgb(248, 250, 252);
-            dgv.GridColor = Color.FromArgb(226, 232, 240);
-        }
-
-        private void CargarProductosEInventario()
+        private void CargarProductosDesdeBD()
         {
             try
             {
@@ -503,312 +289,212 @@ namespace SISTEMAACTUALIZADO
                 _productosCache = new List<Producto>();
             }
 
-            if (_productosCache.Count == 0)
-            {
-                CargarProductosFallbackDemo();
-            }
+            FiltrarProductosPorCategoria("Lácteos", Color.FromArgb(224, 242, 254));
+        }
 
-            var coleccion = new AutoCompleteStringCollection();
-            foreach (var p in _productosCache)
-            {
-                if (!string.IsNullOrEmpty(p.Nombre)) coleccion.Add(p.Nombre);
-                if (!string.IsNullOrEmpty(p.CodigoBarra)) coleccion.Add(p.CodigoBarra);
-            }
-            txtCodigoBarra.AutoCompleteMode = AutoCompleteMode.SuggestAppend;
-            txtCodigoBarra.AutoCompleteSource = AutoCompleteSource.CustomSource;
-            txtCodigoBarra.AutoCompleteCustomSource = coleccion;
+        private void FiltrarProductosPorCategoria(string categoria, Color colorFondo)
+        {
+            pnlProductosGrid.Controls.Clear();
+            pnlProductosGrid.BackColor = colorFondo;
+            pnlProdContainer.BackColor = colorFondo;
 
-            try
+            var filtrados = _productosCache
+                .Where(p => p.Nombre.ToLower().Contains(categoria.ToLower()) ||
+                            (categoria == "Lácteos" && (p.Nombre.Contains("Leche") || p.Nombre.Contains("Yogurt") || p.Nombre.Contains("Queso"))) ||
+                            (categoria == "Cecinas" && (p.Nombre.Contains("Jamón") || p.Nombre.Contains("Salchicha") || p.Nombre.Contains("Salame"))) ||
+                            (categoria == "Bebidas" && (p.Nombre.Contains("Bebida") || p.Nombre.Contains("Sprite") || p.Nombre.Contains("Coca") || p.Nombre.Contains("Jugo"))) ||
+                            (categoria == "Abarrotes" && (p.Nombre.Contains("Azúcar") || p.Nombre.Contains("Aceite") || p.Nombre.Contains("Café") || p.Nombre.Contains("Galletas"))) ||
+                            (categoria == "Aseo" && (p.Nombre.Contains("Detergente") || p.Nombre.Contains("Cloro") || p.Nombre.Contains("Lavaloza") || p.Nombre.Contains("Papel"))))
+                .ToList();
+
+            foreach (var prod in filtrados)
             {
-                var clientesCache = _db.Clientes.Where(c => c.Estado).ToList();
-                var colRuts = new AutoCompleteStringCollection();
-                foreach (var c in clientesCache)
+                Button btnCard = new Button
                 {
-                    if (!string.IsNullOrEmpty(c.Rut)) colRuts.Add(c.Rut);
-                }
-
-                txtRutFactura.AutoCompleteMode = AutoCompleteMode.SuggestAppend;
-                txtRutFactura.AutoCompleteSource = AutoCompleteSource.CustomSource;
-                txtRutFactura.AutoCompleteCustomSource = colRuts;
-
-                txtRutFactura.Leave += (s, e) =>
-                {
-                    string rutBuscar = txtRutFactura.Text.Trim().ToLower();
-                    if (!string.IsNullOrEmpty(rutBuscar))
-                    {
-                        var cliente = _db.Clientes.FirstOrDefault(c => c.Rut.ToLower() == rutBuscar);
-                        if (cliente != null)
-                        {
-                            txtRazonSocialFactura.Text = cliente.Nombre;
-                            txtGiroFactura.Text = cliente.Direccion;
-                        }
-                    }
+                    Text = $"{prod.Nombre}\n\n${prod.PrecioUnitario:N0}",
+                    Size = new Size(150, 68),
+                    BackColor = Color.White,
+                    ForeColor = Color.FromArgb(15, 23, 42),
+                    FlatStyle = FlatStyle.Flat,
+                    Font = new Font("Segoe UI", 8.5F, FontStyle.Bold),
+                    Cursor = Cursors.Hand,
+                    Margin = new Padding(4)
                 };
+                btnCard.FlatAppearance.BorderColor = Color.FromArgb(180, 200, 220);
+                btnCard.FlatAppearance.BorderSize = 1;
+                btnCard.Click += (s, e) => AgregarProductoAlCarrito(prod, 1);
+                pnlProductosGrid.Controls.Add(btnCard);
             }
-            catch { }
         }
 
-        private void CargarProductosFallbackDemo()
+        private void BuscarYAgregarProducto()
         {
-            _productosCache = new List<Producto>
+            string query = txtBuscar.Text.Trim();
+            if (string.IsNullOrEmpty(query)) return;
+
+            var prod = _productosCache.FirstOrDefault(p => p.CodigoBarra.Equals(query, StringComparison.OrdinalIgnoreCase) ||
+                                                           p.Nombre.ToLower().Contains(query.ToLower()));
+
+            if (prod != null)
             {
-                new Producto { ProductoID = 1, CodigoBarra = "780123456781", Nombre = "Leche Entera 1L", PrecioUnitario = 1150, Stock = 40, Estado = true },
-                new Producto { ProductoID = 2, CodigoBarra = "780123456782", Nombre = "Queso Gauda 250g", PrecioUnitario = 2490, Stock = 25, Estado = true },
-                new Producto { ProductoID = 3, CodigoBarra = "780123456783", Nombre = "Jamón Pierna 200g", PrecioUnitario = 1990, Stock = 20, Estado = true },
-                new Producto { ProductoID = 4, CodigoBarra = "780123456784", Nombre = "Bebida Sprite 1.5L", PrecioUnitario = 1500, Stock = 30, Estado = true },
-                new Producto { ProductoID = 5, CodigoBarra = "780123456785", Nombre = "Galletas Tritón 126g", PrecioUnitario = 850, Stock = 50, Estado = true },
-                new Producto { ProductoID = 6, CodigoBarra = "780123456786", Nombre = "Café Nescafé 170g", PrecioUnitario = 4200, Stock = 15, Estado = true },
-                new Producto { ProductoID = 7, CodigoBarra = "780123456787", Nombre = "Azúcar Blanca 1kg", PrecioUnitario = 1290, Stock = 60, Estado = true },
-                new Producto { ProductoID = 8, CodigoBarra = "780123456788", Nombre = "Aceite Vegetal 900ml", PrecioUnitario = 2190, Stock = 35, Estado = true },
-                new Producto { ProductoID = 9, CodigoBarra = "780123456789", Nombre = "Papas Chips 130g", PrecioUnitario = 1490, Stock = 45, Estado = true },
-                new Producto { ProductoID = 10, CodigoBarra = "780123456790", Nombre = "Yogurt Frutilla 125g", PrecioUnitario = 450, Stock = 80, Estado = true }
-            };
+                AgregarProductoAlCarrito(prod, 1);
+                txtBuscar.Clear();
+                txtBuscar.Focus();
+            }
+            else
+            {
+                MessageBox.Show($"No se encontró el producto '{query}'.", "Producto no encontrado", MessageBoxButtons.OK, MessageBoxIcon.Warning);
+            }
         }
 
-        private void AgregarProductoDirecto(Producto prod, int cantidad)
+        private void AgregarProductoAlCarrito(Producto prod, int cant)
         {
-            var existente = _carrito.FirstOrDefault(c => c.ProductoID == prod.ProductoID);
-            if (existente != null) existente.Cantidad += cantidad;
-            else _carrito.Add(new DetalleCarrito { ProductoID = prod.ProductoID, Nombre = prod.Nombre, PrecioUnitario = prod.PrecioUnitario, Cantidad = cantidad });
-            ActualizarTablaCarrito();
-        }
+            var item = _carrito.FirstOrDefault(c => c.ProductoID == prod.ProductoID);
+            if (item != null)
+            {
+                item.Cantidad += cant;
+            }
+            else
+            {
+                _carrito.Add(new DetalleCarrito
+                {
+                    ProductoID = prod.ProductoID,
+                    Nombre = prod.Nombre,
+                    PrecioUnitario = prod.PrecioUnitario,
+                    Cantidad = cant
+                });
+            }
 
-        private void AgregarProductoAlCarrito(string codigoOBusqueda, int cantidad)
-        {
-            if (string.IsNullOrWhiteSpace(codigoOBusqueda)) return;
-            var prod = _productosCache.FirstOrDefault(p => p.CodigoBarra.Equals(codigoOBusqueda, StringComparison.OrdinalIgnoreCase) || p.Nombre.Equals(codigoOBusqueda, StringComparison.OrdinalIgnoreCase));
-            if (prod != null) { AgregarProductoDirecto(prod, cantidad); txtCodigoBarra.Clear(); txtCodigoBarra.Focus(); numCantidad.Value = 1; }
-            else MessageBox.Show($"No se encontró el producto '{codigoOBusqueda}'.", "Producto No Encontrado", MessageBoxButtons.OK, MessageBoxIcon.Information);
+            ActualizarCarritoUI();
         }
 
         private void ModificarCantidadSeleccionada(int delta)
         {
-            if (dgvCarrito.CurrentRow != null && dgvCarrito.CurrentRow.DataBoundItem is DetalleCarrito item)
+            if (dgvCarrito.CurrentRow?.DataBoundItem is DetalleCarrito item)
             {
                 item.Cantidad += delta;
                 if (item.Cantidad <= 0) _carrito.Remove(item);
-                ActualizarTablaCarrito();
+                ActualizarCarritoUI();
             }
         }
 
-        private void ActualizarTablaCarrito()
+        private void EliminarItemSeleccionado()
+        {
+            if (dgvCarrito.CurrentRow?.DataBoundItem is DetalleCarrito item)
+            {
+                _carrito.Remove(item);
+                ActualizarCarritoUI();
+            }
+        }
+
+        private void ActualizarCarritoUI()
         {
             dgvCarrito.DataSource = null;
-            dgvCarrito.DataSource = _carrito;
+            dgvCarrito.DataSource = _carrito.ToList();
 
             if (dgvCarrito.Columns["ProductoID"] != null) dgvCarrito.Columns["ProductoID"].Visible = false;
-            if (dgvCarrito.Columns["Nombre"] != null) dgvCarrito.Columns["Nombre"].HeaderText = "Descripción";
+            if (dgvCarrito.Columns["Nombre"] != null) dgvCarrito.Columns["Nombre"].HeaderText = "Producto";
             if (dgvCarrito.Columns["PrecioUnitario"] != null) { dgvCarrito.Columns["PrecioUnitario"].HeaderText = "Precio"; dgvCarrito.Columns["PrecioUnitario"].DefaultCellStyle.Format = "$#,##0"; }
             if (dgvCarrito.Columns["Cantidad"] != null) dgvCarrito.Columns["Cantidad"].HeaderText = "Cant.";
-            if (dgvCarrito.Columns["Subtotal"] != null) { dgvCarrito.Columns["Subtotal"].HeaderText = "Subtotal"; dgvCarrito.Columns["Subtotal"].DefaultCellStyle.Format = "$#,##0"; }
+            if (dgvCarrito.Columns["Subtotal"] != null) { dgvCarrito.Columns["Subtotal"].HeaderText = "Subtotal"; dgvCarrito.Columns["Subtotal"].DefaultCellStyle.Format = "$#,##0"; dgvCarrito.Columns["Subtotal"].DefaultCellStyle.Font = new Font("Segoe UI", 8.5F, FontStyle.Bold); }
 
             decimal total = _carrito.Sum(c => c.Subtotal);
-            decimal neto = Math.Round(total / 1.19m, 0);
-            decimal iva = total - neto;
-
-            lblTotalPagar.Text = $"$ {total:N0}";
-            lblNetoPagar.Text = $"Neto: $ {neto:N0}";
-            lblIvaPagar.Text = $"IVA (19%): $ {iva:N0}";
-
-            CalcularVuelto();
-            CalcularMontoCuota();
-        }
-
-        private void CalcularVuelto()
-        {
-            decimal total = _carrito.Sum(c => c.Subtotal);
-            if (decimal.TryParse(txtPagoCon.Text.Trim(), out decimal pagaCon))
-            {
-                decimal vuelto = pagaCon - total;
-                lblVuelto.Text = vuelto >= 0 ? $"$ {vuelto:N0}" : "$ 0";
-                lblVuelto.ForeColor = vuelto >= 0 ? Color.FromArgb(16, 185, 129) : Color.FromArgb(220, 38, 38);
-            }
-            else lblVuelto.Text = "$ 0";
-        }
-
-        private void CalcularMontoCuota()
-        {
-            decimal total = _carrito.Sum(c => c.Subtotal);
-            int numCuotas = cbCuotas.SelectedIndex switch { 1 => 3, 2 => 6, 3 => 12, 4 => 24, _ => 1 };
-            if (numCuotas > 1 && total > 0) lblValorCuota.Text = $"{numCuotas} cuotas de $ {Math.Round(total / numCuotas, 0):N0} / mes";
-            else lblValorCuota.Text = "Pago al contado / 1 cuota";
-        }
-
-        private void BtnProcesarCobro_Click(object? sender, EventArgs e)
-        {
-            if (_carrito.Count == 0)
-            {
-                MessageBox.Show("El carrito de compras está vacío.", "Atención", MessageBoxButtons.OK, MessageBoxIcon.Warning);
-                return;
-            }
-
-            string tipoDoc = cbTipoDocumento.SelectedItem?.ToString() ?? "Boleta Electrónica";
-            int iddocDTE = tipoDoc switch
-            {
-                "Factura Electrónica" => 33,
-                "Guía de Despacho" => 52,
-                _ => 39 // Boleta Electrónica
-            };
-
-            if (tipoDoc == "Factura Electrónica" && (string.IsNullOrWhiteSpace(txtRutFactura.Text) || string.IsNullOrWhiteSpace(txtRazonSocialFactura.Text)))
-            {
-                MessageBox.Show("Para emitir una Factura Electrónica debe ingresar el RUT y Razón Social.", "Datos Incompletos", MessageBoxButtons.OK, MessageBoxIcon.Warning);
-                return;
-            }
-
-            decimal total = _carrito.Sum(c => c.Subtotal);
-            decimal neto = Math.Round(total / 1.19m, 0);
-            decimal iva = total - neto;
-            decimal pagaCon = total;
-            decimal vuelto = 0;
-            string medioPagoFinal = cbMedioPago.SelectedItem?.ToString() ?? "Efectivo";
-
-            if (medioPagoFinal == "Efectivo")
-            {
-                if (!decimal.TryParse(txtPagoCon.Text.Trim(), out pagaCon) || pagaCon < total)
-                {
-                    MessageBox.Show("El monto en 'Paga con' es insuficiente.", "Monto Insuficiente", MessageBoxButtons.OK, MessageBoxIcon.Warning);
-                    return;
-                }
-                vuelto = pagaCon - total;
-            }
-
-            try
-            {
-                var rangoFolio = _db.Folios.FirstOrDefault(f => f.TipoDocumento == tipoDoc && f.Activo);
-                int folioDTE = 0;
-
-                if (rangoFolio != null)
-                {
-                    folioDTE = rangoFolio.FolioActual;
-                    rangoFolio.FolioActual += 1;
-                    if (rangoFolio.FolioActual > rangoFolio.FolioHasta) rangoFolio.Activo = false;
-                }
-                else
-                {
-                    folioDTE = (int)(DateTime.Now.Ticks % 1000000);
-                }
-
-                // Guardar la Cabecera de Venta en la tabla estandarizada TVE2607
-                TVE2607 ventaEncabezado = new TVE2607
-                {
-                    idLocal = 1,
-                    nmbLocal = "Caja Principal 01",
-                    iddocDTE = iddocDTE,
-                    Documento = tipoDoc,
-                    nroDTE = folioDTE,
-                    nroInT = folioDTE,
-                    FecDoc = DateTime.Now,
-                    HoraDoc = DateTime.Now.ToString("HH:mm:ss"),
-                    SubTotal = total,
-                    Descuento = 0,
-                    Neto = neto,
-                    IvA = iva,
-                    Total = total,
-                    UserDTE = _usuarioActual?.NombreUsuario ?? "barbara",
-                    Vendedor = _usuarioActual?.NombreCompleto ?? "Barbara",
-                    RuT = txtRutFactura.Text.Trim(),
-                    RazonSocial = txtRazonSocialFactura.Text.Trim(),
-                    Giro = txtGiroFactura.Text.Trim(),
-                    status = "1"
-                };
-
-                _db.TVE2607.Add(ventaEncabezado);
-                _db.SaveChanges(); // Genera idTve
-
-                // Guardar cada ítem en TVD2607
-                foreach (var item in _carrito)
-                {
-                    decimal pneto = Math.Round(item.PrecioUnitario / 1.19m, 0);
-
-                    TVD2607 detalleItem = new TVD2607
-                    {
-                        idTve = ventaEncabezado.idTve,
-                        idLocal = 1,
-                        iddocDTE = iddocDTE,
-                        Documento = tipoDoc,
-                        NroDTE = folioDTE,
-                        NroInT = folioDTE,
-                        FecMoV = DateTime.Now,
-                        HoraMoV = DateTime.Now.ToString("HH:mm:ss"),
-                        IdProducto = item.ProductoID,
-                        NmbProducto = item.Nombre,
-                        Cantidad = item.Cantidad,
-                        Precio = item.PrecioUnitario,
-                        PneTo = pneto,
-                        SubTotal = item.Subtotal,
-                        SubNeto = pneto * item.Cantidad,
-                        nmbVendedor = ventaEncabezado.Vendedor
-                    };
-
-                    _db.TVD2607.Add(detalleItem);
-
-                    var prodBd = _db.Productos.FirstOrDefault(p => p.ProductoID == item.ProductoID);
-                    if (prodBd != null)
-                    {
-                        prodBd.Stock -= item.Cantidad;
-                    }
-                }
-
-                _db.SaveChanges();
-
-                Venta ventaLegacy = new Venta
-                {
-                    VentaID = ventaEncabezado.idTve,
-                    Fecha = ventaEncabezado.FecDoc,
-                    Total = total,
-                    Neto = neto,
-                    IVA = iva,
-                    MedioPago = medioPagoFinal,
-                    TipoDocumento = tipoDoc,
-                    FolioDTE = folioDTE,
-                    RutCliente = ventaEncabezado.RuT,
-                    RazonSocial = ventaEncabezado.RazonSocial,
-                    Giro = ventaEncabezado.Giro,
-                    Usuario = ventaEncabezado.UserDTE
-                };
-
-                FormTicket ticket = new FormTicket(ventaLegacy, _carrito, pagaCon, vuelto);
-                ticket.ShowDialog();
-
-                LimpiarCarrito();
-            }
-            catch (Exception ex)
-            {
-                MessageBox.Show($"Venta cobrada con éxito (Modo Impresión).\nNota DB: {ex.Message}", "Venta Finalizada", MessageBoxButtons.OK, MessageBoxIcon.Information);
-
-                Venta ventaFallback = new Venta
-                {
-                    VentaID = (int)(DateTime.Now.Ticks % 10000),
-                    Fecha = DateTime.Now,
-                    Total = total,
-                    Neto = neto,
-                    IVA = iva,
-                    MedioPago = medioPagoFinal,
-                    TipoDocumento = tipoDoc,
-                    FolioDTE = (int)(DateTime.Now.Ticks % 100000),
-                    RutCliente = txtRutFactura.Text.Trim(),
-                    RazonSocial = txtRazonSocialFactura.Text.Trim(),
-                    Giro = txtGiroFactura.Text.Trim(),
-                    Usuario = _usuarioActual?.NombreUsuario ?? "barbara"
-                };
-
-                FormTicket ticketFallback = new FormTicket(ventaFallback, _carrito, pagaCon, vuelto);
-                ticketFallback.ShowDialog();
-
-                LimpiarCarrito();
-            }
+            lblTotal.Text = $"$ {total:N0}";
         }
 
         private void LimpiarCarrito()
         {
             _carrito.Clear();
-            txtPagoCon.Clear();
-            txtRutFactura.Clear();
-            txtRazonSocialFactura.Clear();
-            txtGiroFactura.Clear();
-            cbCuotas.SelectedIndex = 0;
-            ActualizarTablaCarrito();
+            ActualizarCarritoUI();
+        }
+
+        private void BtnGenerarTicket_Click(object? sender, EventArgs e)
+        {
+            if (_carrito.Count == 0)
+            {
+                MessageBox.Show("El carro de compras está vacío.", "Atención", MessageBoxButtons.OK, MessageBoxIcon.Warning);
+                return;
+            }
+
+            string vendedorNombre = cbVendedor.SelectedItem?.ToString() ?? "Bárbara";
+            decimal total = _carrito.Sum(c => c.Subtotal);
+            int nroTicket = (int)(DateTime.Now.Ticks % 1000000);
+
+            try
+            {
+                // Guardar Ticket de Atención (Pre-Venta) en TVE2607 con status = "Pendiente"
+                TVE2607 tve = new TVE2607
+                {
+                    idLocal = 1,
+                    nmbLocal = "Local Principal",
+                    iddocDTE = 0, // 0 = Ticket de Atención Pendiente de Pago
+                    Documento = "Ticket de Atención",
+                    nroDTE = nroTicket,
+                    FecDoc = DateTime.Now,
+                    SubTotal = Math.Round(total / 1.19m, 0),
+                    Neto = Math.Round(total / 1.19m, 0),
+                    IvA = total - Math.Round(total / 1.19m, 0),
+                    Total = total,
+                    UserDTE = vendedorNombre,
+                    Vendedor = vendedorNombre,
+                    status = "Pendiente" // Pendiente de cobro en caja
+                };
+
+                _db.TVE2607.Add(tve);
+                _db.SaveChanges(); // Genera tve.idTve
+
+                // Guardar ítems en TVD2607
+                foreach (var item in _carrito)
+                {
+                    TVD2607 tvd = new TVD2607
+                    {
+                        idTve = tve.idTve,
+                        idLocal = 1,
+                        iddocDTE = 0,
+                        Documento = "Ticket de Atención",
+                        NroDTE = nroTicket,
+                        FecMoV = DateTime.Now,
+                        IdProducto = item.ProductoID,
+                        NmbProducto = item.Nombre,
+                        Cantidad = item.Cantidad,
+                        Precio = item.PrecioUnitario,
+                        SubTotal = item.Subtotal,
+                        nmbVendedor = vendedorNombre
+                    };
+                    _db.TVD2607.Add(tvd);
+                }
+
+                _db.SaveChanges();
+
+                MessageBox.Show($"🎟️ TICKET DE ATENCIÓN N° {nroTicket:D6} GENERADO CON ÉXITO\n\n" +
+                                $"• Vendedor: {vendedorNombre}\n" +
+                                $"• Total a Pagar en Caja: ${total:N0}\n\n" +
+                                $"Indique al cliente pasar a CAJA con el N° de Ticket {nroTicket:D6}.",
+                                "Pre-Venta Registrada", MessageBoxButtons.OK, MessageBoxIcon.Information);
+
+                LimpiarCarrito();
+            }
+            catch (Exception ex)
+            {
+                MessageBox.Show($"Error al generar Ticket de Atención: {ex.Message}", "Error DB", MessageBoxButtons.OK, MessageBoxIcon.Error);
+            }
+        }
+
+        private void ConfigurarEstiloTabla(DataGridView dgv)
+        {
+            dgv.EnableHeadersVisualStyles = false;
+            dgv.ColumnHeadersDefaultCellStyle.BackColor = Color.FromArgb(30, 41, 59);
+            dgv.ColumnHeadersDefaultCellStyle.ForeColor = Color.White;
+            dgv.ColumnHeadersDefaultCellStyle.Font = new Font("Segoe UI", 9F, FontStyle.Bold);
+            dgv.ColumnHeadersHeight = 32;
+
+            dgv.DefaultCellStyle.Font = new Font("Segoe UI", 8.5F);
+            dgv.DefaultCellStyle.ForeColor = Color.FromArgb(51, 65, 85);
+            dgv.DefaultCellStyle.SelectionBackColor = Color.FromArgb(224, 242, 254);
+            dgv.DefaultCellStyle.SelectionForeColor = Color.FromArgb(15, 23, 42);
+            dgv.RowTemplate.Height = 30;
+            dgv.AlternatingRowsDefaultCellStyle.BackColor = Color.FromArgb(248, 250, 252);
+            dgv.GridColor = Color.FromArgb(226, 232, 240);
         }
     }
 }

@@ -7,7 +7,6 @@ namespace SISTEMAACTUALIZADO.Data
     {
         public DbSet<Producto> Productos { get; set; } = null!;
         public DbSet<Cliente> Clientes { get; set; } = null!;
-        public DbSet<Venta> Ventas { get; set; } = null!;
         public DbSet<TVE2607> TVE2607 { get; set; } = null!;
         public DbSet<TVD2607> TVD2607 { get; set; } = null!;
         public DbSet<Usuario> Usuarios { get; set; } = null!;
@@ -26,8 +25,6 @@ namespace SISTEMAACTUALIZADO.Data
         protected override void OnModelCreating(ModelBuilder modelBuilder)
         {
             base.OnModelCreating(modelBuilder);
-            modelBuilder.Entity<Venta>().ToTable("ventas");
-
             modelBuilder.Entity<TVE2607>(entity =>
             {
                 entity.ToTable("TVE2607");

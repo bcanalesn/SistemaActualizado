@@ -2,6 +2,7 @@ using System;
 using System.Collections.Generic;
 using System.Drawing;
 using System.Drawing.Printing;
+using System.Linq;
 using System.Windows.Forms;
 using SISTEMAACTUALIZADO.Models;
 
@@ -9,7 +10,7 @@ namespace SISTEMAACTUALIZADO
 {
     public partial class FormTicket : Form
     {
-        private Venta _venta;
+        private TVE2607 _venta;
         private List<DetalleCarrito> _items;
         private decimal _pagoCon;
         private decimal _vuelto;
@@ -18,30 +19,29 @@ namespace SISTEMAACTUALIZADO
         private Button btnCerrar = null!;
         private Panel pnlBoletaPapel = null!;
 
-        public FormTicket(Venta venta, List<DetalleCarrito> items, decimal pagaCon, decimal vuelto)
+        public FormTicket(TVE2607 venta, List<DetalleCarrito> items, decimal pagaCon, decimal vuelto)
         {
             _venta = venta;
-            _items = items;
+            _items = items ?? new List<DetalleCarrito>();
             _pagoCon = pagaCon;
             _vuelto = vuelto;
 
             InitializeComponent();
         }
 
-        // Constructor sobrecargado para compatibilidad
         public FormTicket(int nroTicket, DateTime fecha, List<DetalleCarrito> items, decimal total, decimal pagaCon, decimal vuelto, string medioPago)
         {
-            _venta = new Venta
+            _venta = new TVE2607
             {
-                FolioDTE = nroTicket,
-                Fecha = fecha,
+                nroDTE = nroTicket,
+                FecDoc = fecha,
                 Total = total,
                 Neto = Math.Round(total / 1.19m, 0),
-                IVA = total - Math.Round(total / 1.19m, 0),
-                MedioPago = medioPago,
-                TipoDocumento = medioPago.Contains("Factura") ? "Factura Electrónica" : "Boleta Electrónica"
+                IvA = total - Math.Round(total / 1.19m, 0),
+                UserDTE = medioPago,
+                Documento = medioPago.Contains("Factura") ? "Factura Electrónica" : "Boleta Electrónica"
             };
-            _items = items;
+            _items = items ?? new List<DetalleCarrito>();
             _pagoCon = pagaCon;
             _vuelto = vuelto;
 
@@ -51,51 +51,32 @@ namespace SISTEMAACTUALIZADO
         private void InitializeComponent()
         {
             this.SuspendLayout();
-
-            bool esFactura = _venta.TipoDocumento.Equals("Factura Electrónica", StringComparison.OrdinalIgnoreCase) ||
-                             _venta.TipoDocumento.Equals("Guía de Despacho", StringComparison.OrdinalIgnoreCase);
-            bool esNotaCredito = _venta.TipoDocumento.Equals("Nota de Crédito Electrónica", StringComparison.OrdinalIgnoreCase);
-
-            this.Text = esNotaCredito ? $"Nota de Crédito Electrónica - N° {_venta.FolioDTE}" : (esFactura ? $"Documento Tributario - {_venta.TipoDocumento} N° {_venta.FolioDTE}" : $"Comprobante de Venta - Boleta Electrónica N° {_venta.FolioDTE}");
-            this.Size = (esFactura || esNotaCredito) ? new Size(480, 750) : new Size(420, 680);
+            this.Text = $"{_venta.Documento} - N° {_venta.nroDTE:D6}";
+            this.Size = new Size(420, 680);
             this.StartPosition = FormStartPosition.CenterParent;
             this.FormBorderStyle = FormBorderStyle.FixedDialog;
             this.MaximizeBox = false;
             this.MinimizeBox = false;
-            this.BackColor = Color.FromArgb(15, 23, 42);
+            this.BackColor = Color.FromArgb(241, 245, 249);
 
-            // Contenedor principal del documento impreso
-            pnlBoletaPapel = new Panel
+            // Panel Superior con Botones
+            Panel pnlTopBar = new Panel
             {
-                Size = (esFactura || esNotaCredito) ? new Size(420, 590) : new Size(360, 520),
-                Location = new Point(22, 20),
-                BackColor = Color.White,
-                AutoScroll = true,
-                Padding = new Padding(15)
+                Dock = DockStyle.Top,
+                Height = 55,
+                BackColor = Color.FromArgb(30, 41, 59),
+                Padding = new Padding(10)
             };
-
-            if (esNotaCredito)
-            {
-                ConstruirFormatoNotaCredito();
-            }
-            else if (esFactura)
-            {
-                ConstruirFormatoFactura();
-            }
-            else
-            {
-                ConstruirFormatoBoleta();
-            }
 
             btnImprimir = new Button
             {
-                Text = "🖨️ IMPRIMIR " + (esNotaCredito ? "NOTA DE CRÉDITO" : (esFactura ? "FACTURA" : "TICKET")),
-                Location = new Point(22, (esFactura || esNotaCredito) ? 625 : 555),
-                Size = new Size(220, 45),
+                Text = "🖨️ Imprimir Ticket",
+                Size = new Size(150, 35),
+                Location = new Point(12, 10),
                 BackColor = Color.FromArgb(16, 185, 129),
                 ForeColor = Color.White,
                 FlatStyle = FlatStyle.Flat,
-                Font = new Font("Segoe UI", 10F, FontStyle.Bold),
+                Font = new Font("Segoe UI", 9.5F, FontStyle.Bold),
                 Cursor = Cursors.Hand
             };
             btnImprimir.FlatAppearance.BorderSize = 0;
@@ -104,409 +85,169 @@ namespace SISTEMAACTUALIZADO
             btnCerrar = new Button
             {
                 Text = "❌ Cerrar",
-                Location = new Point(252, (esFactura || esNotaCredito) ? 625 : 555),
-                Size = new Size((esFactura || esNotaCredito) ? 190 : 130, 45),
-                BackColor = Color.FromArgb(51, 65, 85),
+                Size = new Size(100, 35),
+                Location = new Point(290, 10),
+                BackColor = Color.FromArgb(239, 68, 68),
                 ForeColor = Color.White,
                 FlatStyle = FlatStyle.Flat,
-                Font = new Font("Segoe UI", 10F, FontStyle.Bold),
+                Font = new Font("Segoe UI", 9.5F, FontStyle.Bold),
                 Cursor = Cursors.Hand
             };
             btnCerrar.FlatAppearance.BorderSize = 0;
             btnCerrar.Click += (s, e) => this.Close();
 
-            this.Controls.Add(btnImprimir);
-            this.Controls.Add(btnCerrar);
-            this.Controls.Add(pnlBoletaPapel);
+            pnlTopBar.Controls.Add(btnImprimir);
+            pnlTopBar.Controls.Add(btnCerrar);
+
+            // Panel simulador de boleta en papel térmico
+            Panel pnlScrollContainer = new Panel
+            {
+                Dock = DockStyle.Fill,
+                AutoScroll = true,
+                Padding = new Padding(20)
+            };
+
+            pnlBoletaPapel = new Panel
+            {
+                Size = new Size(360, 850),
+                BackColor = Color.White,
+                Margin = new Padding(0, 0, 0, 20)
+            };
+            pnlBoletaPapel.Paint += PnlBoletaPapel_Paint;
+
+            pnlScrollContainer.Controls.Add(pnlBoletaPapel);
+
+            this.Controls.Add(pnlScrollContainer);
+            this.Controls.Add(pnlTopBar);
 
             this.ResumeLayout(false);
         }
 
-        private void ConstruirFormatoFactura()
+        private void PnlBoletaPapel_Paint(object? sender, PaintEventArgs e)
         {
-            // 1. Recuadro Tributario SII (Borde Rojo / Azul)
-            Panel pnlCuadroSII = new Panel
+            Graphics g = e.Graphics;
+            g.SmoothingMode = System.Drawing.Drawing2D.SmoothingMode.AntiAlias;
+
+            Font fontTitle = new Font("Segoe UI", 12F, FontStyle.Bold);
+            Font fontSub = new Font("Segoe UI", 8.5F, FontStyle.Regular);
+            Font fontBold = new Font("Segoe UI", 8.5F, FontStyle.Bold);
+            Font fontSmall = new Font("Segoe UI", 8F, FontStyle.Regular);
+
+            Brush brushText = Brushes.Black;
+            Pen penDash = new Pen(Color.Gray, 1) { DashStyle = System.Drawing.Drawing2D.DashStyle.Dash };
+            Pen penRedBox = new Pen(Color.Red, 2);
+
+            int y = 15;
+            int width = pnlBoletaPapel.Width;
+
+            // 1. Encabezado de la Empresa
+            StringFormat centerFormat = new StringFormat { Alignment = StringAlignment.Center };
+            g.DrawString("SISTEMA POS COMERCIAL", fontTitle, brushText, new RectangleF(0, y, width, 25), centerFormat);
+            y += 24;
+            g.DrawString("R.U.T.: 76.543.210-K", fontBold, brushText, new RectangleF(0, y, width, 20), centerFormat);
+            y += 18;
+            g.DrawString("Giro: Comercializadora General y Retail", fontSub, brushText, new RectangleF(0, y, width, 18), centerFormat);
+            y += 16;
+            g.DrawString("Casa Matriz: Av. Principal #1234, Santiago", fontSub, brushText, new RectangleF(0, y, width, 18), centerFormat);
+            y += 16;
+            g.DrawString("Teléfono: +56 2 2345 6789", fontSub, brushText, new RectangleF(0, y, width, 18), centerFormat);
+            y += 22;
+
+            // 2. Recuadro Rojo Tributario (Estilo SII)
+            if (_venta.iddocDTE > 0)
             {
-                Dock = DockStyle.Top,
-                Height = 85,
-                BorderStyle = BorderStyle.FixedSingle,
-                BackColor = Color.FromArgb(254, 242, 242),
-                Margin = new Padding(0, 0, 0, 10)
-            };
+                Rectangle redBox = new Rectangle(30, y, width - 60, 55);
+                g.DrawRectangle(penRedBox, redBox);
 
-            Label lblRutsii = new Label
+                string tituloDoc = _venta.Documento.ToUpper();
+                g.DrawString(tituloDoc, fontBold, Brushes.Red, new RectangleF(30, y + 8, width - 60, 20), centerFormat);
+                g.DrawString($"FOLIO N° {_venta.nroDTE:D6}", fontTitle, Brushes.Red, new RectangleF(30, y + 26, width - 60, 24), centerFormat);
+                y += 68;
+
+                g.DrawString("S.I.I. - SANTIAGO CENTRO", fontBold, Brushes.Red, new RectangleF(0, y, width, 18), centerFormat);
+                y += 22;
+            }
+            else
             {
-                Text = $"R.U.T.: 76.543.210-K\n{_venta.TipoDocumento.ToUpper()}\nN° {_venta.FolioDTE:D6}\nS.I.I. - SANTIAGO CENTRO",
-                Font = new Font("Segoe UI", 10F, FontStyle.Bold),
-                ForeColor = Color.FromArgb(185, 28, 28),
-                Dock = DockStyle.Fill,
-                TextAlign = ContentAlignment.MiddleCenter
-            };
-            pnlCuadroSII.Controls.Add(lblRutsii);
+                // Ticket de Atención
+                Rectangle blackBox = new Rectangle(30, y, width - 60, 50);
+                g.DrawRectangle(Pens.Black, blackBox);
 
-            // 2. Encabezado Emisor
-            Label lblEmisor = new Label
+                g.DrawString("TICKET DE ATENCIÓN", fontBold, brushText, new RectangleF(30, y + 8, width - 60, 20), centerFormat);
+                g.DrawString($"N° TICKET: {_venta.nroDTE:D6}", fontTitle, brushText, new RectangleF(30, y + 26, width - 60, 22), centerFormat);
+                y += 62;
+            }
+
+            g.DrawLine(penDash, 15, y, width - 15, y);
+            y += 10;
+
+            // 3. Datos de la Venta
+            g.DrawString($"Fecha Emisión: {_venta.FecDoc:dd/MM/yyyy HH:mm:ss}", fontSub, brushText, 15, y); y += 18;
+            g.DrawString($"Atendido por : {(_venta.UserDTE ?? "barbara")}", fontSub, brushText, 15, y); y += 18;
+
+            if (!string.IsNullOrEmpty(_venta.RuT))
             {
-                Text = "⚡ SISTEMA POS DEMO S.A.\nGiro: Comercializadora de Abarrotes e Insumos\nAv. Principal #123 - Santiago | Tel: +56 9 1234 5678",
-                Font = new Font("Segoe UI", 8.5F, FontStyle.Regular),
-                ForeColor = Color.FromArgb(30, 41, 59),
-                Dock = DockStyle.Top,
-                Height = 55,
-                TextAlign = ContentAlignment.MiddleLeft
-            };
-
-            Label lblLinea1 = CrearLineaDivisora();
-            lblLinea1.Dock = DockStyle.Top;
-
-            // 3. Cuadro Receptor / Datos del Cliente
-            Panel pnlCliente = new Panel
+                g.DrawString($"RUT Cliente  : {_venta.RuT}", fontBold, brushText, 15, y); y += 18;
+            }
+            if (!string.IsNullOrEmpty(_venta.RazonSocial))
             {
-                Dock = DockStyle.Top,
-                Height = 90,
-                BackColor = Color.FromArgb(248, 250, 252),
-                Padding = new Padding(8),
-                Margin = new Padding(0, 5, 0, 5)
-            };
-
-            Label lblDatosCliente = new Label
+                g.DrawString($"Razón Social : {_venta.RazonSocial}", fontSub, brushText, 15, y); y += 18;
+            }
+            if (_venta.iddocDTE == 61 && _venta.nroREF.HasValue)
             {
-                Text = $"SEÑOR(ES): {_venta.RazonSocial.ToUpper()}\n" +
-                       $"R.U.T. RECEPTOR: {_venta.RutCliente}\n" +
-                       $"GIRO: {(string.IsNullOrWhiteSpace(_venta.Giro) ? "SIN INFORMACIÓN" : _venta.Giro.ToUpper())}\n" +
-                       $"FECHA EMISIÓN: {_venta.Fecha:dd/MM/yyyy HH:mm} | PAGO: {_venta.MedioPago.ToUpper()}",
-                Font = new Font("Segoe UI", 8.5F, FontStyle.Bold),
-                ForeColor = Color.FromArgb(15, 23, 42),
-                Dock = DockStyle.Fill
-            };
-            pnlCliente.Controls.Add(lblDatosCliente);
+                g.DrawString($"Doc. Modifica : Referencia DTE N° {_venta.nroREF}", fontBold, Brushes.Red, 15, y); y += 18;
+                if (!string.IsNullOrEmpty(_venta.codigoREF))
+                {
+                    g.DrawString($"Causa / Glosa : {_venta.codigoREF}", fontSub, brushText, 15, y); y += 18;
+                }
+            }
 
-            Label lblLinea2 = CrearLineaDivisora();
-            lblLinea2.Dock = DockStyle.Top;
+            g.DrawLine(penDash, 15, y, width - 15, y);
+            y += 10;
 
-            // 4. Encabezado de la Tabla
-            Label lblHeaderTabla = new Label
-            {
-                Text = "CANT  DESCRIPCION            P.NETO    SUBTOTAL",
-                Font = new Font("Courier New", 8.5F, FontStyle.Bold),
-                ForeColor = Color.Black,
-                Dock = DockStyle.Top,
-                Height = 20
-            };
+            // 4. Encabezados de Tabla de Ítems
+            g.DrawString("CANT  DESCRIPCIÓN", fontBold, brushText, 15, y);
+            g.DrawString("TOTAL", fontBold, brushText, width - 65, y);
+            y += 18;
+            g.DrawLine(penDash, 15, y, width - 15, y);
+            y += 8;
 
-            Label lblLinea3 = CrearLineaDivisora();
-            lblLinea3.Dock = DockStyle.Top;
-
-            // 5. Ítems Comprados
-            Panel pnlItems = new Panel
-            {
-                Dock = DockStyle.Top,
-                AutoSize = true,
-                MaximumSize = new Size(390, 0)
-            };
-
-            int topPos = 0;
+            // 5. Listado de Ítems del Carrito
             foreach (var item in _items)
             {
-                decimal precioNetoItem = Math.Round(item.PrecioUnitario / 1.19m, 0);
-                decimal subtotalNetoItem = precioNetoItem * item.Cantidad;
-
-                Label lblItem = new Label
-                {
-                    Text = $"{item.Cantidad,2}x {TruncarNombre(item.Nombre, 20),-20} ${precioNetoItem,7:N0} ${subtotalNetoItem,8:N0}",
-                    Font = new Font("Courier New", 8.5F, FontStyle.Regular),
-                    ForeColor = Color.Black,
-                    Location = new Point(0, topPos),
-                    AutoSize = true
-                };
-                pnlItems.Controls.Add(lblItem);
-                topPos += 18;
+                string desc = item.Nombre.Length > 22 ? item.Nombre.Substring(0, 22) : item.Nombre;
+                g.DrawString($"{item.Cantidad,2} x  {desc}", fontSub, brushText, 15, y);
+                g.DrawString($"${item.Subtotal,8:N0}", fontSub, brushText, width - 85, y);
+                y += 18;
             }
 
-            Label lblLinea4 = CrearLineaDivisora();
-            lblLinea4.Dock = DockStyle.Top;
+            g.DrawLine(penDash, 15, y, width - 15, y);
+            y += 12;
 
-            // 6. Totales Tributarios (Neto + IVA + Total)
-            Panel pnlTotalesDTE = new Panel
+            // 6. Totales y Desglose de Impuestos
+            g.DrawString("MONTO NETO:", fontSub, brushText, 120, y);
+            g.DrawString($"${_venta.Neto,10:N0}", fontSub, brushText, width - 95, y); y += 18;
+
+            g.DrawString("I.V.A. (19%):", fontSub, brushText, 120, y);
+            g.DrawString($"${_venta.IvA,10:N0}", fontSub, brushText, width - 95, y); y += 22;
+
+            g.DrawString("TOTAL A PAGAR:", fontTitle, brushText, 90, y);
+            g.DrawString($"${_venta.Total,10:N0}", fontTitle, brushText, width - 110, y); y += 28;
+
+            if (_pagoCon > 0)
             {
-                Dock = DockStyle.Top,
-                Height = 80,
-                Padding = new Padding(0, 5, 0, 5)
-            };
-
-            Label lblTotales = new Label
-            {
-                Text = $"MONTO NETO:      ${_venta.Neto:N0}\n" +
-                       $"I.V.A. (19%):    ${_venta.IVA:N0}\n" +
-                       $"TOTAL FACTURA:   ${_venta.Total:N0}",
-                Font = new Font("Courier New", 10F, FontStyle.Bold),
-                ForeColor = Color.Black,
-                Dock = DockStyle.Right,
-                Width = 260,
-                TextAlign = ContentAlignment.TopRight
-            };
-            pnlTotalesDTE.Controls.Add(lblTotales);
-
-            Label lblPieDTE = new Label
-            {
-                Text = "==========================================\nTimbre Electrónico SII - Res. N° 80 de 2014\nVerifique Documento en www.sii.cl",
-                Font = new Font("Courier New", 8F, FontStyle.Italic),
-                ForeColor = Color.FromArgb(100, 116, 139),
-                TextAlign = ContentAlignment.MiddleCenter,
-                Dock = DockStyle.Top,
-                Height = 45
-            };
-
-            pnlBoletaPapel.Controls.Add(lblPieDTE);
-            pnlBoletaPapel.Controls.Add(pnlTotalesDTE);
-            pnlBoletaPapel.Controls.Add(lblLinea4);
-            pnlBoletaPapel.Controls.Add(pnlItems);
-            pnlBoletaPapel.Controls.Add(lblLinea3);
-            pnlBoletaPapel.Controls.Add(lblHeaderTabla);
-            pnlBoletaPapel.Controls.Add(lblLinea2);
-            pnlBoletaPapel.Controls.Add(pnlCliente);
-            pnlBoletaPapel.Controls.Add(lblLinea1);
-            pnlBoletaPapel.Controls.Add(lblEmisor);
-            pnlBoletaPapel.Controls.Add(pnlCuadroSII);
-        }
-
-        private void ConstruirFormatoNotaCredito()
-        {
-            Panel pnlCuadroSII = new Panel
-            {
-                Dock = DockStyle.Top,
-                Height = 85,
-                BorderStyle = BorderStyle.FixedSingle,
-                BackColor = Color.FromArgb(254, 242, 242),
-                Margin = new Padding(0, 0, 0, 10)
-            };
-
-            Label lblRutsii = new Label
-            {
-                Text = $"R.U.T.: 76.543.210-K\nNOTA DE CRÉDITO ELECTRÓNICA\nN° {_venta.FolioDTE:D6}\nS.I.I. - SANTIAGO CENTRO",
-                Font = new Font("Segoe UI", 10F, FontStyle.Bold),
-                ForeColor = Color.FromArgb(185, 28, 28),
-                Dock = DockStyle.Fill,
-                TextAlign = ContentAlignment.MiddleCenter
-            };
-            pnlCuadroSII.Controls.Add(lblRutsii);
-
-            Label lblEmisor = new Label
-            {
-                Text = "⚡ SISTEMA POS DEMO S.A.\nGiro: Comercializadora de Abarrotes e Insumos\nAv. Principal #123 - Santiago | Tel: +56 9 1234 5678",
-                Font = new Font("Segoe UI", 8.5F, FontStyle.Regular),
-                ForeColor = Color.FromArgb(30, 41, 59),
-                Dock = DockStyle.Top,
-                Height = 55,
-                TextAlign = ContentAlignment.MiddleLeft
-            };
-
-            Label lblLinea1 = CrearLineaDivisora();
-            lblLinea1.Dock = DockStyle.Top;
-
-            string referencia = $"Documento que modifica: {_venta.TipoDocumento} N° {_venta.nroREF?.ToString() ?? _venta.idREF?.ToString() ?? "N/D"}";
-            if (_venta.idREF.HasValue)
-            {
-                referencia += $"\nMotivo: {(_venta.GlosaREF ?? "SIN GLOSA").ToUpper()}";
+                g.DrawLine(penDash, 15, y, width - 15, y); y += 10;
+                g.DrawString($"Paga Con: ${_pagoCon:N0}", fontSub, brushText, 15, y);
+                g.DrawString($"Vuelto: ${_vuelto:N0}", fontBold, Brushes.Green, 200, y); y += 22;
             }
 
-            Panel pnlReferencia = new Panel
-            {
-                Dock = DockStyle.Top,
-                Height = 70,
-                BackColor = Color.FromArgb(248, 250, 252),
-                Padding = new Padding(8),
-                Margin = new Padding(0, 5, 0, 5)
-            };
+            g.DrawLine(penDash, 15, y, width - 15, y); y += 15;
 
-            Label lblDatosReferencia = new Label
-            {
-                Text = referencia,
-                Font = new Font("Segoe UI", 8.5F, FontStyle.Bold),
-                ForeColor = Color.FromArgb(15, 23, 42),
-                Dock = DockStyle.Fill
-            };
-            pnlReferencia.Controls.Add(lblDatosReferencia);
+            // 7. Pie de Página / Timbre Electrónico Simulado
+            g.DrawString("Timbre Electrónico S.I.I.", fontSmall, brushText, new RectangleF(0, y, width, 15), centerFormat); y += 15;
+            g.DrawString("Res. 99 de 2026 - Verifique documento en www.sii.cl", fontSmall, brushText, new RectangleF(0, y, width, 15), centerFormat); y += 25;
 
-            Label lblLinea2 = CrearLineaDivisora();
-            lblLinea2.Dock = DockStyle.Top;
-
-            Label lblHeaderTabla = new Label
-            {
-                Text = "CANT  DESCRIPCION            P.NETO    SUBTOTAL",
-                Font = new Font("Courier New", 8.5F, FontStyle.Bold),
-                ForeColor = Color.Black,
-                Dock = DockStyle.Top,
-                Height = 20
-            };
-
-            Label lblLinea3 = CrearLineaDivisora();
-            lblLinea3.Dock = DockStyle.Top;
-
-            Panel pnlItems = new Panel
-            {
-                Dock = DockStyle.Top,
-                AutoSize = true,
-                MaximumSize = new Size(390, 0)
-            };
-
-            int topPos = 0;
-            foreach (var item in _items)
-            {
-                decimal precioNetoItem = Math.Round(item.PrecioUnitario / 1.19m, 0);
-                decimal subtotalNetoItem = precioNetoItem * item.Cantidad;
-
-                Label lblItem = new Label
-                {
-                    Text = $"{item.Cantidad,2}x {TruncarNombre(item.Nombre, 20),-20} ${precioNetoItem,7:N0} ${subtotalNetoItem,8:N0}",
-                    Font = new Font("Courier New", 8.5F, FontStyle.Regular),
-                    ForeColor = Color.Black,
-                    Location = new Point(0, topPos),
-                    AutoSize = true
-                };
-                pnlItems.Controls.Add(lblItem);
-                topPos += 18;
-            }
-
-            Label lblLinea4 = CrearLineaDivisora();
-            lblLinea4.Dock = DockStyle.Top;
-
-            Label lblTotales = new Label
-            {
-                Text = $"MONTO NETO:      ${_venta.Neto:N0}\n" +
-                       $"I.V.A. (19%):    ${_venta.IVA:N0}\n" +
-                       $"TOTAL NC:        ${_venta.Total:N0}",
-                Font = new Font("Courier New", 10F, FontStyle.Bold),
-                ForeColor = Color.Black,
-                Dock = DockStyle.Top,
-                Height = 65,
-                TextAlign = ContentAlignment.TopRight
-            };
-
-            Label lblPie = new Label
-            {
-                Text = "------------------------------------------\nDocumento de ajuste tributario\nVerifique documento en SII",
-                Font = new Font("Courier New", 8.5F, FontStyle.Italic),
-                ForeColor = Color.FromArgb(80, 80, 80),
-                TextAlign = ContentAlignment.MiddleCenter,
-                Dock = DockStyle.Top,
-                Height = 50
-            };
-
-            pnlBoletaPapel.Controls.Add(lblPie);
-            pnlBoletaPapel.Controls.Add(lblTotales);
-            pnlBoletaPapel.Controls.Add(lblLinea4);
-            pnlBoletaPapel.Controls.Add(pnlItems);
-            pnlBoletaPapel.Controls.Add(lblLinea3);
-            pnlBoletaPapel.Controls.Add(lblHeaderTabla);
-            pnlBoletaPapel.Controls.Add(lblLinea2);
-            pnlBoletaPapel.Controls.Add(pnlReferencia);
-            pnlBoletaPapel.Controls.Add(lblLinea1);
-            pnlBoletaPapel.Controls.Add(lblEmisor);
-            pnlBoletaPapel.Controls.Add(pnlCuadroSII);
-        }
-
-        private void ConstruirFormatoBoleta()
-        {
-            Label lblEncabezado = new Label
-            {
-                Text = $"⚡ SISTEMA POS DEMO\nR.U.T.: 76.543.210-K\nBOLETA ELECTRÓNICA N° {_venta.FolioDTE:D6}\nS.I.I. - SANTIAGO CENTRO",
-                Font = new Font("Courier New", 9.5F, FontStyle.Bold),
-                ForeColor = Color.Black,
-                TextAlign = ContentAlignment.MiddleCenter,
-                Dock = DockStyle.Top,
-                Height = 75
-            };
-
-            Label lblLinea1 = CrearLineaDivisora();
-            lblLinea1.Dock = DockStyle.Top;
-
-            Label lblInfoTicket = new Label
-            {
-                Text = $"FECHA: {_venta.Fecha:dd/MM/yyyy HH:mm:ss}\nFORMA PAGO: {_venta.MedioPago.ToUpper()}",
-                Font = new Font("Courier New", 9F, FontStyle.Regular),
-                ForeColor = Color.FromArgb(30, 30, 30),
-                Dock = DockStyle.Top,
-                Height = 35
-            };
-
-            Label lblLinea2 = CrearLineaDivisora();
-            lblLinea2.Dock = DockStyle.Top;
-
-            Label lblHeaderTabla = new Label
-            {
-                Text = "CANT  DESCRIPCION        PRECIO    SUBTOTAL",
-                Font = new Font("Courier New", 8.5F, FontStyle.Bold),
-                ForeColor = Color.Black,
-                Dock = DockStyle.Top,
-                Height = 20
-            };
-
-            Label lblLinea3 = CrearLineaDivisora();
-            lblLinea3.Dock = DockStyle.Top;
-
-            Panel pnlItems = new Panel
-            {
-                Dock = DockStyle.Top,
-                AutoSize = true,
-                MaximumSize = new Size(330, 0)
-            };
-
-            int topPos = 0;
-            foreach (var item in _items)
-            {
-                Label lblItem = new Label
-                {
-                    Text = $"{item.Cantidad,2}x {TruncarNombre(item.Nombre, 16),-16} ${item.PrecioUnitario,7:N0} ${item.Subtotal,8:N0}",
-                    Font = new Font("Courier New", 8.5F, FontStyle.Regular),
-                    ForeColor = Color.Black,
-                    Location = new Point(0, topPos),
-                    AutoSize = true
-                };
-                pnlItems.Controls.Add(lblItem);
-                topPos += 18;
-            }
-
-            Label lblLinea4 = CrearLineaDivisora();
-            lblLinea4.Dock = DockStyle.Top;
-
-            string textoTotales = $"TOTAL A PAGAR:        ${_venta.Total:N0}\n" +
-                                  $"(Monto Neto: ${_venta.Neto:N0} | IVA 19%: ${_venta.IVA:N0})\n";
-            if (_venta.MedioPago.StartsWith("Efectivo", StringComparison.OrdinalIgnoreCase))
-            {
-                textoTotales += $"PAGO CON:             ${_pagoCon:N0}\n" +
-                                $"VUELTO:               ${_vuelto:N0}\n";
-            }
-
-            Label lblTotales = new Label
-            {
-                Text = textoTotales,
-                Font = new Font("Courier New", 9.5F, FontStyle.Bold),
-                ForeColor = Color.Black,
-                Dock = DockStyle.Top,
-                Height = 75,
-                TextAlign = ContentAlignment.TopRight
-            };
-
-            Label lblPie = new Label
-            {
-                Text = "------------------------------------------\n¡GRACIAS POR SU COMPRA!\nEl IVA de esta boleta ha sido retenido por el SII",
-                Font = new Font("Courier New", 8.5F, FontStyle.Italic),
-                ForeColor = Color.FromArgb(80, 80, 80),
-                TextAlign = ContentAlignment.MiddleCenter,
-                Dock = DockStyle.Top,
-                Height = 50
-            };
-
-            pnlBoletaPapel.Controls.Add(lblPie);
-            pnlBoletaPapel.Controls.Add(lblTotales);
-            pnlBoletaPapel.Controls.Add(lblLinea4);
-            pnlBoletaPapel.Controls.Add(pnlItems);
-            pnlBoletaPapel.Controls.Add(lblLinea3);
-            pnlBoletaPapel.Controls.Add(lblHeaderTabla);
-            pnlBoletaPapel.Controls.Add(lblLinea2);
-            pnlBoletaPapel.Controls.Add(lblInfoTicket);
-            pnlBoletaPapel.Controls.Add(lblLinea1);
-            pnlBoletaPapel.Controls.Add(lblEncabezado);
+            g.DrawString("¡Gracias por su compra!", fontBold, brushText, new RectangleF(0, y, width, 20), centerFormat);
         }
 
         private void BtnImprimir_Click(object? sender, EventArgs e)
@@ -514,98 +255,26 @@ namespace SISTEMAACTUALIZADO
             try
             {
                 PrintDocument pd = new PrintDocument();
-                pd.PrintPage += Pd_PrintPage;
-
-                PrintDialog printDialog = new PrintDialog { Document = pd };
-                if (printDialog.ShowDialog() == DialogResult.OK)
+                pd.PrintPage += (s, ev) =>
                 {
-                    pd.Print();
-                }
+                    // Reutilizar el dibujado de la boleta para la impresora
+                    Bitmap bmp = new Bitmap(pnlBoletaPapel.Width, pnlBoletaPapel.Height);
+                    pnlBoletaPapel.DrawToBitmap(bmp, new Rectangle(0, 0, pnlBoletaPapel.Width, pnlBoletaPapel.Height));
+                    ev.Graphics?.DrawImage(bmp, 0, 0);
+                };
+
+                PrintPreviewDialog preview = new PrintPreviewDialog
+                {
+                    Document = pd,
+                    Width = 600,
+                    Height = 700
+                };
+                preview.ShowDialog();
             }
             catch (Exception ex)
             {
-                MessageBox.Show($"Error al enviar a la impresora: {ex.Message}", "Error de Impresión", MessageBoxButtons.OK, MessageBoxIcon.Error);
+                MessageBox.Show($"Error al enviar a impresión: {ex.Message}", "Impresión", MessageBoxButtons.OK, MessageBoxIcon.Error);
             }
-        }
-
-        private void Pd_PrintPage(object sender, PrintPageEventArgs e)
-        {
-            Graphics g = e.Graphics!;
-            Font fontTitulo = new Font("Courier New", 10, FontStyle.Bold);
-            Font fontTexto = new Font("Courier New", 8.5F, FontStyle.Regular);
-            Font fontBold = new Font("Courier New", 8.5F, FontStyle.Bold);
-
-            float y = 20;
-            float x = 10;
-
-            if (_venta.TipoDocumento.Equals("Nota de Crédito Electrónica", StringComparison.OrdinalIgnoreCase))
-            {
-                g.DrawString("⚡ NOTA DE CRÉDITO ELECTRÓNICA", fontTitulo, Brushes.Black, x, y); y += 18;
-                g.DrawString($"N° Folio: {_venta.FolioDTE:D6}", fontBold, Brushes.Black, x, y); y += 16;
-                g.DrawString($"Documento que modifica: {_venta.nroREF?.ToString() ?? _venta.idREF?.ToString() ?? "N/D"}", fontTexto, Brushes.Black, x, y); y += 16;
-                if (!string.IsNullOrWhiteSpace(_venta.GlosaREF))
-                {
-                    g.DrawString($"Motivo: {_venta.GlosaREF}", fontTexto, Brushes.Black, x, y); y += 16;
-                }
-
-                g.DrawString($"Fecha: {_venta.Fecha:dd/MM/yyyy HH:mm}", fontTexto, Brushes.Black, x, y); y += 16;
-                g.DrawString("------------------------------------", fontTexto, Brushes.Black, x, y); y += 16;
-
-                foreach (var item in _items)
-                {
-                    g.DrawString($"{item.Cantidad}x {TruncarNombre(item.Nombre, 15)} - ${item.Subtotal:N0}", fontTexto, Brushes.Black, x, y);
-                    y += 16;
-                }
-
-                g.DrawString("------------------------------------", fontTexto, Brushes.Black, x, y); y += 16;
-                g.DrawString($"NETO:  ${_venta.Neto:N0}", fontTexto, Brushes.Black, x, y); y += 16;
-                g.DrawString($"IVA:   ${_venta.IVA:N0}", fontTexto, Brushes.Black, x, y); y += 16;
-                g.DrawString($"TOTAL: ${_venta.Total:N0}", fontTitulo, Brushes.Black, x, y); y += 20;
-                g.DrawString("Verifique documento en SII", fontBold, Brushes.Black, x, y);
-                return;
-            }
-
-            g.DrawString($"⚡ {_venta.TipoDocumento.ToUpper()}", fontTitulo, Brushes.Black, x, y); y += 18;
-            g.DrawString($"N° Folio: {_venta.FolioDTE:D6}", fontBold, Brushes.Black, x, y); y += 16;
-            g.DrawString($"Fecha: {_venta.Fecha:dd/MM/yyyy HH:mm}", fontTexto, Brushes.Black, x, y); y += 16;
-
-            if (!string.IsNullOrWhiteSpace(_venta.RutCliente))
-            {
-                g.DrawString($"RUT Cliente: {_venta.RutCliente}", fontTexto, Brushes.Black, x, y); y += 16;
-                g.DrawString($"Razón Social: {_venta.RazonSocial}", fontTexto, Brushes.Black, x, y); y += 16;
-            }
-
-            g.DrawString("------------------------------------", fontTexto, Brushes.Black, x, y); y += 16;
-
-            foreach (var item in _items)
-            {
-                g.DrawString($"{item.Cantidad}x {TruncarNombre(item.Nombre, 15)} - ${item.Subtotal:N0}", fontTexto, Brushes.Black, x, y);
-                y += 16;
-            }
-
-            g.DrawString("------------------------------------", fontTexto, Brushes.Black, x, y); y += 16;
-            g.DrawString($"NETO:  ${_venta.Neto:N0}", fontTexto, Brushes.Black, x, y); y += 16;
-            g.DrawString($"IVA:   ${_venta.IVA:N0}", fontTexto, Brushes.Black, x, y); y += 16;
-            g.DrawString($"TOTAL: ${_venta.Total:N0}", fontTitulo, Brushes.Black, x, y); y += 20;
-            g.DrawString("Verifique documento en SII", fontBold, Brushes.Black, x, y);
-        }
-
-        private Label CrearLineaDivisora()
-        {
-            return new Label
-            {
-                Text = "------------------------------------------",
-                Font = new Font("Courier New", 8.5F),
-                ForeColor = Color.Gray,
-                Height = 15,
-                TextAlign = ContentAlignment.MiddleCenter
-            };
-        }
-
-        private string TruncarNombre(string nombre, int largo)
-        {
-            if (string.IsNullOrEmpty(nombre)) return string.Empty;
-            return nombre.Length <= largo ? nombre : nombre.Substring(0, largo - 1) + ".";
         }
     }
 }
