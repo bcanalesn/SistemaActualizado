@@ -1,15 +1,14 @@
 using System;
 using System.Drawing;
-using System.Linq;
 using System.Windows.Forms;
-using SISTEMAACTUALIZADO.Data;
 using SISTEMAACTUALIZADO.Models;
+using SISTEMAACTUALIZADO.Services;
 
 namespace SISTEMAACTUALIZADO
 {
     public class FormClientes : Form
     {
-        private AppDbContext _db = new AppDbContext();
+        private readonly ClienteService _clienteService = new ClienteService();
 
         private TextBox txtBuscar = null!;
         private Button btnBuscar = null!;
@@ -40,7 +39,6 @@ namespace SISTEMAACTUALIZADO
                 BackColor = Color.FromArgb(244, 246, 249)
             };
 
-            // 1. BARRA SUPERIOR DE ACCIONES Y BÚSQUEDA
             Panel pnlHeader = new Panel
             {
                 Dock = DockStyle.Top,
@@ -95,7 +93,6 @@ namespace SISTEMAACTUALIZADO
             btnRefrescar.FlatAppearance.BorderSize = 0;
             btnRefrescar.Click += (s, e) => { txtBuscar.Clear(); CargarClientes(); };
 
-            // Botones de acción alineados a la derecha
             btnNuevo = new Button
             {
                 Text = "➕ Nuevo Cliente",
@@ -148,7 +145,6 @@ namespace SISTEMAACTUALIZADO
             pnlHeader.Controls.Add(btnEditar);
             pnlHeader.Controls.Add(btnNuevo);
 
-            // 2. TABLA DE CLIENTES
             dgvClientes = new DataGridView
             {
                 Dock = DockStyle.Fill,
@@ -203,14 +199,7 @@ namespace SISTEMAACTUALIZADO
         {
             try
             {
-                var query = _db.Clientes.AsQueryable();
-
-                if (!string.IsNullOrWhiteSpace(filtro))
-                {
-                    query = query.Where(c => c.Nombre.Contains(filtro) || c.Rut.Contains(filtro) || c.Email.Contains(filtro));
-                }
-
-                var clientes = query.OrderBy(c => c.Nombre).ToList();
+                var clientes = _clienteService.ObtenerClientes(filtro);
                 dgvClientes.DataSource = clientes;
 
                 if (dgvClientes.Columns["ClienteID"] != null) dgvClientes.Columns["ClienteID"].HeaderText = "ID";
@@ -267,8 +256,7 @@ namespace SISTEMAACTUALIZADO
             {
                 try
                 {
-                    _clienteSeleccionado.Estado = !_clienteSeleccionado.Estado;
-                    _db.SaveChanges();
+                    _clienteService.CambiarEstado(_clienteSeleccionado.ClienteID);
                     CargarClientes(txtBuscar.Text.Trim());
                 }
                 catch (Exception ex)
@@ -297,19 +285,19 @@ namespace SISTEMAACTUALIZADO
             Label lblTitle = new Label { Text = esNuevo ? "👤 Nuevo Cliente" : "✏️ Editar Cliente", Location = new Point(25, 20), Font = new Font("Segoe UI", 12F, FontStyle.Bold), AutoSize = true, ForeColor = Color.FromArgb(15, 23, 42) };
 
             Label lblRut = new Label { Text = "RUT / DNI:", Location = new Point(25, 60), AutoSize = true, Font = new Font("Segoe UI", 9F, FontStyle.Bold) };
-            TextBox txtRut = new TextBox { Text = c.Rut, Location = new Point(25, 82), Size = new Size(350, 30), Font = new Font("Segoe UI", 10F) };
+            TextBox txtRut = new TextBox { Text = c.Rut ?? string.Empty, Location = new Point(25, 82), Size = new Size(350, 30), Font = new Font("Segoe UI", 10F) };
 
             Label lblNombre = new Label { Text = "Nombre Completo:", Location = new Point(25, 122), AutoSize = true, Font = new Font("Segoe UI", 9F, FontStyle.Bold) };
-            TextBox txtNombre = new TextBox { Text = c.Nombre, Location = new Point(25, 144), Size = new Size(350, 30), Font = new Font("Segoe UI", 10F) };
+            TextBox txtNombre = new TextBox { Text = c.Nombre ?? string.Empty, Location = new Point(25, 144), Size = new Size(350, 30), Font = new Font("Segoe UI", 10F) };
 
             Label lblTelefono = new Label { Text = "Teléfono de Contacto:", Location = new Point(25, 184), AutoSize = true, Font = new Font("Segoe UI", 9F, FontStyle.Bold) };
-            TextBox txtTelefono = new TextBox { Text = c.Telefono, Location = new Point(25, 206), Size = new Size(350, 30), Font = new Font("Segoe UI", 10F) };
+            TextBox txtTelefono = new TextBox { Text = c.Telefono ?? string.Empty, Location = new Point(25, 206), Size = new Size(350, 30), Font = new Font("Segoe UI", 10F) };
 
             Label lblEmail = new Label { Text = "Correo Electrónico:", Location = new Point(25, 246), AutoSize = true, Font = new Font("Segoe UI", 9F, FontStyle.Bold) };
-            TextBox txtEmail = new TextBox { Text = c.Email, Location = new Point(25, 268), Size = new Size(350, 30), Font = new Font("Segoe UI", 10F) };
+            TextBox txtEmail = new TextBox { Text = c.Email ?? string.Empty, Location = new Point(25, 268), Size = new Size(350, 30), Font = new Font("Segoe UI", 10F) };
 
             Label lblDireccion = new Label { Text = "Dirección:", Location = new Point(25, 308), AutoSize = true, Font = new Font("Segoe UI", 9F, FontStyle.Bold) };
-            TextBox txtDireccion = new TextBox { Text = c.Direccion, Location = new Point(25, 330), Size = new Size(350, 30), Font = new Font("Segoe UI", 10F) };
+            TextBox txtDireccion = new TextBox { Text = c.Direccion ?? string.Empty, Location = new Point(25, 330), Size = new Size(350, 30), Font = new Font("Segoe UI", 10F) };
 
             Button btnGuardar = new Button
             {
@@ -339,11 +327,7 @@ namespace SISTEMAACTUALIZADO
 
                 try
                 {
-                    if (esNuevo)
-                    {
-                        _db.Clientes.Add(c);
-                    }
-                    _db.SaveChanges();
+                    _clienteService.GuardarCliente(c, esNuevo);
 
                     MessageBox.Show("Cliente guardado correctamente.", "Éxito", MessageBoxButtons.OK, MessageBoxIcon.Information);
                     modal.Close();

@@ -2,16 +2,15 @@ using System;
 using System.Collections.Generic;
 using System.Drawing;
 using System.IO;
-using System.Linq;
 using System.Windows.Forms;
-using SISTEMAACTUALIZADO.Data;
 using SISTEMAACTUALIZADO.Models;
+using SISTEMAACTUALIZADO.Services;
 
 namespace SISTEMAACTUALIZADO
 {
     public class FormProductos : Form
     {
-        private AppDbContext _db = new AppDbContext();
+        private readonly ProductoService _productoService = new ProductoService();
 
         private TextBox txtBuscar = null!;
         private Button btnBuscar = null!;
@@ -218,14 +217,7 @@ namespace SISTEMAACTUALIZADO
         {
             try
             {
-                var query = _db.Productos.AsQueryable();
-
-                if (!string.IsNullOrWhiteSpace(filtro))
-                {
-                    query = query.Where(p => (p.Nombre != null && p.Nombre.Contains(filtro)) || (p.CodigoBarra != null && p.CodigoBarra.Contains(filtro)));
-                }
-
-                var productos = query.OrderBy(p => p.Nombre).ToList();
+                var productos = _productoService.ObtenerProductos(filtro);
                 dgvProductos.DataSource = productos;
 
                 if (dgvProductos.Columns["ProductoID"] != null) dgvProductos.Columns["ProductoID"].HeaderText = "ID";
@@ -266,34 +258,9 @@ namespace SISTEMAACTUALIZADO
         {
             try
             {
-                var productosDemo = new List<Producto>
-                {
-                    new Producto { CodigoBarra = "780123456781", Nombre = "Leche Entera 1L", PrecioUnitario = 1150, Stock = 40, Estado = true },
-                    new Producto { CodigoBarra = "780123456782", Nombre = "Queso Gauda 250g", PrecioUnitario = 2490, Stock = 25, Estado = true },
-                    new Producto { CodigoBarra = "780123456783", Nombre = "Jamón Pierna 200g", PrecioUnitario = 1990, Stock = 20, Estado = true },
-                    new Producto { CodigoBarra = "780123456784", Nombre = "Bebida Sprite 1.5L", PrecioUnitario = 1500, Stock = 30, Estado = true },
-                    new Producto { CodigoBarra = "780123456785", Nombre = "Galletas Tritón 126g", PrecioUnitario = 850, Stock = 50, Estado = true },
-                    new Producto { CodigoBarra = "780123456786", Nombre = "Café Nescafé 170g", PrecioUnitario = 4200, Stock = 15, Estado = true },
-                    new Producto { CodigoBarra = "780123456787", Nombre = "Azúcar Blanca 1kg", PrecioUnitario = 1290, Stock = 60, Estado = true },
-                    new Producto { CodigoBarra = "780123456788", Nombre = "Aceite Vegetal 900ml", PrecioUnitario = 2190, Stock = 35, Estado = true },
-                    new Producto { CodigoBarra = "780123456789", Nombre = "Papas Chips 130g", PrecioUnitario = 1490, Stock = 45, Estado = true },
-                    new Producto { CodigoBarra = "780123456790", Nombre = "Yogurt Frutilla 125g", PrecioUnitario = 450, Stock = 80, Estado = true }
-                };
-
-                int agregados = 0;
-                foreach (var p in productosDemo)
-                {
-                    bool existe = _db.Productos.Any(x => x.CodigoBarra == p.CodigoBarra || x.Nombre == p.Nombre);
-                    if (!existe)
-                    {
-                        _db.Productos.Add(p);
-                        agregados++;
-                    }
-                }
-
+                int agregados = _productoService.CargarProductosDemo();
                 if (agregados > 0)
                 {
-                    _db.SaveChanges();
                     MessageBox.Show($"¡Se agregaron {agregados} productos de prueba exitosamente!", "Éxito Demo", MessageBoxButtons.OK, MessageBoxIcon.Information);
                     CargarProductos();
                 }
@@ -332,8 +299,7 @@ namespace SISTEMAACTUALIZADO
             {
                 try
                 {
-                    _productoSeleccionado.Estado = !_productoSeleccionado.Estado;
-                    _db.SaveChanges();
+                    _productoService.CambiarEstado(_productoSeleccionado.ProductoID);
                     CargarProductos(txtBuscar.Text.Trim());
                 }
                 catch (Exception ex)
@@ -470,11 +436,7 @@ namespace SISTEMAACTUALIZADO
 
                 try
                 {
-                    if (esNuevo)
-                    {
-                        _db.Productos.Add(p);
-                    }
-                    _db.SaveChanges();
+                    _productoService.GuardarProducto(p, esNuevo);
 
                     MessageBox.Show("Producto guardado correctamente.", "Éxito", MessageBoxButtons.OK, MessageBoxIcon.Information);
                     modal.Close();
