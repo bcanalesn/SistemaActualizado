@@ -17,7 +17,7 @@ namespace SISTEMAACTUALIZADO.Data
         {
             if (!optionsBuilder.IsConfigured)
             {
-                string connectionString = "Server=localhost;Database=sistemaepos;Uid=root;Pwd=root;";
+                string connectionString = "Server=localhost;Database=sistemaepos;Uid=root;";
                 optionsBuilder.UseMySql(connectionString, ServerVersion.AutoDetect(connectionString));
             }
         }

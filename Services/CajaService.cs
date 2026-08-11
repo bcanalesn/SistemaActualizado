@@ -6,6 +6,26 @@ using SISTEMAACTUALIZADO.Models;
 
 namespace SISTEMAACTUALIZADO.Services
 {
+    public class DesgloseMedioPago
+    {
+        public string Medio { get; set; } = "Efectivo";
+        public decimal Monto { get; set; }
+        public decimal Porcentaje { get; set; }
+    }
+
+    public class MetricasTurno
+    {
+        public decimal VentasTotales { get; set; }
+        public decimal VentasEfectivo { get; set; }
+        public decimal VentasTarjetas { get; set; }
+        public decimal VentasTransferencia { get; set; }
+        public decimal MontoAnulaciones { get; set; }
+        public int CantVentas { get; set; }
+        public int CantAnulaciones { get; set; }
+        public int CantProductos { get; set; }
+        public List<DesgloseMedioPago> ListaDesglose { get; set; } = new List<DesgloseMedioPago>();
+    }
+
     public class CajaService
     {
         private readonly AppDbContext _db = new AppDbContext();
@@ -89,13 +109,82 @@ namespace SISTEMAACTUALIZADO.Services
             try
             {
                 return _db.TVE2607
-                    .Where(v => v.FecDoc >= fechaApertura && v.status == "Emitido")
+                    .Where(v => v.FecDoc >= fechaApertura && v.status == "Emitido" && (string.IsNullOrEmpty(v.UserDTE) || v.UserDTE.Contains("Efectivo") || v.UserDTE.Contains("Múltiple") || v.UserDTE.Contains("Cajero")))
                     .Sum(v => (decimal?)(v.iddocDTE == 61 ? -v.Total : v.Total)) ?? 0;
             }
             catch
             {
                 return 0;
             }
+        }
+
+        public MetricasTurno ObtenerMetricasResumenTurno(DateTime fechaApertura)
+        {
+            var metricas = new MetricasTurno();
+            try
+            {
+                var ventasEmitidas = _db.TVE2607.Where(v => v.FecDoc >= fechaApertura && v.status == "Emitido").ToList();
+                var anulaciones = _db.TVE2607.Where(v => v.FecDoc >= fechaApertura && v.status == "Anulado").ToList();
+
+                metricas.VentasTotales = ventasEmitidas.Sum(v => v.Total);
+                metricas.CantVentas = ventasEmitidas.Count;
+
+                metricas.MontoAnulaciones = anulaciones.Sum(v => v.Total);
+                metricas.CantAnulaciones = anulaciones.Count;
+
+                var idsEmitidos = ventasEmitidas.Select(v => v.idTve).ToList();
+                metricas.CantProductos = _db.TVD2607.Where(d => idsEmitidos.Contains(d.idTve)).Sum(d => (int?)d.Cantidad) ?? 0;
+
+                // Desglose por Medio de Pago en Base al UserDTE / Documento
+                decimal mEfectivo = 0;
+                decimal mDebito = 0;
+                decimal mCredito = 0;
+                decimal mTransferencia = 0;
+                decimal mMultiple = 0;
+
+                foreach (var v in ventasEmitidas)
+            {
+                string infoPago = v.UserDTE ?? "";
+
+                if (infoPago.Contains("Débito") || infoPago.Contains("Debito"))
+                {
+                    mDebito += v.Total;
+                }
+                else if (infoPago.Contains("Crédito") || infoPago.Contains("Credito"))
+                {
+                    mCredito += v.Total;
+                }
+                else if (infoPago.Contains("Transferencia"))
+                {
+                    mTransferencia += v.Total;
+                }
+                else
+                {
+                    // Todo lo demás (Efectivo y la porción cobrada directamente) computa a Efectivo
+                    mEfectivo += v.Total;
+                }
+            }
+
+            metricas.VentasEfectivo = mEfectivo;
+            metricas.VentasTarjetas = mDebito + mCredito;
+            metricas.VentasTransferencia = mTransferencia;
+
+            decimal total = metricas.VentasTotales > 0 ? metricas.VentasTotales : 1;
+
+            // Solo mantenemos los 4 medios principales en el desglose
+            if (mEfectivo > 0) metricas.ListaDesglose.Add(new DesgloseMedioPago { Medio = "Efectivo", Monto = mEfectivo, Porcentaje = Math.Round((mEfectivo / total) * 100, 0) });
+            if (mDebito > 0) metricas.ListaDesglose.Add(new DesgloseMedioPago { Medio = "Débito", Monto = mDebito, Porcentaje = Math.Round((mDebito / total) * 100, 0) });
+            if (mCredito > 0) metricas.ListaDesglose.Add(new DesgloseMedioPago { Medio = "Crédito", Monto = mCredito, Porcentaje = Math.Round((mCredito / total) * 100, 0) });
+            if (mTransferencia > 0) metricas.ListaDesglose.Add(new DesgloseMedioPago { Medio = "Transferencia", Monto = mTransferencia, Porcentaje = Math.Round((mTransferencia / total) * 100, 0) });
+
+            if (metricas.ListaDesglose.Count == 0)
+            {
+                metricas.ListaDesglose.Add(new DesgloseMedioPago { Medio = "Efectivo", Monto = 0, Porcentaje = 100 });
+            }
+            }
+            catch { }
+
+            return metricas;
         }
     }
 }

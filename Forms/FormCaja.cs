@@ -1,6 +1,7 @@
 using System;
 using System.Collections.Generic;
 using System.Drawing;
+using System.Drawing.Drawing2D;
 using System.Linq;
 using System.Windows.Forms;
 using SISTEMAACTUALIZADO.Modals;
@@ -15,7 +16,6 @@ namespace SISTEMAACTUALIZADO
         private static CajaTurno? _turnoActual = null;
         private Usuario? _usuarioActual;
 
-        // Controles de Encabezado Superior
         private Button btnAbrirCaja = null!;
         private Label lblEstadoTag = null!;
         private Label lblEstadoDetalle = null!;
@@ -23,32 +23,48 @@ namespace SISTEMAACTUALIZADO
         private Label lblFondoInicial = null!;
         private Button btnVerResumen = null!;
 
-        // Controles de búsqueda y filtros
         private TextBox txtBuscarTicket = null!;
         private Button btnLimpiar = null!;
         private Label lblTotalResultados = null!;
         private Label lblUltimaActualizacion = null!;
 
-        // Grillas
         private DataGridView dgvTicketsPendientes = null!;
         private DataGridView dgvDetalleTicket = null!;
 
-        // Opciones de cobro DTE
-        private ComboBox cbTipoDocumentoCobro = null!;
-        private ComboBox cbMedioPago = null!;
+        // SECCIÓN 1: BOTONES TIPO DE DOCUMENTO
+        private Button btnDocBoleta = null!;
+        private Button btnDocFactura = null!;
+        private string _tipoDocSeleccionado = "Boleta Electrónica";
+
+        // SECCIÓN 2: BOTONES MEDIO DE PAGO
+        private Button btnPagoEfectivo = null!;
+        private Button btnPagoDebito = null!;
+        private Button btnPagoCredito = null!;
+        private Button btnPagoTransferencia = null!;
+        private Button btnPagoMultiple = null!;
+        private string _medioPagoSeleccionado = "Efectivo";
+
+        // SECCIÓN 3: DATOS DE COBRO
+        private Panel pnlDatosCobroCard = null!;
         private TextBox txtPagaCon = null!;
         private Label lblVuelto = null!;
         private Label lblTotalCobrar = null!;
 
-        // Botones de acción principales
+        // SECCIÓN 4: ACCIONES PRINCIPALES
         private Button btnCobrarTicket = null!;
         private Button btnImprimirVistaPrevia = null!;
         private Button btnAnularTicket = null!;
 
-        // Panel de Bloqueo / Opacidad (Caja Cerrada)
         private Panel pnlBloqueoCaja = null!;
 
         private TVE2607? _ticketSeleccionado = null;
+
+        // Variables Pago Múltiple
+        private decimal _pagoEfectivo = 0;
+        private decimal _pagoTarjeta = 0;
+        private decimal _pagoTransferencia = 0;
+        private decimal _vueltoMixto = 0;
+        private bool _pagoMixtoConfirmado = false;
 
         public FormCaja(Usuario? usuario = null)
         {
@@ -66,7 +82,7 @@ namespace SISTEMAACTUALIZADO
             Panel pnlMainContainer = new Panel
             {
                 Dock = DockStyle.Fill,
-                Padding = new Padding(20),
+                Padding = new Padding(12, 5, 12, 12),
                 BackColor = Color.FromArgb(248, 250, 252)
             };
 
@@ -76,39 +92,38 @@ namespace SISTEMAACTUALIZADO
             Panel pnlHeader = new Panel
             {
                 Dock = DockStyle.Top,
-                Height = 65,
+                Height = 52,
                 BackColor = Color.Transparent,
-                Margin = new Padding(0, 0, 0, 15)
+                Margin = new Padding(0, 0, 0, 5)
             };
 
             Label lblTitulo = new Label
             {
                 Text = "Caja",
-                Font = new Font("Segoe UI", 20F, FontStyle.Bold),
+                Font = new Font("Segoe UI", 18F, FontStyle.Bold),
                 ForeColor = Color.FromArgb(15, 23, 42),
-                Location = new Point(0, 8),
+                Location = new Point(0, 2),
                 AutoSize = true
             };
 
             btnAbrirCaja = new Button
             {
                 Text = "🏪 Abrir Caja",
-                Location = new Point(85, 12),
-                Size = new Size(115, 38),
+                Location = new Point(80, 6),
+                Size = new Size(115, 36),
                 BackColor = Color.White,
                 ForeColor = Color.FromArgb(37, 99, 235),
                 FlatStyle = FlatStyle.Flat,
-                Font = new Font("Segoe UI", 9.5F, FontStyle.Bold),
+                Font = new Font("Segoe UI", 9F, FontStyle.Bold),
                 Cursor = Cursors.Hand
             };
             btnAbrirCaja.FlatAppearance.BorderColor = Color.FromArgb(191, 219, 254);
             btnAbrirCaja.Click += BtnAbrirCaja_Click;
 
-            // Panel Metricas
             FlowLayoutPanel flpMetricas = new FlowLayoutPanel
             {
-                Location = new Point(380, 5),
-                Size = new Size(490, 52),
+                Location = new Point(370, 0),
+                Size = new Size(490, 48),
                 FlowDirection = FlowDirection.LeftToRight,
                 WrapContents = false
             };
@@ -124,12 +139,12 @@ namespace SISTEMAACTUALIZADO
             btnVerResumen = new Button
             {
                 Text = "📈 Ver resumen del turno",
-                Location = new Point(880, 12),
-                Size = new Size(170, 38),
+                Location = new Point(870, 6),
+                Size = new Size(170, 36),
                 BackColor = Color.White,
-                ForeColor = Color.FromArgb(51, 65, 85),
+                ForeColor = Color.FromArgb(15, 23, 42),
                 FlatStyle = FlatStyle.Flat,
-                Font = new Font("Segoe UI", 9F, FontStyle.Bold),
+                Font = new Font("Segoe UI", 8.5F, FontStyle.Bold),
                 Cursor = Cursors.Hand
             };
             btnVerResumen.FlatAppearance.BorderColor = Color.FromArgb(226, 232, 240);
@@ -138,7 +153,7 @@ namespace SISTEMAACTUALIZADO
             pnlHeader.Controls.AddRange(new Control[] { lblTitulo, btnAbrirCaja, flpMetricas, btnVerResumen });
 
             // ==========================================
-            // 2. CUERPO DE TRABAJO (2 COLUMNAS)
+            // CUERPO DE TRABAJO (2 COLUMNAS)
             // ==========================================
             Panel pnlWorkArea = new Panel { Dock = DockStyle.Fill, BackColor = Color.Transparent };
 
@@ -148,44 +163,42 @@ namespace SISTEMAACTUALIZADO
                 ColumnCount = 2,
                 RowCount = 1
             };
-            gridLayout.ColumnStyles.Add(new ColumnStyle(SizeType.Percent, 58F));
-            gridLayout.ColumnStyles.Add(new ColumnStyle(SizeType.Percent, 42F));
+            gridLayout.ColumnStyles.Add(new ColumnStyle(SizeType.Percent, 50F));
+            gridLayout.ColumnStyles.Add(new ColumnStyle(SizeType.Percent, 50F));
 
             // COLUMNA IZQUIERDA
-            Panel pnlColIzquierda = new Panel { Dock = DockStyle.Fill, Padding = new Padding(0, 0, 10, 0) };
+            Panel pnlColIzquierda = new Panel { Dock = DockStyle.Fill, Padding = new Padding(0, 0, 8, 0) };
 
-            // Panel Búsqueda
-            Panel pnlCardBusqueda = new Panel { Dock = DockStyle.Top, Height = 60, BackColor = Color.White, Padding = new Padding(12), Margin = new Padding(0, 0, 0, 10) };
-            Label lblTitBuscar = new Label { Text = "1. BUSCAR TICKET PENDIENTE", Font = new Font("Segoe UI", 8.5F, FontStyle.Bold), ForeColor = Color.FromArgb(30, 41, 59), Location = new Point(12, 6), AutoSize = true };
+            Panel pnlCardBusqueda = new Panel { Dock = DockStyle.Top, Height = 58, BackColor = Color.White, Padding = new Padding(10), Margin = new Padding(0, 0, 0, 8) };
+            Label lblTitBuscar = new Label { Text = "BUSCAR TICKET PENDIENTE", Font = new Font("Segoe UI", 8.5F, FontStyle.Bold), ForeColor = Color.FromArgb(15, 23, 42), Location = new Point(10, 5), AutoSize = true };
 
-            txtBuscarTicket = new TextBox { Location = new Point(12, 26), Size = new Size(240, 26), Font = new Font("Segoe UI", 9.5F) };
+            txtBuscarTicket = new TextBox { Location = new Point(10, 24), Size = new Size(200, 26), Font = new Font("Segoe UI", 9.5F) };
             txtBuscarTicket.KeyDown += (s, e) => { if (e.KeyCode == Keys.Enter) { CargarTicketsPendientes(txtBuscarTicket.Text.Trim()); e.SuppressKeyPress = true; } };
 
-            Button btnBuscar = new Button { Text = "🔍 Buscar", Location = new Point(258, 25), Size = new Size(80, 28), BackColor = Color.FromArgb(37, 99, 235), ForeColor = Color.White, FlatStyle = FlatStyle.Flat, Font = new Font("Segoe UI", 8.5F, FontStyle.Bold), Cursor = Cursors.Hand };
+            Button btnBuscar = new Button { Text = "🔍 Buscar", Location = new Point(218, 23), Size = new Size(75, 28), BackColor = Color.FromArgb(37, 99, 235), ForeColor = Color.White, FlatStyle = FlatStyle.Flat, Font = new Font("Segoe UI", 8.5F, FontStyle.Bold), Cursor = Cursors.Hand };
             btnBuscar.FlatAppearance.BorderSize = 0;
             btnBuscar.Click += (s, e) => CargarTicketsPendientes(txtBuscarTicket.Text.Trim());
 
-            Button btnRecargar = new Button { Text = "🔄 Recargar", Location = new Point(343, 25), Size = new Size(88, 28), BackColor = Color.FromArgb(241, 245, 249), ForeColor = Color.FromArgb(37, 99, 235), FlatStyle = FlatStyle.Flat, Font = new Font("Segoe UI", 8.5F, FontStyle.Bold), Cursor = Cursors.Hand };
+            Button btnRecargar = new Button { Text = "🔄 Recargar", Location = new Point(298, 23), Size = new Size(82, 28), BackColor = Color.FromArgb(241, 245, 249), ForeColor = Color.FromArgb(37, 99, 235), FlatStyle = FlatStyle.Flat, Font = new Font("Segoe UI", 8.5F, FontStyle.Bold), Cursor = Cursors.Hand };
             btnRecargar.FlatAppearance.BorderSize = 0;
             btnRecargar.Click += (s, e) => CargarTicketsPendientes();
 
-            btnLimpiar = new Button { Text = "🗑️ Limpiar", Location = new Point(436, 25), Size = new Size(80, 28), BackColor = Color.FromArgb(254, 242, 242), ForeColor = Color.FromArgb(239, 68, 68), FlatStyle = FlatStyle.Flat, Font = new Font("Segoe UI", 8.5F, FontStyle.Bold), Cursor = Cursors.Hand };
+            btnLimpiar = new Button { Text = "🗑️ Limpiar", Location = new Point(385, 23), Size = new Size(75, 28), BackColor = Color.FromArgb(254, 242, 242), ForeColor = Color.FromArgb(239, 68, 68), FlatStyle = FlatStyle.Flat, Font = new Font("Segoe UI", 8.5F, FontStyle.Bold), Cursor = Cursors.Hand };
             btnLimpiar.FlatAppearance.BorderSize = 0;
             btnLimpiar.Click += (s, e) => { txtBuscarTicket.Clear(); CargarTicketsPendientes(); };
 
             pnlCardBusqueda.Controls.AddRange(new Control[] { lblTitBuscar, txtBuscarTicket, btnBuscar, btnRecargar, btnLimpiar });
 
-            // Tabla Tickets Pendientes
-            Panel pnlCardPendientes = new Panel { Dock = DockStyle.Top, Height = 200, BackColor = Color.White, Padding = new Padding(12), Margin = new Padding(0, 10, 0, 10) };
-            Label lblTitPend = new Label { Text = "2. TICKETS PENDIENTES DE PAGO", Font = new Font("Segoe UI", 8.5F, FontStyle.Bold), ForeColor = Color.FromArgb(30, 41, 59), Dock = DockStyle.Top, Height = 22 };
+            Panel pnlCardPendientes = new Panel { Dock = DockStyle.Top, Height = 210, BackColor = Color.White, Padding = new Padding(10), Margin = new Padding(0, 8, 0, 8) };
+            Label lblTitPend = new Label { Text = "TICKETS PENDIENTES DE PAGO", Font = new Font("Segoe UI", 8.5F, FontStyle.Bold), ForeColor = Color.FromArgb(15, 23, 42), Dock = DockStyle.Top, Height = 22 };
 
             dgvTicketsPendientes = new DataGridView { Dock = DockStyle.Fill, BackgroundColor = Color.White, BorderStyle = BorderStyle.None, ReadOnly = true, MultiSelect = false, SelectionMode = DataGridViewSelectionMode.FullRowSelect, RowHeadersVisible = false, AutoSizeColumnsMode = DataGridViewAutoSizeColumnsMode.Fill };
             ConfigurarEstiloTabla(dgvTicketsPendientes);
             dgvTicketsPendientes.SelectionChanged += DgvTicketsPendientes_SelectionChanged;
 
             Panel pnlStatusFooter = new Panel { Dock = DockStyle.Bottom, Height = 25, BackColor = Color.White };
-            lblTotalResultados = new Label { Text = "✔ 0 tickets encontrados", Location = new Point(5, 5), AutoSize = true, Font = new Font("Segoe UI", 8F, FontStyle.Bold), ForeColor = Color.FromArgb(22, 163, 74) };
-            lblUltimaActualizacion = new Label { Text = $"Última actualización: {DateTime.Now:HH:mm:ss} 🔄", Dock = DockStyle.Right, AutoSize = true, Font = new Font("Segoe UI", 8F), ForeColor = Color.FromArgb(100, 116, 139) };
+            lblTotalResultados = new Label { Text = "✔ 0 tickets encontrados", Location = new Point(5, 5), AutoSize = true, Font = new Font("Segoe UI", 8.5F, FontStyle.Bold), ForeColor = Color.FromArgb(22, 163, 74) };
+            lblUltimaActualizacion = new Label { Text = $"Última actualización: {DateTime.Now:HH:mm:ss} 🔄", Dock = DockStyle.Right, AutoSize = true, Font = new Font("Segoe UI", 8.5F), ForeColor = Color.FromArgb(15, 23, 42) };
             pnlStatusFooter.Controls.Add(lblTotalResultados);
             pnlStatusFooter.Controls.Add(lblUltimaActualizacion);
 
@@ -193,9 +206,8 @@ namespace SISTEMAACTUALIZADO
             pnlCardPendientes.Controls.Add(pnlStatusFooter);
             pnlCardPendientes.Controls.Add(lblTitPend);
 
-            // Tabla Detalle Ticket
-            Panel pnlCardDetalle = new Panel { Dock = DockStyle.Fill, BackColor = Color.White, Padding = new Padding(12) };
-            Label lblTitDet = new Label { Text = "3. DETALLE DEL TICKET SELECCIONADO", Font = new Font("Segoe UI", 8.5F, FontStyle.Bold), ForeColor = Color.FromArgb(30, 41, 59), Dock = DockStyle.Top, Height = 22 };
+            Panel pnlCardDetalle = new Panel { Dock = DockStyle.Fill, BackColor = Color.White, Padding = new Padding(10) };
+            Label lblTitDet = new Label { Text = "DETALLE DEL TICKET SELECCIONADO", Font = new Font("Segoe UI", 8.5F, FontStyle.Bold), ForeColor = Color.FromArgb(15, 23, 42), Dock = DockStyle.Top, Height = 22 };
 
             dgvDetalleTicket = new DataGridView { Dock = DockStyle.Fill, BackgroundColor = Color.White, BorderStyle = BorderStyle.None, ReadOnly = true, MultiSelect = false, SelectionMode = DataGridViewSelectionMode.FullRowSelect, RowHeadersVisible = false, AutoSizeColumnsMode = DataGridViewAutoSizeColumnsMode.Fill };
             ConfigurarEstiloTabla(dgvDetalleTicket);
@@ -207,39 +219,124 @@ namespace SISTEMAACTUALIZADO
             pnlColIzquierda.Controls.Add(pnlCardPendientes);
             pnlColIzquierda.Controls.Add(pnlCardBusqueda);
 
-            // COLUMNA DERECHA (Opciones de Cobro)
-            Panel pnlColDerecha = new Panel { Dock = DockStyle.Fill, BackColor = Color.White, Padding = new Padding(15) };
-            Label lblTitCobro = new Label { Text = "4. OPCIONES DE COBRO Y EMISIÓN DTE", Font = new Font("Segoe UI", 9.5F, FontStyle.Bold), ForeColor = Color.FromArgb(30, 41, 59), Location = new Point(15, 12), AutoSize = true };
+            // =========================================================================
+            // COLUMNA DERECHA
+            // =========================================================================
+            Panel pnlColDerecha = new Panel { Dock = DockStyle.Fill, BackColor = Color.White, Padding = new Padding(10), AutoScroll = false };
 
-            Label lblTipoDoc = new Label { Text = "TIPO DE DOCUMENTO", Location = new Point(15, 45), AutoSize = true, Font = new Font("Segoe UI", 8F, FontStyle.Bold), ForeColor = Color.FromArgb(100, 116, 139) };
-            cbTipoDocumentoCobro = new ComboBox { Location = new Point(15, 63), Size = new Size(180, 28), DropDownStyle = ComboBoxStyle.DropDownList, Font = new Font("Segoe UI", 9.5F) };
-            cbTipoDocumentoCobro.Items.AddRange(new string[] { "Boleta Electrónica", "Factura Electrónica" });
-            cbTipoDocumentoCobro.SelectedIndex = 0;
+            // SECCIÓN 1: TIPO DE DOCUMENTO
+            Panel pnlSec1 = CrearContenedorSeccion(2, 98, Color.FromArgb(124, 58, 237));
+            Panel circle1 = CrearBadgeNumero("1", Color.FromArgb(124, 58, 237), new Point(10, 8));
+            Label lblT1 = new Label { Text = "TIPO DE DOCUMENTO", Location = new Point(42, 6), AutoSize = true, Font = new Font("Segoe UI", 8.5F, FontStyle.Bold), ForeColor = Color.FromArgb(124, 58, 237) };
+            Label lblSub1 = new Label { Text = "Selecciona el tipo de documento a emitir", Location = new Point(42, 22), AutoSize = true, Font = new Font("Segoe UI", 7.5F), ForeColor = Color.FromArgb(100, 116, 139) };
 
-            Label lblMedio = new Label { Text = "MEDIO DE PAGO", Location = new Point(205, 45), AutoSize = true, Font = new Font("Segoe UI", 8F, FontStyle.Bold), ForeColor = Color.FromArgb(100, 116, 139) };
-            cbMedioPago = new ComboBox { Location = new Point(205, 63), Size = new Size(180, 28), DropDownStyle = ComboBoxStyle.DropDownList, Font = new Font("Segoe UI", 9.5F) };
-            cbMedioPago.Items.AddRange(new string[] { "Efectivo", "Tarjeta Débito", "Tarjeta Crédito", "Transferencia", "Pago Mixto" });
-            cbMedioPago.SelectedIndex = 0;
+            btnDocBoleta = CrearBotonTarjeVisual("📄", "BOLETA", "ELECTRÓNICA", new Point(10, 42), new Size(205, 45), Color.FromArgb(124, 58, 237), esActivo: true);
+            btnDocBoleta.Click += (s, e) => SeleccionarTipoDocumento("Boleta Electrónica");
 
-            Label lblPaga = new Label { Text = "PAGA CON ($)", Location = new Point(15, 105), AutoSize = true, Font = new Font("Segoe UI", 8F, FontStyle.Bold), ForeColor = Color.FromArgb(100, 116, 139) };
-            txtPagaCon = new TextBox { Location = new Point(15, 123), Size = new Size(230, 32), Font = new Font("Segoe UI", 12F, FontStyle.Bold) };
+            btnDocFactura = CrearBotonTarjeVisual("📑", "FACTURA", "ELECTRÓNICA", new Point(223, 42), new Size(205, 45), Color.FromArgb(124, 58, 237), esActivo: false);
+            btnDocFactura.Click += (s, e) => SeleccionarTipoDocumento("Factura Electrónica");
+
+            pnlSec1.Controls.AddRange(new Control[] { circle1, lblT1, lblSub1, btnDocBoleta, btnDocFactura });
+
+            // SECCIÓN 2: MEDIO DE PAGO
+            Panel pnlSec2 = CrearContenedorSeccion(108, 115, Color.FromArgb(203, 213, 225));
+            Panel circle2 = CrearBadgeNumero("2", Color.FromArgb(37, 99, 235), new Point(10, 8));
+            Label lblT2 = new Label { Text = "MEDIO DE PAGO", Location = new Point(42, 6), AutoSize = true, Font = new Font("Segoe UI", 8.5F, FontStyle.Bold), ForeColor = Color.FromArgb(37, 99, 235) };
+            Label lblSub2 = new Label { Text = "Selecciona el medio de pago", Location = new Point(42, 22), AutoSize = true, Font = new Font("Segoe UI", 7.5F), ForeColor = Color.FromArgb(100, 116, 139) };
+
+            btnPagoEfectivo = CrearBotonPagoVectorial("EFECTIVO", "EFECTIVO", new Point(8, 42), new Size(80, 62), Color.FromArgb(16, 185, 129), () => _medioPagoSeleccionado == "Efectivo");
+            btnPagoEfectivo.Click += (s, e) => SeleccionarMedioPago("Efectivo");
+
+            btnPagoDebito = CrearBotonPagoVectorial("DÉBITO", "DÉBITO", new Point(92, 42), new Size(80, 62), Color.FromArgb(37, 99, 235), () => _medioPagoSeleccionado == "Débito");
+            btnPagoDebito.Click += (s, e) => SeleccionarMedioPago("Débito");
+
+            btnPagoCredito = CrearBotonPagoVectorial("CRÉDITO", "CRÉDITO", new Point(176, 42), new Size(80, 62), Color.FromArgb(124, 58, 237), () => _medioPagoSeleccionado == "Crédito");
+            btnPagoCredito.Click += (s, e) => SeleccionarMedioPago("Crédito");
+
+            btnPagoTransferencia = CrearBotonPagoVectorial("TRANSFERENCIA", "TRANSFERENCIA", new Point(260, 42), new Size(88, 62), Color.FromArgb(13, 148, 136), () => _medioPagoSeleccionado == "Transferencia");
+            btnPagoTransferencia.Click += (s, e) => SeleccionarMedioPago("Transferencia");
+
+            btnPagoMultiple = CrearBotonPagoVectorial("PAGO MÚLTIPLE", "PAGO\nMÚLTIPLE", new Point(352, 42), new Size(76, 62), Color.FromArgb(234, 88, 12), () => _medioPagoSeleccionado == "Pago Múltiple");
+            btnPagoMultiple.Click += (s, e) => SeleccionarMedioPago("Pago Múltiple");
+
+            pnlSec2.Controls.AddRange(new Control[] { circle2, lblT2, lblSub2, btnPagoEfectivo, btnPagoDebito, btnPagoCredito, btnPagoTransferencia, btnPagoMultiple });
+
+            // SECCIÓN 3: DATOS DE COBRO
+            pnlDatosCobroCard = CrearContenedorSeccion(231, 162, Color.FromArgb(16, 185, 129));
+            Panel circle3 = CrearBadgeNumero("3", Color.FromArgb(16, 185, 129), new Point(10, 8));
+            Label lblT3 = new Label { Text = "DATOS DE COBRO", Location = new Point(42, 6), AutoSize = true, Font = new Font("Segoe UI", 8.5F, FontStyle.Bold), ForeColor = Color.FromArgb(16, 185, 129) };
+            Label lblSub3 = new Label { Text = "Ingresa el monto recibido (solo para Efectivo o Pago Múltiple)", Location = new Point(42, 22), AutoSize = true, Font = new Font("Segoe UI", 7.5F), ForeColor = Color.FromArgb(100, 116, 139) };
+
+            // Panel PAGA CON con posiciones alineadas
+            Panel pnlPagaCon = new Panel { Location = new Point(10, 42), Size = new Size(210, 52), BackColor = Color.FromArgb(248, 250, 252) };
+            pnlPagaCon.Paint += (s, e) =>
+            {
+                e.Graphics.SmoothingMode = SmoothingMode.AntiAlias;
+                Rectangle r = new Rectangle(0, 0, pnlPagaCon.Width - 1, pnlPagaCon.Height - 1);
+                using GraphicsPath p = CrearRutaRedondeada(r, 8);
+                using Pen pen = new Pen(Color.FromArgb(226, 232, 240), 1.5f);
+                e.Graphics.DrawPath(pen, p);
+            };
+
+            Label lblP = new Label { Text = "PAGA CON", Location = new Point(8, 4), AutoSize = true, Font = new Font("Segoe UI", 7.5F, FontStyle.Bold), ForeColor = Color.FromArgb(15, 23, 42) };
+
+            // Signo $ ligeramente desplazado
+            Label lblSigno = new Label { Text = "$", Location = new Point(8, 22), AutoSize = true, Font = new Font("Segoe UI", 11F, FontStyle.Bold), ForeColor = Color.FromArgb(100, 116, 139) };
+
+            // TextBox reposicionado en Y=20 y con mayor ancho/alto para evitar recortes
+            txtPagaCon = new TextBox 
+            { 
+                Location = new Point(24, 22), 
+                Size = new Size(178, 26), 
+                Font = new Font("Segoe UI", 11F, FontStyle.Bold), 
+                BorderStyle = BorderStyle.None, 
+                BackColor = Color.FromArgb(248, 250, 252) 
+            };
             txtPagaCon.TextChanged += TxtPagaCon_TextChanged;
 
-            Panel cardVuelto = new Panel { Location = new Point(255, 105), Size = new Size(130, 50), BackColor = Color.FromArgb(240, 249, 255) };
-            Label lblVuelCap = new Label { Text = "VUELTO", Location = new Point(8, 6), AutoSize = true, Font = new Font("Segoe UI", 7.5F, FontStyle.Bold), ForeColor = Color.FromArgb(3, 105, 161) };
-            lblVuelto = new Label { Text = "$ 0", Location = new Point(8, 22), AutoSize = true, Font = new Font("Segoe UI", 13F, FontStyle.Bold), ForeColor = Color.FromArgb(16, 185, 129) };
-            cardVuelto.Controls.AddRange(new Control[] { lblVuelCap, lblVuelto });
+            pnlPagaCon.Controls.AddRange(new Control[] { lblP, lblSigno, txtPagaCon });
 
-            Panel pnlCardTotal = new Panel { Location = new Point(15, 170), Size = new Size(370, 60), BackColor = Color.FromArgb(238, 242, 255) };
-            Label lblTotCap = new Label { Text = "TOTAL A COBRAR", Location = new Point(15, 10), AutoSize = true, Font = new Font("Segoe UI", 8.5F, FontStyle.Bold), ForeColor = Color.FromArgb(49, 46, 129) };
-            lblTotalCobrar = new Label { Text = "$ 0", Location = new Point(15, 26), AutoSize = true, Font = new Font("Segoe UI", 18F, FontStyle.Bold), ForeColor = Color.FromArgb(37, 99, 235) };
-            pnlCardTotal.Controls.AddRange(new Control[] { lblTotCap, lblTotalCobrar });
+            Panel pnlVueltoCard = new Panel { Location = new Point(226, 42), Size = new Size(202, 52), BackColor = Color.FromArgb(240, 253, 244) };
+            pnlVueltoCard.Paint += (s, e) =>
+            {
+                e.Graphics.SmoothingMode = SmoothingMode.AntiAlias;
+                Rectangle r = new Rectangle(0, 0, pnlVueltoCard.Width - 1, pnlVueltoCard.Height - 1);
+                using GraphicsPath p = CrearRutaRedondeada(r, 8);
+                using Pen pen = new Pen(Color.FromArgb(187, 247, 208), 1.5f);
+                e.Graphics.DrawPath(pen, p);
+            };
+
+            Label lblVIcon = new Label { Text = "💵 VUELTO", Location = new Point(8, 5), AutoSize = true, Font = new Font("Segoe UI", 7.5F, FontStyle.Bold), ForeColor = Color.FromArgb(22, 101, 52) };
+            lblVuelto = new Label { Text = "$0", Location = new Point(70, 12), Size = new Size(124, 30), Font = new Font("Segoe UI", 15F, FontStyle.Bold), ForeColor = Color.FromArgb(16, 185, 129), TextAlign = ContentAlignment.MiddleRight };
+            pnlVueltoCard.Controls.AddRange(new Control[] { lblVIcon, lblVuelto });
+
+            Panel pnlTotalCard = new Panel { Location = new Point(10, 100), Size = new Size(418, 50), BackColor = Color.FromArgb(245, 243, 255) };
+            pnlTotalCard.Paint += (s, e) =>
+            {
+                e.Graphics.SmoothingMode = SmoothingMode.AntiAlias;
+                Rectangle r = new Rectangle(0, 0, pnlTotalCard.Width - 1, pnlTotalCard.Height - 1);
+                using GraphicsPath p = CrearRutaRedondeada(r, 8);
+                using Pen pen = new Pen(Color.FromArgb(221, 214, 254), 1.5f);
+                e.Graphics.DrawPath(pen, p);
+            };
+
+            Panel pnlTotCircle = CrearBadgeNumero("$", Color.FromArgb(124, 58, 237), new Point(8, 10));
+            Label lblTotCap = new Label { Text = "TOTAL A COBRAR", Location = new Point(42, 5), AutoSize = true, Font = new Font("Segoe UI", 7.5F, FontStyle.Bold), ForeColor = Color.FromArgb(124, 58, 237) };
+            lblTotalCobrar = new Label { Text = "$0", Location = new Point(42, 18), AutoSize = true, Font = new Font("Segoe UI", 16F, FontStyle.Bold), ForeColor = Color.FromArgb(124, 58, 237) };
+            pnlTotalCard.Controls.AddRange(new Control[] { pnlTotCircle, lblTotCap, lblTotalCobrar });
+
+            pnlDatosCobroCard.Controls.AddRange(new Control[] { circle3, lblT3, lblSub3, pnlPagaCon, pnlVueltoCard, pnlTotalCard });
+
+            // SECCIÓN 4: ACCIONES PRINCIPALES
+            Panel pnlSec4 = CrearContenedorSeccion(401, 118, Color.FromArgb(234, 88, 12));
+            Panel circle4 = CrearBadgeNumero("4", Color.FromArgb(234, 88, 12), new Point(10, 8));
+            Label lblT4 = new Label { Text = "ACCIONES PRINCIPALES", Location = new Point(42, 8), AutoSize = true, Font = new Font("Segoe UI", 8.5F, FontStyle.Bold), ForeColor = Color.FromArgb(234, 88, 12) };
 
             btnCobrarTicket = new Button
             {
-                Text = "⚡ COBRAR Y EMITIR DTE\nConfirmar pago y emitir documento",
-                Location = new Point(15, 242),
-                Size = new Size(370, 52),
+                Text = "⚡  COBRAR Y EMITIR DTE",
+                Location = new Point(10, 38),
+                Size = new Size(418, 38),
                 BackColor = Color.FromArgb(16, 185, 129),
                 ForeColor = Color.White,
                 FlatStyle = FlatStyle.Flat,
@@ -252,11 +349,11 @@ namespace SISTEMAACTUALIZADO
 
             btnImprimirVistaPrevia = new Button
             {
-                Text = "🖨️ Imprimir Vista Previa",
-                Location = new Point(15, 305),
-                Size = new Size(180, 36),
+                Text = "🖨️  IMPRIMIR VISTA PREVIA",
+                Location = new Point(10, 80),
+                Size = new Size(202, 30),
                 BackColor = Color.White,
-                ForeColor = Color.FromArgb(51, 65, 85),
+                ForeColor = Color.FromArgb(15, 23, 42),
                 FlatStyle = FlatStyle.Flat,
                 Font = new Font("Segoe UI", 8.5F, FontStyle.Bold),
                 Cursor = Cursors.Hand
@@ -266,9 +363,9 @@ namespace SISTEMAACTUALIZADO
 
             btnAnularTicket = new Button
             {
-                Text = "🚫 Anular Ticket",
-                Location = new Point(205, 305),
-                Size = new Size(180, 36),
+                Text = "🚫  ANULAR TICKET",
+                Location = new Point(220, 80),
+                Size = new Size(208, 30),
                 BackColor = Color.White,
                 ForeColor = Color.FromArgb(239, 68, 68),
                 FlatStyle = FlatStyle.Flat,
@@ -279,24 +376,20 @@ namespace SISTEMAACTUALIZADO
             btnAnularTicket.FlatAppearance.BorderColor = Color.FromArgb(254, 202, 202);
             btnAnularTicket.Click += BtnAnularTicket_Click;
 
-            pnlColDerecha.Controls.AddRange(new Control[] {
-                lblTitCobro, lblTipoDoc, cbTipoDocumentoCobro, lblMedio, cbMedioPago,
-                lblPaga, txtPagaCon, cardVuelto, pnlCardTotal, btnCobrarTicket,
-                btnImprimirVistaPrevia, btnAnularTicket
-            });
+            pnlSec4.Controls.AddRange(new Control[] { circle4, lblT4, btnCobrarTicket, btnImprimirVistaPrevia, btnAnularTicket });
+
+            pnlColDerecha.Controls.AddRange(new Control[] { pnlSec1, pnlSec2, pnlDatosCobroCard, pnlSec4 });
 
             gridLayout.Controls.Add(pnlColIzquierda, 0, 0);
             gridLayout.Controls.Add(pnlColDerecha, 1, 0);
 
             pnlWorkArea.Controls.Add(gridLayout);
 
-            // ==========================================
-            // 3. CAPA / PANEL DE BLOQUEO (CAJA CERRADA)
-            // ==========================================
+            // CAPA DE BLOQUEO (CAJA CERRADA)
             pnlBloqueoCaja = new Panel
             {
                 Dock = DockStyle.Fill,
-                BackColor = Color.FromArgb(160, 241, 245, 249), // Opaco/Translúcido
+                BackColor = Color.FromArgb(160, 241, 245, 249),
                 Visible = true
             };
 
@@ -304,7 +397,7 @@ namespace SISTEMAACTUALIZADO
             {
                 Text = "🔒 LA CAJA SE ENCUENTRA CERRADA\nPresione el botón 'Abrir Caja' en la barra superior para habilitar cobros.",
                 Font = new Font("Segoe UI", 12F, FontStyle.Bold),
-                ForeColor = Color.FromArgb(71, 85, 105),
+                ForeColor = Color.FromArgb(15, 23, 42),
                 TextAlign = ContentAlignment.MiddleCenter,
                 Dock = DockStyle.Fill
             };
@@ -320,11 +413,258 @@ namespace SISTEMAACTUALIZADO
             CargarTicketsPendientes();
         }
 
+        // ==========================================
+        // DIBUJADO VECTORIAL Y ESQUINAS REDONDEADAS
+        // ==========================================
+        private GraphicsPath CrearRutaRedondeada(Rectangle rect, int radio)
+        {
+            GraphicsPath path = new GraphicsPath();
+            int d = radio * 2;
+            path.AddArc(rect.X, rect.Y, d, d, 180, 90);
+            path.AddArc(rect.Right - d, rect.Y, d, d, 270, 90);
+            path.AddArc(rect.Right - d, rect.Bottom - d, d, d, 0, 90);
+            path.AddArc(rect.X, rect.Bottom - d, d, d, 90, 90);
+            path.CloseFigure();
+            return path;
+        }
+
+        private Panel CrearContenedorSeccion(int y, int alto, Color colorBorde)
+        {
+            Panel pnl = new Panel
+            {
+                Location = new Point(10, y),
+                Size = new Size(440, alto),
+                BackColor = Color.White,
+                Margin = new Padding(0, 0, 0, 10)
+            };
+
+            pnl.Paint += (s, e) =>
+            {
+                e.Graphics.SmoothingMode = SmoothingMode.AntiAlias;
+                Rectangle rect = new Rectangle(0, 0, pnl.Width - 1, pnl.Height - 1);
+                using GraphicsPath path = CrearRutaRedondeada(rect, 10);
+                using Pen pen = new Pen(colorBorde, 1.5f);
+                e.Graphics.DrawPath(pen, path);
+            };
+            return pnl;
+        }
+
+        private Panel CrearBadgeNumero(string texto, Color colorFondo, Point ubicacion)
+        {
+            Panel pnl = new Panel
+            {
+                Location = ubicacion,
+                Size = new Size(24, 24),
+                BackColor = Color.Transparent
+            };
+
+            pnl.Paint += (s, e) =>
+            {
+                e.Graphics.SmoothingMode = SmoothingMode.AntiAlias;
+                using SolidBrush brush = new SolidBrush(colorFondo);
+                e.Graphics.FillEllipse(brush, 0, 0, pnl.Width - 1, pnl.Height - 1);
+
+                using StringFormat sf = new StringFormat { Alignment = StringAlignment.Center, LineAlignment = StringAlignment.Center };
+                using Font font = new Font("Segoe UI", 9F, FontStyle.Bold);
+                e.Graphics.DrawString(texto, font, Brushes.White, new RectangleF(0, 0, pnl.Width, pnl.Height), sf);
+            };
+            return pnl;
+        }
+
+        private Button CrearBotonTarjeVisual(string icono, string linea1, string linea2, Point loc, Size tamano, Color colorTema, bool esActivo)
+        {
+            Button btn = new Button
+            {
+                Text = $"{icono}   {linea1}\n    {linea2}",
+                Location = loc,
+                Size = tamano,
+                FlatStyle = FlatStyle.Flat,
+                Font = new Font("Segoe UI", 8.5F, FontStyle.Bold),
+                TextAlign = ContentAlignment.MiddleLeft,
+                Cursor = Cursors.Hand
+            };
+            AplicarEstiloBotonDocumento(btn, colorTema, esActivo);
+            return btn;
+        }
+
+        private void AplicarEstiloBotonDocumento(Button btn, Color colorTema, bool esActivo)
+        {
+            if (esActivo)
+            {
+                btn.BackColor = colorTema;
+                btn.ForeColor = Color.White;
+                btn.FlatAppearance.BorderSize = 0;
+            }
+            else
+            {
+                btn.BackColor = Color.White;
+                btn.ForeColor = Color.FromArgb(15, 23, 42);
+                btn.FlatAppearance.BorderColor = Color.FromArgb(226, 232, 240);
+                btn.FlatAppearance.BorderSize = 1;
+            }
+        }
+
+        private Button CrearBotonPagoVectorial(string tipo, string titulo, Point loc, Size tamano, Color colorTema, Func<bool> fnEstaSeleccionado)
+        {
+            Button btn = new Button
+            {
+                Location = loc,
+                Size = tamano,
+                FlatStyle = FlatStyle.Flat,
+                Cursor = Cursors.Hand,
+                BackColor = Color.White
+            };
+            btn.FlatAppearance.BorderSize = 0;
+
+            btn.Paint += (s, e) =>
+            {
+                Graphics g = e.Graphics;
+                g.SmoothingMode = SmoothingMode.AntiAlias;
+
+                bool esActivo = fnEstaSeleccionado();
+
+                Rectangle rect = new Rectangle(0, 0, btn.Width - 1, btn.Height - 1);
+                using GraphicsPath path = CrearRutaRedondeada(rect, 10);
+
+                if (esActivo && tipo == "PAGO MÚLTIPLE")
+                {
+                    using SolidBrush bg = new SolidBrush(Color.FromArgb(254, 243, 199));
+                    g.FillPath(bg, path);
+                    using Pen p = new Pen(colorTema, 2.5f);
+                    g.DrawPath(p, path);
+                }
+                else if (esActivo)
+                {
+                    using SolidBrush bg = new SolidBrush(Color.FromArgb(240, 253, 244));
+                    g.FillPath(bg, path);
+                    using Pen p = new Pen(colorTema, 2.5f);
+                    g.DrawPath(p, path);
+                }
+                else
+                {
+                    using SolidBrush bg = new SolidBrush(Color.White);
+                    g.FillPath(bg, path);
+                    using Pen p = new Pen(Color.FromArgb(226, 232, 240), 1.5f);
+                    g.DrawPath(p, path);
+                }
+
+                int iconX = (btn.Width - 30) / 2;
+                int iconY = 8;
+                Color colorIcono = (esActivo || tipo == "PAGO MÚLTIPLE") ? colorTema : Color.FromArgb(100, 116, 139);
+
+                DibujarIconoVectorial(g, tipo, iconX, iconY, colorIcono);
+
+                using StringFormat sf = new StringFormat { Alignment = StringAlignment.Center, LineAlignment = StringAlignment.Center };
+                using Font font = new Font("Segoe UI", 7.5F, FontStyle.Bold);
+                using SolidBrush brushText = new SolidBrush(Color.FromArgb(15, 23, 42));
+
+                RectangleF rectTexto = new RectangleF(0, 30, btn.Width, btn.Height - 30);
+                g.DrawString(titulo, font, brushText, rectTexto, sf);
+            };
+
+            return btn;
+        }
+
+        private void DibujarIconoVectorial(Graphics g, string tipo, int x, int y, Color color)
+        {
+            using SolidBrush brush = new SolidBrush(color);
+            using Pen pen = new Pen(color, 2f);
+
+            switch (tipo)
+            {
+                case "EFECTIVO":
+                    using (GraphicsPath bPath = CrearRutaRedondeada(new Rectangle(x, y + 2, 30, 18), 3))
+                    {
+                        g.FillPath(brush, bPath);
+                    }
+                    using (SolidBrush whiteB = new SolidBrush(Color.White))
+                    {
+                        g.FillEllipse(whiteB, x + 10, y + 6, 10, 10);
+                    }
+                    g.FillEllipse(brush, x + 12, y + 8, 6, 6);
+                    break;
+
+                case "DÉBITO":
+                case "CRÉDITO":
+                    using (GraphicsPath tPath = CrearRutaRedondeada(new Rectangle(x + 1, y + 2, 28, 18), 3))
+                    {
+                        g.FillPath(brush, tPath);
+                    }
+                    using (SolidBrush whiteB = new SolidBrush(Color.White))
+                    {
+                        g.FillRectangle(whiteB, x + 1, y + 6, 28, 4);
+                        g.FillRectangle(whiteB, x + 5, y + 13, 6, 3);
+                    }
+                    break;
+
+                case "TRANSFERENCIA":
+                    Point[] techo = { new Point(x + 15, y + 2), new Point(x + 2, y + 8), new Point(x + 28, y + 8) };
+                    g.FillPolygon(brush, techo);
+                    g.FillRectangle(brush, x + 4, y + 9, 22, 2);
+                    g.FillRectangle(brush, x + 6, y + 12, 3, 6);
+                    g.FillRectangle(brush, x + 12, y + 12, 3, 6);
+                    g.FillRectangle(brush, x + 18, y + 12, 3, 6);
+                    g.FillRectangle(brush, x + 3, y + 18, 24, 2);
+                    break;
+
+                case "PAGO MÚLTIPLE":
+                    pen.Width = 2.5f;
+                    pen.StartCap = LineCap.Round;
+                    pen.EndCap = LineCap.ArrowAnchor;
+
+                    g.FillRectangle(brush, x + 2, y + 9, 8, 4);
+                    g.DrawLine(pen, new Point(x + 8, y + 11), new Point(x + 22, y + 4));
+                    g.DrawLine(pen, new Point(x + 8, y + 11), new Point(x + 22, y + 18));
+                    break;
+            }
+        }
+
+        private void SeleccionarTipoDocumento(string tipoDoc)
+        {
+            _tipoDocSeleccionado = tipoDoc;
+            AplicarEstiloBotonDocumento(btnDocBoleta, Color.FromArgb(124, 58, 237), _tipoDocSeleccionado == "Boleta Electrónica");
+            AplicarEstiloBotonDocumento(btnDocFactura, Color.FromArgb(124, 58, 237), _tipoDocSeleccionado == "Factura Electrónica");
+        }
+
+        private void SeleccionarMedioPago(string medio)
+        {
+            _medioPagoSeleccionado = medio;
+
+            btnPagoEfectivo.Invalidate();
+            btnPagoDebito.Invalidate();
+            btnPagoCredito.Invalidate();
+            btnPagoTransferencia.Invalidate();
+            btnPagoMultiple.Invalidate();
+
+            if (_medioPagoSeleccionado == "Pago Múltiple")
+            {
+                if (_ticketSeleccionado == null)
+                {
+                    MessageBox.Show("Seleccione un ticket de la lista antes de configurar el Pago Múltiple.", "Atención", MessageBoxButtons.OK, MessageBoxIcon.Warning);
+                    SeleccionarMedioPago("Efectivo");
+                    return;
+                }
+
+                AbrirModalPagoMultiplesMedios(_ticketSeleccionado.Total);
+            }
+            else
+            {
+                _pagoMixtoConfirmado = false;
+                txtPagaCon.Enabled = (_medioPagoSeleccionado == "Efectivo");
+
+                if (_medioPagoSeleccionado != "Efectivo" && _ticketSeleccionado != null)
+                {
+                    txtPagaCon.Text = _ticketSeleccionado.Total.ToString();
+                    lblVuelto.Text = "$0";
+                }
+            }
+        }
+
         private Panel CrearCardEncabezado(string titulo, string detalle, out Label lblTag, out Label lblVal)
         {
-            Panel pnl = new Panel { Size = new Size(150, 48), BackColor = Color.White, Margin = new Padding(3) };
-            lblTag = new Label { Text = titulo, Font = new Font("Segoe UI", 7.5F, FontStyle.Bold), ForeColor = Color.FromArgb(22, 163, 74), Location = new Point(8, 6), AutoSize = true };
-            lblVal = new Label { Text = detalle, Font = new Font("Segoe UI", 10F, FontStyle.Bold), ForeColor = Color.FromArgb(15, 23, 42), Location = new Point(8, 22), AutoSize = true };
+            Panel pnl = new Panel { Size = new Size(150, 44), BackColor = Color.White, Margin = new Padding(3) };
+            lblTag = new Label { Text = titulo, Font = new Font("Segoe UI", 7.5F, FontStyle.Bold), ForeColor = Color.FromArgb(22, 163, 74), Location = new Point(8, 4), AutoSize = true };
+            lblVal = new Label { Text = detalle, Font = new Font("Segoe UI", 9.5F, FontStyle.Bold), ForeColor = Color.FromArgb(15, 23, 42), Location = new Point(8, 20), AutoSize = true };
             pnl.Controls.Add(lblTag);
             pnl.Controls.Add(lblVal);
             return pnl;
@@ -333,17 +673,28 @@ namespace SISTEMAACTUALIZADO
         private void ConfigurarEstiloTabla(DataGridView dgv)
         {
             dgv.EnableHeadersVisualStyles = false;
-            dgv.ColumnHeadersDefaultCellStyle.BackColor = Color.FromArgb(248, 250, 252);
-            dgv.ColumnHeadersDefaultCellStyle.ForeColor = Color.FromArgb(100, 116, 139);
+            dgv.ColumnHeadersDefaultCellStyle.BackColor = Color.FromArgb(30, 41, 59);
+            dgv.ColumnHeadersDefaultCellStyle.ForeColor = Color.White;
             dgv.ColumnHeadersDefaultCellStyle.Font = new Font("Segoe UI", 8.5F, FontStyle.Bold);
+            dgv.ColumnHeadersDefaultCellStyle.SelectionBackColor = Color.FromArgb(30, 41, 59);
+            dgv.ColumnHeadersDefaultCellStyle.SelectionForeColor = Color.White;
             dgv.ColumnHeadersHeight = 32;
 
             dgv.DefaultCellStyle.Font = new Font("Segoe UI", 9F);
-            dgv.DefaultCellStyle.ForeColor = Color.FromArgb(30, 41, 59);
+            dgv.DefaultCellStyle.ForeColor = Color.FromArgb(15, 23, 42);
             dgv.DefaultCellStyle.SelectionBackColor = Color.FromArgb(220, 252, 231);
             dgv.DefaultCellStyle.SelectionForeColor = Color.FromArgb(22, 101, 52);
             dgv.RowTemplate.Height = 32;
-            dgv.GridColor = Color.FromArgb(241, 245, 249);
+            dgv.GridColor = Color.FromArgb(226, 232, 240);
+
+            dgv.CellFormatting += (s, e) =>
+            {
+                if (dgv.Columns[e.ColumnIndex].HeaderCell.Style.BackColor != Color.FromArgb(30, 41, 59))
+                {
+                    dgv.Columns[e.ColumnIndex].HeaderCell.Style.BackColor = Color.FromArgb(30, 41, 59);
+                    dgv.Columns[e.ColumnIndex].HeaderCell.Style.ForeColor = Color.White;
+                }
+            };
         }
 
         private void ActualizarEstadoCajaUI()
@@ -375,11 +726,124 @@ namespace SISTEMAACTUALIZADO
             }
         }
 
+        private void AbrirModalPagoMultiplesMedios(decimal totalTicket)
+        {
+            Form modalMixto = new Form
+            {
+                Text = "Configurar Pago Múltiple / Combinado",
+                Size = new Size(380, 360),
+                StartPosition = FormStartPosition.CenterParent,
+                FormBorderStyle = FormBorderStyle.FixedDialog,
+                MaximizeBox = false,
+                MinimizeBox = false,
+                BackColor = Color.White
+            };
+
+            Label lblT = new Label { Text = $"💳 TOTAL TICKET: ${totalTicket:N0}", Location = new Point(20, 15), Font = new Font("Segoe UI", 12F, FontStyle.Bold), ForeColor = Color.FromArgb(37, 99, 235), AutoSize = true };
+
+            Label lblEf = new Label { Text = "Monto en Efectivo ($):", Location = new Point(20, 52), AutoSize = true, Font = new Font("Segoe UI", 8.5F, FontStyle.Bold) };
+            TextBox txtEf = new TextBox { Text = "0", Location = new Point(20, 72), Size = new Size(320, 26), Font = new Font("Segoe UI", 10F) };
+
+            Label lblTar = new Label { Text = "Monto en Tarjeta (Débito/Crédito) ($):", Location = new Point(20, 107), AutoSize = true, Font = new Font("Segoe UI", 8.5F, FontStyle.Bold) };
+            TextBox txtTar = new TextBox { Text = "0", Location = new Point(20, 127), Size = new Size(320, 26), Font = new Font("Segoe UI", 10F) };
+
+            Label lblTrans = new Label { Text = "Monto en Transferencia ($):", Location = new Point(20, 162), AutoSize = true, Font = new Font("Segoe UI", 8.5F, FontStyle.Bold) };
+            TextBox txtTrans = new TextBox { Text = "0", Location = new Point(20, 182), Size = new Size(320, 26), Font = new Font("Segoe UI", 10F) };
+
+            Label lblEstadoSuma = new Label { Text = $"Falta por cubrir: ${totalTicket:N0}", Location = new Point(20, 220), AutoSize = true, Font = new Font("Segoe UI", 10F, FontStyle.Bold), ForeColor = Color.FromArgb(239, 68, 68) };
+
+            Action recalcular = () =>
+            {
+                decimal.TryParse(txtEf.Text.Trim(), out decimal ef);
+                decimal.TryParse(txtTar.Text.Trim(), out decimal tar);
+                decimal.TryParse(txtTrans.Text.Trim(), out decimal tr);
+
+                decimal sumaTotal = ef + tar + tr;
+                decimal diferencia = totalTicket - (tar + tr);
+
+                if (sumaTotal < totalTicket)
+                {
+                    lblEstadoSuma.Text = $"Falta por cubrir: ${(totalTicket - sumaTotal):N0}";
+                    lblEstadoSuma.ForeColor = Color.FromArgb(239, 68, 68);
+                }
+                else if (ef > diferencia && ef > 0)
+                {
+                    decimal vuelto = ef - diferencia;
+                    lblEstadoSuma.Text = $" Cubierto | Vuelto Efectivo: ${vuelto:N0}";
+                    lblEstadoSuma.ForeColor = Color.FromArgb(22, 163, 74);
+                }
+                else if (sumaTotal == totalTicket)
+                {
+                    lblEstadoSuma.Text = "✔ Total cubierto exactamente";
+                    lblEstadoSuma.ForeColor = Color.FromArgb(22, 163, 74);
+                }
+                else
+                {
+                    lblEstadoSuma.Text = $" Exceso en tarjeta/transferencia (+${(sumaTotal - totalTicket):N0})";
+                    lblEstadoSuma.ForeColor = Color.FromArgb(239, 68, 68);
+                }
+            };
+
+            txtEf.TextChanged += (s, e) => recalcular();
+            txtTar.TextChanged += (s, e) => recalcular();
+            txtTrans.TextChanged += (s, e) => recalcular();
+
+            Button btnAplicar = new Button
+            {
+                Text = "✔ Confirmar Pago Múltiple",
+                Location = new Point(20, 255),
+                Size = new Size(320, 42),
+                BackColor = Color.FromArgb(16, 185, 129),
+                ForeColor = Color.White,
+                FlatStyle = FlatStyle.Flat,
+                Font = new Font("Segoe UI", 9.5F, FontStyle.Bold),
+                Cursor = Cursors.Hand
+            };
+            btnAplicar.FlatAppearance.BorderSize = 0;
+
+            btnAplicar.Click += (s, e) =>
+            {
+                decimal.TryParse(txtEf.Text.Trim(), out _pagoEfectivo);
+                decimal.TryParse(txtTar.Text.Trim(), out _pagoTarjeta);
+                decimal.TryParse(txtTrans.Text.Trim(), out _pagoTransferencia);
+
+                decimal sumaTotal = _pagoEfectivo + _pagoTarjeta + _pagoTransferencia;
+                decimal cobroEnTarjetas = _pagoTarjeta + _pagoTransferencia;
+
+                if (cobroEnTarjetas > totalTicket)
+                {
+                    MessageBox.Show("El monto en tarjeta/transferencia no puede superar el total del ticket.", "Monto Excedido", MessageBoxButtons.OK, MessageBoxIcon.Warning);
+                    return;
+                }
+
+                if (sumaTotal < totalTicket)
+                {
+                    MessageBox.Show($"La suma de los pagos (${sumaTotal:N0}) no cubre el total del ticket (${totalTicket:N0}).", "Monto Incompleto", MessageBoxButtons.OK, MessageBoxIcon.Warning);
+                    return;
+                }
+
+                _vueltoMixto = sumaTotal - totalTicket;
+                _pagoMixtoConfirmado = true;
+
+                txtPagaCon.Text = _pagoEfectivo.ToString();
+                lblVuelto.Text = $"${_vueltoMixto:N0}";
+
+                modalMixto.DialogResult = DialogResult.OK;
+                modalMixto.Close();
+            };
+
+            modalMixto.Controls.AddRange(new Control[] { lblT, lblEf, txtEf, lblTar, txtTar, lblTrans, txtTrans, lblEstadoSuma, btnAplicar });
+            
+            if (modalMixto.ShowDialog(this) != DialogResult.OK)
+            {
+                SeleccionarMedioPago("Efectivo");
+            }
+        }
+
         private void BtnAbrirCaja_Click(object? sender, EventArgs e)
         {
             if (_turnoActual != null && _turnoActual.Estado == "Abierta")
             {
-                // Cierre de Caja
                 decimal ventasEfectivo = _cajaService.CalcularVentasEfectivo(_turnoActual.FechaApertura);
                 decimal totalEsperado = _turnoActual.MontoInicial + ventasEfectivo;
 
@@ -394,7 +858,6 @@ namespace SISTEMAACTUALIZADO
             }
             else
             {
-                // Apertura de Caja Modal Rápido
                 Form modalApertura = new Form
                 {
                     Text = "Apertura de Caja",
@@ -406,7 +869,7 @@ namespace SISTEMAACTUALIZADO
                     BackColor = Color.White
                 };
 
-                Label lblM = new Label { Text = "Monto Inicial de Caja ($):", Location = new Point(20, 20), AutoSize = true, Font = new Font("Segoe UI", 9F, FontStyle.Bold) };
+                Label lblM = new Label { Text = "Monto Inicial de Caja ($):", Location = new Point(20, 20), AutoSize = true, Font = new Font("Segoe UI", 9F, FontStyle.Bold), ForeColor = Color.FromArgb(15, 23, 42) };
                 TextBox txtM = new TextBox { Text = "20000", Location = new Point(20, 45), Size = new Size(260, 28), Font = new Font("Segoe UI", 11F, FontStyle.Bold) };
 
                 Button btnA = new Button { Text = "🚀 Iniciar Turno", Location = new Point(20, 90), Size = new Size(260, 40), BackColor = Color.FromArgb(16, 185, 129), ForeColor = Color.White, FlatStyle = FlatStyle.Flat, Font = new Font("Segoe UI", 9.5F, FontStyle.Bold), Cursor = Cursors.Hand };
@@ -439,25 +902,26 @@ namespace SISTEMAACTUALIZADO
         }
 
         private void BtnVerResumen_Click(object? sender, EventArgs e)
-        {
-            if (_turnoActual == null)
-            {
-                MessageBox.Show("La caja debe estar abierta para consultar el resumen del turno.", "Atención", MessageBoxButtons.OK, MessageBoxIcon.Warning);
-                return;
-            }
+{
+    if (_turnoActual == null)
+    {
+        MessageBox.Show("La caja debe estar abierta para consultar el resumen del turno.", "Atención", MessageBoxButtons.OK, MessageBoxIcon.Warning);
+        return;
+    }
 
-            decimal ventasEfectivo = _cajaService.CalcularVentasEfectivo(_turnoActual.FechaApertura);
-            decimal totalEsperado = _turnoActual.MontoInicial + ventasEfectivo;
+    // VALIDACIÓN DE PERFIL ADMINISTRADOR
+    bool esAdmin = (_usuarioActual?.Rol != null && _usuarioActual.Rol.Equals("Administrador", StringComparison.OrdinalIgnoreCase)) 
+                   || (_usuarioActual?.NombreUsuario != null && _usuarioActual.NombreUsuario.Equals("barbara", StringComparison.OrdinalIgnoreCase));
 
-            MessageBox.Show($"📊 RESUMEN DEL TURNO ACTUAL\n\n" +
-                            $"• Cajero Activo: {_turnoActual.Usuario}\n" +
-                            $"• Hora Apertura: {_turnoActual.FechaApertura:HH:mm:ss}\n" +
-                            $"• Fondo Inicial: ${_turnoActual.MontoInicial:N0}\n" +
-                            $"• Ventas Efectivo: ${ventasEfectivo:N0}\n" +
-                            $"-----------------------------------\n" +
-                            $"• Efectivo Total Esperado: ${totalEsperado:N0}",
-                            "Resumen de Turno", MessageBoxButtons.OK, MessageBoxIcon.Information);
-        }
+    if (!esAdmin)
+    {
+        MessageBox.Show("Acceso denegado: El Resumen del Turno solo está disponible para usuarios con perfil Administrador.", "Permiso Insuficiente", MessageBoxButtons.OK, MessageBoxIcon.Stop);
+        return;
+    }
+
+    FormResumenTurnoModal modalResumen = new FormResumenTurnoModal(_turnoActual);
+    modalResumen.ShowDialog(this);
+}
 
         private void CargarTicketsPendientes(string filtro = "")
         {
@@ -492,7 +956,7 @@ namespace SISTEMAACTUALIZADO
                 btnCobrarTicket.Enabled = true;
                 btnAnularTicket.Enabled = true;
 
-                lblTotalCobrar.Text = $"$ {ticket.Total:N0}";
+                lblTotalCobrar.Text = $"${ticket.Total:N0}";
 
                 var detalles = _cajaService.ObtenerDetallesTicket(ticket.idTve);
                 dgvDetalleTicket.DataSource = detalles;
@@ -514,7 +978,7 @@ namespace SISTEMAACTUALIZADO
                 _ticketSeleccionado = null;
                 btnCobrarTicket.Enabled = false;
                 btnAnularTicket.Enabled = false;
-                lblTotalCobrar.Text = "$ 0";
+                lblTotalCobrar.Text = "$0";
                 dgvDetalleTicket.DataSource = null;
             }
         }
@@ -522,66 +986,89 @@ namespace SISTEMAACTUALIZADO
         private void TxtPagaCon_TextChanged(object? sender, EventArgs e)
         {
             if (_ticketSeleccionado == null) return;
+            if (_pagoMixtoConfirmado) return;
 
             if (decimal.TryParse(txtPagaCon.Text.Trim(), out decimal pagaCon))
             {
                 decimal vuelto = pagaCon - _ticketSeleccionado.Total;
-                lblVuelto.Text = vuelto >= 0 ? $"$ {vuelto:N0}" : "Insuficiente";
+                lblVuelto.Text = vuelto >= 0 ? $"${vuelto:N0}" : "$0";
                 lblVuelto.ForeColor = vuelto >= 0 ? Color.FromArgb(16, 185, 129) : Color.FromArgb(239, 68, 68);
             }
             else
             {
-                lblVuelto.Text = "$ 0";
+                lblVuelto.Text = "$0";
             }
         }
 
         private void BtnCobrarTicket_Click(object? sender, EventArgs e)
+{
+    if (_ticketSeleccionado == null) return;
+
+    string tipoDoc = _tipoDocSeleccionado;
+    string medioPago = _medioPagoSeleccionado;
+
+    decimal pagaCon = 0;
+    decimal vuelto = 0;
+
+    if (medioPago.Contains("Múltiple"))
+    {
+        if (!_pagoMixtoConfirmado)
         {
-            if (_ticketSeleccionado == null) return;
-
-            string tipoDoc = cbTipoDocumentoCobro.SelectedItem?.ToString() ?? "Boleta Electrónica";
-            string medioPago = cbMedioPago.SelectedItem?.ToString() ?? "Efectivo";
-
-            decimal pagaCon = 0;
-            decimal vuelto = 0;
-
-            if (medioPago == "Efectivo")
-            {
-                if (!decimal.TryParse(txtPagaCon.Text.Trim(), out pagaCon) || pagaCon < _ticketSeleccionado.Total)
-                {
-                    MessageBox.Show("Ingrese un monto en efectivo suficiente para cobro.", "Atención", MessageBoxButtons.OK, MessageBoxIcon.Warning);
-                    return;
-                }
-                vuelto = pagaCon - _ticketSeleccionado.Total;
-            }
-
-            try
-            {
-                string usuarioNombre = _usuarioActual?.NombreUsuario ?? "Bárbara";
-                int folioOficial = _cajaService.ProcesarCobroTicket(_ticketSeleccionado, tipoDoc, usuarioNombre, _ticketSeleccionado.RuT, _ticketSeleccionado.RazonSocial, "GENERAL");
-
-                var detalles = _cajaService.ObtenerDetallesTicket(_ticketSeleccionado.idTve);
-                List<DetalleCarrito> itemsCarrito = detalles.Select(item => new DetalleCarrito
-                {
-                    ProductoID = item.IdProducto,
-                    Nombre = item.NmbProducto ?? "Producto",
-                    PrecioUnitario = item.Precio,
-                    Cantidad = item.Cantidad
-                }).ToList();
-
-                MessageBox.Show($"¡{tipoDoc.ToUpper()} N° {folioOficial} COBRADA CON ÉXITO!", "Cobro Finalizado", MessageBoxButtons.OK, MessageBoxIcon.Information);
-
-                FormTicketModal formTicket = new FormTicketModal(_ticketSeleccionado, itemsCarrito, pagaCon, vuelto);
-                formTicket.ShowDialog(this);
-
-                txtBuscarTicket.Clear();
-                CargarTicketsPendientes();
-            }
-            catch (Exception ex)
-            {
-                MessageBox.Show($"Error al procesar el cobro: {ex.Message}", "Error DB", MessageBoxButtons.OK, MessageBoxIcon.Error);
-            }
+            MessageBox.Show("Por favor configure el desglose del Pago Múltiple.", "Atención", MessageBoxButtons.OK, MessageBoxIcon.Warning);
+            return;
         }
+
+        pagaCon = _pagoEfectivo + _pagoTarjeta + _pagoTransferencia;
+        vuelto = _vueltoMixto;
+        medioPago = $"Múltiple (Efec: ${_pagoEfectivo:N0} | Tarj: ${_pagoTarjeta:N0} | Transf: ${_pagoTransferencia:N0})";
+    }
+    else if (medioPago == "Efectivo")
+    {
+        if (!decimal.TryParse(txtPagaCon.Text.Trim(), out pagaCon) || pagaCon < _ticketSeleccionado.Total)
+        {
+            MessageBox.Show("Ingrese un monto en efectivo suficiente para cobro.", "Atención", MessageBoxButtons.OK, MessageBoxIcon.Warning);
+            return;
+        }
+        vuelto = pagaCon - _ticketSeleccionado.Total;
+    }
+    else
+    {
+        pagaCon = _ticketSeleccionado.Total;
+        vuelto = 0;
+    }
+
+    try
+    {
+        // SE PASA 'medioPago' PARA GUARDAR EL MEDIO DE PAGO REAL EN LA BD Y CALCULAR EL RESUMEN CORRECTAMENTE
+        int folioOficial = _cajaService.ProcesarCobroTicket(_ticketSeleccionado, tipoDoc, medioPago, _ticketSeleccionado.RuT, _ticketSeleccionado.RazonSocial, "GENERAL");
+
+        var detalles = _cajaService.ObtenerDetallesTicket(_ticketSeleccionado.idTve);
+        List<DetalleCarrito> itemsCarrito = detalles.Select(item => new DetalleCarrito
+        {
+            ProductoID = item.IdProducto,
+            Nombre = item.NmbProducto ?? "Producto",
+            PrecioUnitario = item.Precio,
+            Cantidad = item.Cantidad
+        }).ToList();
+
+        MessageBox.Show($"¡{tipoDoc.ToUpper()} N° {folioOficial} COBRADA CON ÉXITO!\n\n" +
+                        $"• Medio de Pago: {medioPago}\n" +
+                        $"• Total Cobrado: ${_ticketSeleccionado.Total:N0}\n" +
+                        $"• Vuelto: ${vuelto:N0}",
+                        "Cobro Finalizado", MessageBoxButtons.OK, MessageBoxIcon.Information);
+
+        FormTicketModal formTicket = new FormTicketModal(_ticketSeleccionado, itemsCarrito, pagaCon, vuelto);
+        formTicket.ShowDialog(this);
+
+        _pagoMixtoConfirmado = false;
+        txtBuscarTicket.Clear();
+        CargarTicketsPendientes();
+    }
+    catch (Exception ex)
+    {
+        MessageBox.Show($"Error al procesar el cobro: {ex.Message}", "Error DB", MessageBoxButtons.OK, MessageBoxIcon.Error);
+    }
+}
 
         private void BtnImprimirVistaPrevia_Click(object? sender, EventArgs e)
         {
