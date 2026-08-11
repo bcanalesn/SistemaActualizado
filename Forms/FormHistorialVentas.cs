@@ -6,6 +6,7 @@ using System.Linq;
 using System.Windows.Forms;
 using SISTEMAACTUALIZADO.Data;
 using SISTEMAACTUALIZADO.Models;
+using SISTEMAACTUALIZADO.Modals;
 
 namespace SISTEMAACTUALIZADO
 {
@@ -540,8 +541,8 @@ namespace SISTEMAACTUALIZADO
                 new DetalleCarrito { ProductoID = 1, Nombre = "Glosa DTE - " + _ventaSeleccionada.Documento, PrecioUnitario = _ventaSeleccionada.Total, Cantidad = 1 }
             };
 
-            FormTicket formTicket = new FormTicket(_ventaSeleccionada.nroDTE, _ventaSeleccionada.FecDoc, itemsEjemplo, _ventaSeleccionada.Total, _ventaSeleccionada.Total, 0, "Efectivo");
-            formTicket.ShowDialog();
+            FormTicketModal formTicket = new FormTicketModal(_ventaSeleccionada.nroDTE, _ventaSeleccionada.FecDoc, itemsEjemplo, _ventaSeleccionada.Total, _ventaSeleccionada.Total, 0, "Efectivo");
+            formTicket.ShowDialog(this);
         }
 
         private void BtnNotaCredito_Click(object? sender, EventArgs e)

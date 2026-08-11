@@ -85,9 +85,16 @@ namespace SISTEMAACTUALIZADO.Modals
                 EjecutarBusquedaInteligente();
             };
 
+            // NAVEGACIÓN TECLADO: Flechas y Tab/Enter
             txtRutBuscar.KeyDown += (s, e) => 
             { 
-                if (e.KeyCode == Keys.Enter) 
+                if (e.KeyCode == Keys.Down && lstSugerencias.Visible && lstSugerencias.Items.Count > 0)
+                {
+                    lstSugerencias.Focus();
+                    lstSugerencias.SelectedIndex = 0;
+                    e.SuppressKeyPress = true;
+                }
+                else if (e.KeyCode == Keys.Enter) 
                 { 
                     ProcesarSeleccionEnter(); 
                     e.SuppressKeyPress = true; 
@@ -106,7 +113,21 @@ namespace SISTEMAACTUALIZADO.Modals
                 Font = new Font("Segoe UI", 9.5F),
                 Visible = false
             };
+
             lstSugerencias.Click += (s, e) => SeleccionarDesdeSugerencias();
+            lstSugerencias.KeyDown += (s, e) =>
+            {
+                if (e.KeyCode == Keys.Enter || e.KeyCode == Keys.Tab)
+                {
+                    SeleccionarDesdeSugerencias();
+                    e.SuppressKeyPress = true;
+                }
+                else if (e.KeyCode == Keys.Up && lstSugerencias.SelectedIndex == 0)
+                {
+                    txtRutBuscar.Focus();
+                    e.SuppressKeyPress = true;
+                }
+            };
 
             pnlInfoCliente = new Panel
             {
@@ -138,7 +159,7 @@ namespace SISTEMAACTUALIZADO.Modals
 
             btnConfirmar = new Button
             {
-                Text = "➕ Registrar / Asignar Cliente",
+                Text = "🔍 Ingrese RUT para buscar",
                 Location = new Point(20, 385),
                 Size = new Size(380, 42),
                 BackColor = Color.FromArgb(0, 102, 255),
@@ -146,7 +167,7 @@ namespace SISTEMAACTUALIZADO.Modals
                 FlatStyle = FlatStyle.Flat,
                 Font = new Font("Segoe UI", 9.5F, FontStyle.Bold),
                 Cursor = Cursors.Hand,
-                Enabled = true
+                Enabled = false
             };
             btnConfirmar.FlatAppearance.BorderSize = 0;
             btnConfirmar.Click += (s, e) => ProcesarSeleccionEnter();
@@ -189,34 +210,38 @@ namespace SISTEMAACTUALIZADO.Modals
             {
                 lstSugerencias.Visible = false;
                 pnlInfoCliente.Visible = false;
-                btnConfirmar.Text = "➕ Registrar / Asignar Cliente";
+                btnConfirmar.Text = "🔍 Ingrese RUT para buscar";
+                btnConfirmar.Enabled = false;
                 return;
             }
 
             var resultados = _clienteService.BuscarClientesPredictivo(queryLimpia);
+            var directo = _clienteService.BuscarPorRut(queryLimpia);
 
-            if (resultados.Count > 0)
+            if (directo != null)
+            {
+                MostrarInformacionCliente(directo);
+                lstSugerencias.Visible = false;
+                btnConfirmar.Text = "✔ Asignar Cliente";
+                btnConfirmar.Enabled = true;
+            }
+            else if (resultados.Count > 0)
             {
                 lstSugerencias.DataSource = resultados;
                 lstSugerencias.DisplayMember = "Nombre";
                 lstSugerencias.ValueMember = "Rut";
                 lstSugerencias.Visible = true;
                 lstSugerencias.BringToFront();
+                pnlInfoCliente.Visible = false;
+                btnConfirmar.Text = "✔ Asignar Cliente";
+                btnConfirmar.Enabled = true;
             }
             else
             {
                 lstSugerencias.Visible = false;
-            }
-
-            var directo = _clienteService.BuscarPorRut(queryLimpia);
-            if (directo != null)
-            {
-                MostrarInformacionCliente(directo);
-            }
-            else
-            {
                 pnlInfoCliente.Visible = false;
                 btnConfirmar.Text = "➕ Registrar Nuevo Cliente";
+                btnConfirmar.Enabled = true;
             }
         }
 
@@ -227,18 +252,21 @@ namespace SISTEMAACTUALIZADO.Modals
                 txtRutBuscar.Text = RutHelper.Formatear(clienteSel.Rut);
                 MostrarInformacionCliente(clienteSel);
                 lstSugerencias.Visible = false;
+                btnConfirmar.Text = "✔ Asignar Cliente";
+                btnConfirmar.Enabled = true;
+                btnConfirmar.Focus();
             }
         }
 
         private void ProcesarSeleccionEnter()
         {
-            // 1. PRIORIDAD MÁXIMA: Si hay sugerencias en pantalla, seleccionar el primer cliente filtrado
             if (lstSugerencias.Visible && lstSugerencias.Items.Count > 0)
             {
-                if (lstSugerencias.Items[0] is Cliente primerCliente)
+                var seleccionado = lstSugerencias.SelectedItem as Cliente ?? lstSugerencias.Items[0] as Cliente;
+                if (seleccionado != null)
                 {
-                    txtRutBuscar.Text = RutHelper.Formatear(primerCliente.Rut);
-                    MostrarInformacionCliente(primerCliente);
+                    txtRutBuscar.Text = RutHelper.Formatear(seleccionado.Rut);
+                    MostrarInformacionCliente(seleccionado);
                     lstSugerencias.Visible = false;
 
                     this.DialogResult = DialogResult.OK;
@@ -247,7 +275,6 @@ namespace SISTEMAACTUALIZADO.Modals
                 }
             }
 
-            // 2. Si ya se mostró la tarjeta de un cliente existente
             if (pnlInfoCliente.Visible && !string.IsNullOrEmpty(RutCliente))
             {
                 this.DialogResult = DialogResult.OK;
@@ -255,7 +282,6 @@ namespace SISTEMAACTUALIZADO.Modals
                 return;
             }
 
-            // 3. Buscar directo por RUT en BD
             string rutLimpio = RutHelper.Limpiar(txtRutBuscar.Text);
             var clienteBD = _clienteService.BuscarPorRut(rutLimpio);
 
@@ -267,10 +293,10 @@ namespace SISTEMAACTUALIZADO.Modals
             }
             else
             {
-                // 4. BLOQUEO: NO abrir el registro si no cumple con la cantidad mínima de dígitos en Chile (mínimo 8)
+                // AJUSTE SOLICITADO: Debe ser estrictamente igual a 9 dígitos para permitir crear un nuevo cliente
                 if (rutLimpio.Length < 9)
                 {
-                    MessageBox.Show("Para registrar un nuevo cliente, debe ingresar un RUT válido de al menos 9 dígitos.", "RUT Incompleto", MessageBoxButtons.OK, MessageBoxIcon.Warning);
+                    MessageBox.Show("Para registrar un nuevo cliente, debe ingresar un RUT válido de 9 dígitos.", "RUT Incompleto", MessageBoxButtons.OK, MessageBoxIcon.Warning);
                     return;
                 }
 
@@ -290,7 +316,8 @@ namespace SISTEMAACTUALIZADO.Modals
             CargarUltimasDosCompras(cliente.Rut);
 
             pnlInfoCliente.Visible = true;
-            btnConfirmar.Text = "✔ Asignar este Cliente";
+            btnConfirmar.Text = "✔ Asignar Cliente";
+            btnConfirmar.Enabled = true;
         }
 
         private void CargarUltimasDosCompras(string rut)
@@ -428,7 +455,6 @@ namespace SISTEMAACTUALIZADO.Modals
 
             btnGuardar.Click += (s, e) =>
             {
-                // VALIDACIONES OBLIGATORIAS
                 if (string.IsNullOrWhiteSpace(txtNom.Text) || string.IsNullOrWhiteSpace(txtRut.Text) || 
                     string.IsNullOrWhiteSpace(txtTel.Text) || string.IsNullOrWhiteSpace(txtMail.Text) || 
                     string.IsNullOrWhiteSpace(txtDir.Text))
@@ -437,10 +463,9 @@ namespace SISTEMAACTUALIZADO.Modals
                     return;
                 }
 
-                // VALIDACIÓN DEL LARGO DE RUT
                 if (!RutHelper.EsValidoFormato(txtRut.Text))
                 {
-                    MessageBox.Show("El RUT ingresado no cumple con el largo requerido en Chile (mínimo 9 dígitos).", "RUT Incompleto", MessageBoxButtons.OK, MessageBoxIcon.Warning);
+                    MessageBox.Show("El RUT ingresado no cumple con el largo requerido en Chile (9 dígitos).", "RUT Incompleto", MessageBoxButtons.OK, MessageBoxIcon.Warning);
                     return;
                 }
 
