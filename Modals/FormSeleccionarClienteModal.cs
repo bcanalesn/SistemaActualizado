@@ -39,23 +39,14 @@ namespace SISTEMAACTUALIZADO.Modals
             this.FormBorderStyle = FormBorderStyle.FixedDialog;
             this.MaximizeBox = false;
             this.MinimizeBox = false;
-            this.ControlBox = false;
+            
+            // 1. HABILITAR BOTÓN "X" ESTÁNDAR DE WINDOWS
+            this.ControlBox = true;
+            
             this.BackColor = Color.White;
             this.KeyPreview = true;
 
-            Button btnClose = new Button
-            {
-                Text = "✕",
-                Font = new Font("Segoe UI", 10F, FontStyle.Bold),
-                ForeColor = Color.FromArgb(148, 163, 184),
-                Location = new Point(375, 12),
-                Size = new Size(28, 28),
-                FlatStyle = FlatStyle.Flat,
-                TabStop = false,
-                Cursor = Cursors.Hand
-            };
-            btnClose.FlatAppearance.BorderSize = 0;
-            btnClose.Click += (s, e) => { this.DialogResult = DialogResult.Cancel; this.Close(); };
+            // 2. SE ELIMINÓ EL BOTÓN PERSONALIZADO btnClose QUE REPETÍA LA "✕" DENTRO DEL PANEL
 
             Label lblT = new Label 
             { 
@@ -85,7 +76,6 @@ namespace SISTEMAACTUALIZADO.Modals
                 EjecutarBusquedaInteligente();
             };
 
-            // NAVEGACIÓN TECLADO: Flechas y Tab/Enter
             txtRutBuscar.KeyDown += (s, e) => 
             { 
                 if (e.KeyCode == Keys.Down && lstSugerencias.Visible && lstSugerencias.Items.Count > 0)
@@ -192,7 +182,6 @@ namespace SISTEMAACTUALIZADO.Modals
                 this.Close();
             };
 
-            this.Controls.Add(btnClose);
             this.Controls.Add(lblT);
             this.Controls.Add(lblRut);
             this.Controls.Add(txtRutBuscar);
@@ -293,7 +282,6 @@ namespace SISTEMAACTUALIZADO.Modals
             }
             else
             {
-                // AJUSTE SOLICITADO: Debe ser estrictamente igual a 9 dígitos para permitir crear un nuevo cliente
                 if (rutLimpio.Length < 9)
                 {
                     MessageBox.Show("Para registrar un nuevo cliente, debe ingresar un RUT válido de 9 dígitos.", "RUT Incompleto", MessageBoxButtons.OK, MessageBoxIcon.Warning);

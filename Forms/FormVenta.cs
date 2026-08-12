@@ -50,6 +50,16 @@ namespace SISTEMAACTUALIZADO
         {
             _usuarioActual = usuario;
             InitializeComponent();
+            
+            // Al entrar a la pestaña, reconsulta MySQL y descuenta lo que esté en los carritos activos
+            this.VisibleChanged += (s, e) =>
+            {
+                if (this.Visible)
+                {
+                    CargarProductosDesdeBD();
+                }
+            };
+
             CargarProductosDesdeBD();
             RestaurarCarritoVendedorActual();
 
@@ -464,33 +474,33 @@ namespace SISTEMAACTUALIZADO
         {
             try
             {
-                _productosCache = _db.Productos.Where(p => p.Estado).ToList();
+                // 1. Instancia fresca de DbContext para evitar datos en caché de Entity Framework
+                using (var db = new AppDbContext())
+                {
+                    _productosCache = db.Productos.Where(p => p.Estado).ToList();
+                }
+
+                // 2. Restar temporalmente en la interfaz lo que los vendedores tienen retenido en sus carritos
+                foreach (var carritoVendedor in _carritosPorVendedor.Values)
+                {
+                    foreach (var item in carritoVendedor)
+                    {
+                        var prod = _productosCache.FirstOrDefault(p => p.ProductoID == item.ProductoID);
+                        if (prod != null)
+                        {
+                            prod.Stock -= item.Cantidad;
+                            if (prod.Stock < 0) prod.Stock = 0;
+                        }
+                    }
+                }
             }
             catch
             {
                 _productosCache = new List<Producto>();
             }
 
-            if (_productosCache.Count == 0)
-            {
-                _productosCache = new List<Producto>
-                {
-                    new Producto { ProductoID = 1, CodigoBarra = "1001", Nombre = "Leche Entera 1L", PrecioUnitario = 1150, Stock = 50, Estado = true },
-                    new Producto { ProductoID = 2, CodigoBarra = "1002", Nombre = "Queso Gauda 250g", PrecioUnitario = 2490, Stock = 40, Estado = true },
-                    new Producto { ProductoID = 3, CodigoBarra = "1003", Nombre = "Pan de Molde Blanco", PrecioUnitario = 890, Stock = 60, Estado = true },
-                    new Producto { ProductoID = 4, CodigoBarra = "1004", Nombre = "Huevos 12 un.", PrecioUnitario = 2300, Stock = 35, Estado = true },
-                    new Producto { ProductoID = 5, CodigoBarra = "1005", Nombre = "Arroz Grado 1kg", PrecioUnitario = 1250, Stock = 80, Estado = true },
-                    new Producto { ProductoID = 6, CodigoBarra = "1006", Nombre = "Aceite Vegetal 1L", PrecioUnitario = 1690, Stock = 45, Estado = true },
-                    new Producto { ProductoID = 7, CodigoBarra = "1007", Nombre = "Azúcar 1kg", PrecioUnitario = 1190, Stock = 70, Estado = true },
-                    new Producto { ProductoID = 8, CodigoBarra = "1008", Nombre = "Café Instantáneo 100g", PrecioUnitario = 2990, Stock = 30, Estado = true },
-                    new Producto { ProductoID = 9, CodigoBarra = "1009", Nombre = "Detergente Líquido 3L", PrecioUnitario = 5990, Stock = 20, Estado = true },
-                    new Producto { ProductoID = 10, CodigoBarra = "1010", Nombre = "Cloro Gel 900ml", PrecioUnitario = 1390, Stock = 25, Estado = true },
-                    new Producto { ProductoID = 11, CodigoBarra = "1011", Nombre = "Lavaloza Menta 750ml", PrecioUnitario = 1850, Stock = 30, Estado = true },
-                    new Producto { ProductoID = 12, CodigoBarra = "1012", Nombre = "Papel Higiénico 4 rollos", PrecioUnitario = 2290, Stock = 40, Estado = true }
-                };
-            }
-
-            FiltrarProductosPorCategoria("Todas", Color.FromArgb(244, 246, 249));
+            // 3. Renderizar grilla
+            FiltrarProductosPorCategoria(_categoriaActivaNombre, Color.FromArgb(244, 246, 249));
         }
 
         private void FiltrarProductosPorCategoria(string categoria, Color colorFondo)
@@ -689,6 +699,9 @@ namespace SISTEMAACTUALIZADO
 
         private void ActualizarCarritoUI()
         {
+            // Carga los productos reales de BD y les descuenta lo seleccionado en los carritos
+            CargarProductosDesdeBD();
+
             var cart = ObtenerCarritoActivo();
             flowCarritoItems.Controls.Clear();
 
@@ -739,9 +752,9 @@ namespace SISTEMAACTUALIZADO
                 btnSumar.FlatAppearance.BorderSize = 0;
                 btnSumar.Click += (s, e) =>
                 {
-                    if (prodOriginal != null && item.Cantidad >= prodOriginal.Stock)
+                    if (prodOriginal != null && prodOriginal.Stock <= 0)
                     {
-                        MessageBox.Show($"No se puede agregar más unidades. Stock disponible: {prodOriginal.Stock} un.", "Límite de Stock", MessageBoxButtons.OK, MessageBoxIcon.Warning);
+                        MessageBox.Show($"No se puede agregar más unidades. No hay más stock disponible de '{item.Nombre}'.", "Límite de Stock", MessageBoxButtons.OK, MessageBoxIcon.Warning);
                         return;
                     }
                     item.Cantidad++;
@@ -811,7 +824,16 @@ namespace SISTEMAACTUALIZADO
         {
             var cart = ObtenerCarritoActivo();
             cart.Clear();
-            ActualizarCarritoUI();
+
+            // 1. Vacía el panel derecho visual "VENTA ACTUAL" y resetea los totales
+            flowCarritoItems.Controls.Clear();
+            lblCantItemsBadge.Text = "0";
+            lblSubtotalValue.Text = "$ 0";
+            lblDescuentoValue.Text = "$ 0";
+            lblTotalValue.Text = "$ 0";
+
+            // 2. Devuelve los stocks devueltos a las tarjetas de productos
+            CargarProductosDesdeBD();
         }
 
         private void BtnCliente_Click(object? sender, EventArgs e)
@@ -843,33 +865,20 @@ namespace SISTEMAACTUALIZADO
             string vendedorNombre = cbVendedor.SelectedItem?.ToString() ?? _vendedorActualNombre;
             decimal total = cart.Sum(c => c.Subtotal);
 
+            // 1. Respaldamos una copia de los productos antes de limpiar
+            var cartCopia = cart.ToList();
+
             try
             {
-                // Delegamos el proceso al servicio de ventas
-                int nroTicket = _ventaService.GenerarTicketVenta(cart, vendedorNombre, _clienteSeleccionadoNombre, _clienteSeleccionadoRut);
+                // 2. Generar venta (descuenta en BD MySQL)
+                int nroTicket = _ventaService.GenerarTicketVenta(cartCopia, vendedorNombre, _clienteSeleccionadoNombre, _clienteSeleccionadoRut);
 
-                // Sincronizar cache local de productos con los nuevos stocks
-                foreach (var item in cart)
-                {
-                    var prodCache = _productosCache.FirstOrDefault(p => p.ProductoID == item.ProductoID);
-                    if (prodCache != null)
-                    {
-                        prodCache.Stock -= item.Cantidad;
-                        if (prodCache.Stock < 0) prodCache.Stock = 0;
-                    }
-                }
-
-                FiltrarProductosPorCategoria(_categoriaActivaNombre, Color.FromArgb(244, 246, 249));
-
-                MessageBox.Show($"🎟️ TICKET DE ATENCIÓN N° {nroTicket:D6} GENERADO CON ÉXITO\n\n" +
-                                $"• Vendedor: {vendedorNombre}\n" +
-                                $"• Cliente: {_clienteSeleccionadoNombre}\n" +
-                                $"• Total a Pagar en Caja: ${total:N0}\n\n" +
-                                $"⚠️ Se ha reservado el stock de los productos.\n" +
-                                $"Indique al cliente pasar a CAJA con el N° de Ticket {nroTicket:D6}.",
-                                "Pre-Venta Registrada", MessageBoxButtons.OK, MessageBoxIcon.Information);
-
+                // 3. Vaciamos el carro de la interfaz
                 LimpiarCarritoActual();
+
+                // 4. Abrimos el modal con la copia
+                FormPreVentaModal modalPreVenta = new FormPreVentaModal(nroTicket, vendedorNombre, _clienteSeleccionadoNombre, total, cartCopia);
+                modalPreVenta.ShowDialog(this);
             }
             catch (Exception ex)
             {

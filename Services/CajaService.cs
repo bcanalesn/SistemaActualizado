@@ -47,17 +47,32 @@ namespace SISTEMAACTUALIZADO.Services
             return _db.TVD2607.Where(d => d.idTve == idTve).ToList();
         }
 
-        public int ProcesarCobroTicket(TVE2607 ticket, string tipoDoc, string usuarioNombre, string rutCliente, string razonSocial, string giro)
+        public int ProcesarCobroTicket(TVE2607 ticket, string tipoDoc, string medioPago, string rutCliente, string razonSocial, string giro)
         {
             if (ticket == null) throw new ArgumentNullException(nameof(ticket));
 
-            int folioOficial = (int)(DateTime.Now.Ticks % 1000000);
             int iddoc = tipoDoc.Contains("Factura") ? 33 : 39;
 
+            // 1. OBTENER EL RANGO ACTIVO DE LA TABLA FOLIOS
+            var rangoFolio = _db.Folios.FirstOrDefault(r => r.TipoDocumento == tipoDoc && r.Activo);
+            
+            int folioOficial;
+            if (rangoFolio != null && rangoFolio.FolioActual <= rangoFolio.FolioHasta)
+            {
+                folioOficial = rangoFolio.FolioActual;
+                rangoFolio.FolioActual++; // AVANZA EL FOLIO ACTUAL PARA LA SIGUIENTE VENTA
+            }
+            else
+            {
+                // Respaldo por si no hay folios configurados
+                folioOficial = (int)(DateTime.Now.Ticks % 100000);
+            }
+
+            // 2. ACTUALIZAR ENCABEZADO DE VENTA (TVE2607)
             ticket.iddocDTE = iddoc;
             ticket.Documento = tipoDoc;
-            ticket.nroDTE = folioOficial;
-            ticket.UserDTE = string.IsNullOrWhiteSpace(usuarioNombre) ? "Cajero" : usuarioNombre;
+            ticket.nroDTE = folioOficial; // Folio fiscal consumido
+            ticket.UserDTE = medioPago;
             ticket.status = "Emitido";
 
             if (tipoDoc.Contains("Factura"))
@@ -68,21 +83,23 @@ namespace SISTEMAACTUALIZADO.Services
             }
             else
             {
-                if (string.IsNullOrEmpty(ticket.RuT)) ticket.RuT = "66.666.666-6";
-                if (string.IsNullOrEmpty(ticket.RazonSocial)) ticket.RazonSocial = "Consumidor Final";
+                ticket.RuT = string.IsNullOrWhiteSpace(rutCliente) ? "66.666.666-6" : rutCliente;
+                ticket.RazonSocial = string.IsNullOrWhiteSpace(razonSocial) ? "Consumidor Final" : razonSocial;
             }
 
+            // 3. ACTUALIZAR DETALLE DE VENTA (TVD2607)
             var detalles = _db.TVD2607.Where(d => d.idTve == ticket.idTve).ToList();
             foreach (var item in detalles)
             {
                 item.iddocDTE = iddoc;
                 item.Documento = tipoDoc;
                 item.NroDTE = folioOficial;
+                item.NroInT = ticket.nroInT; // Preserva el nroInT correlativo interno
             }
 
             _db.SaveChanges();
             return folioOficial;
-        }
+    }
 
         public void AnularTicket(int idTve)
         {

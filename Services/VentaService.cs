@@ -8,65 +8,76 @@ namespace SISTEMAACTUALIZADO.Services
 {
     public class VentaService
     {
-        private readonly AppDbContext _db = new AppDbContext();
-
-        public int GenerarTicketVenta(List<DetalleCarrito> carro, string vendedorNombre, string clienteNombre, string clienteRut)
+        public int GenerarTicketVenta(List<DetalleCarrito> carrito, string vendedor, string clienteNombre, string clienteRut)
         {
-            decimal total = carro.Sum(c => c.Subtotal);
-            int nroTicket = (int)(DateTime.Now.Ticks % 1000000);
-
-            TVE2607 tve = new TVE2607
+            using (var db = new AppDbContext())
             {
-                idLocal = 1,
-                nmbLocal = "Local Principal",
-                iddocDTE = 0, // 0 = Ticket de Atención Pendiente
-                Documento = "Ticket de Atención",
-                nroDTE = nroTicket,
-                FecDoc = DateTime.Now,
-                SubTotal = Math.Round(total / 1.19m, 0),
-                Neto = Math.Round(total / 1.19m, 0),
-                IvA = total - Math.Round(total / 1.19m, 0),
-                Total = total,
-                UserDTE = vendedorNombre,
-                Vendedor = vendedorNombre,
-                RuT = clienteRut,
-                RazonSocial = clienteNombre,
-                status = "Pendiente"
-            };
+                // 1. Obtener el último nroInT registrado y sumar 1
+                int ultimoNroInT = db.TVE2607.Max(v => (int?)v.nroInT) ?? 0;
+                int siguienteNroInT = ultimoNroInT + 1;
 
-            _db.TVE2607.Add(tve);
-            _db.SaveChanges();
+                int nroTicketAtencion = (int)(DateTime.Now.Ticks % 1000000);
 
-            foreach (var item in carro)
-            {
-                TVD2607 tvd = new TVD2607
+                var nuevaVenta = new TVE2607
                 {
-                    idTve = tve.idTve,
                     idLocal = 1,
+                    nmbLocal = "Local Principal",
                     iddocDTE = 0,
                     Documento = "Ticket de Atención",
-                    NroDTE = nroTicket,
-                    FecMoV = DateTime.Now,
-                    IdProducto = item.ProductoID,
-                    NmbProducto = item.Nombre,
-                    Cantidad = item.Cantidad,
-                    Precio = item.PrecioUnitario,
-                    SubTotal = item.Subtotal,
-                    nmbVendedor = vendedorNombre
+                    nroDTE = nroTicketAtencion,
+                    nroInT = siguienteNroInT,
+                    FecDoc = DateTime.Now,
+                    SubTotal = carrito.Sum(c => c.Subtotal),
+                    Descuento = 0,
+                    Neto = Math.Round(carrito.Sum(c => c.Subtotal) / 1.19m, 0),
+                    IvA = carrito.Sum(c => c.Subtotal) - Math.Round(carrito.Sum(c => c.Subtotal) / 1.19m, 0),
+                    Total = carrito.Sum(c => c.Subtotal),
+                    UserDTE = vendedor,
+                    Vendedor = vendedor,
+                    RuT = clienteRut,
+                    RazonSocial = clienteNombre,
+                    status = "Pendiente"
                 };
-                _db.TVD2607.Add(tvd);
 
-                // Descuento automático de stock en BD
-                var prodBD = _db.Productos.FirstOrDefault(p => p.ProductoID == item.ProductoID);
-                if (prodBD != null)
+                db.TVE2607.Add(nuevaVenta);
+                db.SaveChanges(); // Guarda encabezado
+
+                // 2. Guardar detalle Y DESCONTAR STOCK PERMANENTE EN BD
+                foreach (var item in carrito)
                 {
-                    prodBD.Stock -= item.Cantidad;
-                    if (prodBD.Stock < 0) prodBD.Stock = 0;
-                }
-            }
+                    var detalle = new TVD2607
+                    {
+                        idTve = nuevaVenta.idTve,
+                        idLocal = 1,
+                        iddocDTE = 0,
+                        Documento = "Ticket de Atención",
+                        NroDTE = nroTicketAtencion,
+                        NroInT = siguienteNroInT,
+                        FecMoV = DateTime.Now,
+                        HoraMoV = DateTime.Now.ToString("HH:mm:ss"),
+                        IdProducto = item.ProductoID,
+                        NmbProducto = item.Nombre,
+                        Cantidad = item.Cantidad,
+                        Precio = item.PrecioUnitario,
+                        SubTotal = item.Subtotal,
+                        nmbVendedor = vendedor,
+                        Unidad = "UN"
+                    };
 
-            _db.SaveChanges();
-            return nroTicket;
+                    db.TVD2607.Add(detalle);
+
+                    // --- AQUÍ ESTABA LA FALTA: DESCONTAR DE LA TABLA PRODUCTOS ---
+                    var prodBD = db.Productos.FirstOrDefault(p => p.ProductoID == item.ProductoID);
+                    if (prodBD != null)
+                    {
+                        prodBD.Stock -= item.Cantidad;
+                        if (prodBD.Stock < 0) prodBD.Stock = 0;
+                    }
+                }
+
+                db.SaveChanges(); // Guarda detalles y nuevos stocks en MySQL
+                return nroTicketAtencion;
+            }
         }
     }
 }

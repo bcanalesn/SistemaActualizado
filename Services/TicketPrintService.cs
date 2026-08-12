@@ -137,5 +137,79 @@ namespace SISTEMAACTUALIZADO.Services
             };
             preview.ShowDialog();
         }
+        public void ImprimirTicketAtencion(int nroTicket, string vendedor, string cliente, decimal total, List<DetalleCarrito> items)
+{
+    try
+    {
+        PrintDocument pd = new PrintDocument();
+        pd.PrintController = new StandardPrintController(); // Oculta el cuadro de diálogo emergente de impresión
+
+        pd.PrintPage += (s, e) =>
+        {
+            Graphics g = e.Graphics;
+            int width = 280; // Ancho estándar térmico 80mm
+            int y = 10;
+
+            using Font fontBoldBig = new Font("Segoe UI", 12F, FontStyle.Bold);
+            using Font fontBold = new Font("Segoe UI", 9F, FontStyle.Bold);
+            using Font fontRegular = new Font("Segoe UI", 8.5F, FontStyle.Regular);
+            using Font fontSmall = new Font("Segoe UI", 7.5F, FontStyle.Regular);
+            using StringFormat sfCenter = new StringFormat { Alignment = StringAlignment.Center };
+            using StringFormat sfRight = new StringFormat { Alignment = StringAlignment.Far };
+
+            // Encabezado
+            g.DrawString("TICKET DE ATENCIÓN", fontBoldBig, Brushes.Black, new RectangleF(0, y, width, 25), sfCenter);
+            y += 25;
+            g.DrawString($"N° #{nroTicket:D6}", fontBoldBig, Brushes.Black, new RectangleF(0, y, width, 25), sfCenter);
+            y += 28;
+
+            g.DrawString("--------------------------------------------------", fontRegular, Brushes.Black, 0, y);
+            y += 15;
+
+            // Datos Preventa
+            g.DrawString($"Fecha: {DateTime.Now:dd/MM/yyyy HH:mm:ss}", fontRegular, Brushes.Black, 5, y); y += 16;
+            g.DrawString($"Vendedor: {vendedor}", fontRegular, Brushes.Black, 5, y); y += 16;
+            g.DrawString($"Cliente: {cliente}", fontRegular, Brushes.Black, 5, y); y += 20;
+
+            g.DrawString("--------------------------------------------------", fontRegular, Brushes.Black, 0, y);
+            y += 15;
+
+            // Ítems
+            g.DrawString("CANT  PRODUCTO", fontBold, Brushes.Black, 5, y);
+            g.DrawString("TOTAL", fontBold, Brushes.Black, new RectangleF(0, y, width - 5, 20), sfRight);
+            y += 18;
+
+            foreach (var item in items)
+            {
+                string nom = item.Nombre.Length > 20 ? item.Nombre.Substring(0, 18) + ".." : item.Nombre;
+                g.DrawString($"{item.Cantidad}x  {nom}", fontRegular, Brushes.Black, 5, y);
+                g.DrawString($"${item.Subtotal:N0}", fontRegular, Brushes.Black, new RectangleF(0, y, width - 5, 20), sfRight);
+                y += 16;
+            }
+
+            g.DrawString("--------------------------------------------------", fontRegular, Brushes.Black, 0, y);
+            y += 15;
+
+            // Total
+            g.DrawString("TOTAL A PAGAR:", fontBold, Brushes.Black, 5, y);
+            g.DrawString($"${total:N0}", fontBoldBig, Brushes.Black, new RectangleF(0, y - 2, width - 5, 25), sfRight);
+            y += 28;
+
+            g.DrawString("--------------------------------------------------", fontRegular, Brushes.Black, 0, y);
+            y += 15;
+
+            // Pie
+            g.DrawString("Pase a CAJA a cancelar su ticket", fontBold, Brushes.Black, new RectangleF(0, y, width, 20), sfCenter);
+            y += 18;
+            g.DrawString("¡Gracias por su visita!", fontSmall, Brushes.Black, new RectangleF(0, y, width, 20), sfCenter);
+        };
+
+        pd.Print();
+    }
+    catch (Exception ex)
+    {
+        MessageBox.Show($"No se pudo conectar a la impresora de tickets: {ex.Message}", "Aviso Impresión", MessageBoxButtons.OK, MessageBoxIcon.Warning);
+    }
+}
     }
 }

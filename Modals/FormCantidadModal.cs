@@ -40,23 +40,14 @@ namespace SISTEMAACTUALIZADO.Modals
             this.FormBorderStyle = FormBorderStyle.FixedDialog;
             this.MaximizeBox = false;
             this.MinimizeBox = false;
-            this.ControlBox = false;
+            
+            // 1. ACTIVAR LA "X" ESTÁNDAR DE LA BARRA DE TÍTULO
+            this.ControlBox = true;
+            
             this.BackColor = Color.White;
             this.KeyPreview = true;
 
-            Button btnClose = new Button
-            {
-                Text = "✕",
-                Font = new Font("Segoe UI", 10F, FontStyle.Bold),
-                ForeColor = Color.FromArgb(148, 163, 184),
-                Location = new Point(345, 12),
-                Size = new Size(28, 28),
-                FlatStyle = FlatStyle.Flat,
-                TabStop = false,
-                Cursor = Cursors.Hand
-            };
-            btnClose.FlatAppearance.BorderSize = 0;
-            btnClose.Click += (s, e) => { this.DialogResult = DialogResult.Cancel; this.Close(); };
+            // 2. SE ELIMINÓ EL BOTÓN PERSONALIZADO btnClose QUE DIBUJAVA LA "✕" INTERNA
 
             Control ctrlIcono;
             if (!string.IsNullOrEmpty(imagenPath) && File.Exists(imagenPath))
@@ -238,7 +229,6 @@ namespace SISTEMAACTUALIZADO.Modals
             this.KeyDown += FormCantidadModal_KeyDown;
             this.Shown += (s, e) => btnAgregarAccion.Focus();
 
-            this.Controls.Add(btnClose);
             this.Controls.Add(ctrlIcono);
             this.Controls.Add(lblTitle);
             this.Controls.Add(lblSub);
