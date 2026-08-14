@@ -47,7 +47,7 @@ namespace SISTEMAACTUALIZADO.Services
             return _db.TVD2607.Where(d => d.idTve == idTve).ToList();
         }
 
-        public int ProcesarCobroTicket(TVE2607 ticket, string tipoDoc, string medioPago, string rutCliente, string razonSocial, string giro)
+        public int ProcesarCobroTicket(TVE2607 ticket, string tipoDoc, string medioPago, string rutCliente, string razonSocial, string giro, decimal vuelto = 0)
         {
             if (ticket == null) throw new ArgumentNullException(nameof(ticket));
 
@@ -60,19 +60,19 @@ namespace SISTEMAACTUALIZADO.Services
             if (rangoFolio != null && rangoFolio.FolioActual <= rangoFolio.FolioHasta)
             {
                 folioOficial = rangoFolio.FolioActual;
-                rangoFolio.FolioActual++; // AVANZA EL FOLIO ACTUAL PARA LA SIGUIENTE VENTA
+                rangoFolio.FolioActual++;
             }
             else
             {
-                // Respaldo por si no hay folios configurados
                 folioOficial = (int)(DateTime.Now.Ticks % 100000);
             }
 
             // 2. ACTUALIZAR ENCABEZADO DE VENTA (TVE2607)
             ticket.iddocDTE = iddoc;
             ticket.Documento = tipoDoc;
-            ticket.nroDTE = folioOficial; // Folio fiscal consumido
-            ticket.UserDTE = medioPago;
+            ticket.nroDTE = folioOficial;
+            ticket.MedioPago = medioPago; // Se guarda en su propia columna
+            ticket.Vuelto = vuelto;       // Se guarda el vuelto real
             ticket.status = "Emitido";
 
             if (tipoDoc.Contains("Factura"))
@@ -94,12 +94,12 @@ namespace SISTEMAACTUALIZADO.Services
                 item.iddocDTE = iddoc;
                 item.Documento = tipoDoc;
                 item.NroDTE = folioOficial;
-                item.NroInT = ticket.nroInT; // Preserva el nroInT correlativo interno
+                item.NroInT = ticket.nroInT;
             }
 
             _db.SaveChanges();
             return folioOficial;
-    }
+        }
 
         public void AnularTicket(int idTve)
         {

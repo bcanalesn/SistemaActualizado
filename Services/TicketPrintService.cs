@@ -64,7 +64,9 @@ namespace SISTEMAACTUALIZADO.Services
             y += 10;
 
             g.DrawString($"Fecha Emisión: {venta.FecDoc:dd/MM/yyyy HH:mm:ss}", fontSub, brushText, 15, y); y += 18;
-            g.DrawString($"Atendido por : {(string.IsNullOrEmpty(venta.UserDTE) ? "barbara" : venta.UserDTE)}", fontSub, brushText, 15, y); y += 18;
+            string nombreVendedor = !string.IsNullOrEmpty(venta.Vendedor) ? venta.Vendedor : (!string.IsNullOrEmpty(venta.UserDTE) ? venta.UserDTE : "Bárbara");
+            g.DrawString($"Atendido por : {nombreVendedor}", fontSub, brushText, 15, y); 
+            y += 18;
 
             if (!string.IsNullOrEmpty(venta.RuT))
             {

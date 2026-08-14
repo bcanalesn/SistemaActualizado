@@ -1060,7 +1060,7 @@ namespace SISTEMAACTUALIZADO
 
             try
             {
-                int folioOficial = _cajaService.ProcesarCobroTicket(_ticketSeleccionado, tipoDoc, medioPago, _ticketSeleccionado.RuT, _ticketSeleccionado.RazonSocial, "GENERAL");
+                int folioOficial = _cajaService.ProcesarCobroTicket(_ticketSeleccionado, tipoDoc, medioPago, _ticketSeleccionado.RuT, _ticketSeleccionado.RazonSocial, "GENERAL", vuelto);
 
                 _totalVueltoEntregadoTurno += vuelto;
 

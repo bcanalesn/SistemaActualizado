@@ -48,6 +48,8 @@ namespace SISTEMAACTUALIZADO.Models
         public string? codigoREF { get; set; }
         public DateTime? FechaREF { get; set; }
         public string HoraDoc { get; set; } = DateTime.Now.ToString("HH:mm:ss");
+        public string MedioPago { get; set; } = "Efectivo";
+        public decimal Vuelto { get; set; } = 0;
 
         public List<TVD2607> Detalles { get; set; } = new List<TVD2607>();
     }
