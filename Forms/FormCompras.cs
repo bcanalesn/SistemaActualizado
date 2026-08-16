@@ -518,27 +518,27 @@ namespace SISTEMAACTUALIZADO
         }
 
         private void BtnNuevoProducto_Click(object? sender, EventArgs e)
-        {
+    {
             using (var modal = new FormNuevoProductoModal())
             {
                 if (modal.ShowDialog(this) == DialogResult.OK && modal.ProductoResultado != null)
                 {
-                    CargarDatosIniciales();
                     _productoSeleccionado = modal.ProductoResultado;
                     txtBuscarProducto.Font = new Font("Segoe UI", 9.5F, FontStyle.Bold);
                     txtBuscarProducto.ForeColor = Color.FromArgb(2, 132, 199);
-                    txtBuscarProducto.Text = $"{modal.ProductoResultado.Nombre} (SKU: {modal.ProductoResultado.CodigoBarra})";
+                    txtBuscarProducto.Text = $"{modal.ProductoResultado.Nombre} (Nuevo ítem a registrar)";
 
                     decimal costo = modal.ProductoResultado.PrecioCosto;
                     txtPrecioCosto.Text = costo.ToString("0");
                     CalcularPreviewPrecioVenta();
 
-                    txtCantidadRecibida.Focus();
-                    txtCantidadRecibida.SelectAll();
+                    txtCantidadRecibida.Text = modal.CantidadFactura.ToString();
+
+                    txtPrecioCosto.Focus();
+                    txtPrecioCosto.SelectAll();
                 }
             }
         }
-
         private void BtnEditarProducto_Click(object? sender, EventArgs e)
         {
             if (_productoSeleccionado == null)
@@ -664,27 +664,60 @@ namespace SISTEMAACTUALIZADO
         }
 
         private void BtnRegistrarCompra_Click(object? sender, EventArgs e)
-        {
+{
+            // 1. Validar que exista un proveedor seleccionado
             if (_proveedorSeleccionado == null)
             {
-                MessageBox.Show("Debe buscar y seleccionar un proveedor.", "Validación", MessageBoxButtons.OK, MessageBoxIcon.Warning);
+                MessageBox.Show("Debe buscar y seleccionar un proveedor antes de procesar.", "Validación", MessageBoxButtons.OK, MessageBoxIcon.Warning);
                 txtBuscarProveedor.Focus();
                 return;
             }
 
+            // 2. Validar que el N° de Documento no esté vacío y sea numérico
             if (string.IsNullOrWhiteSpace(txtNroDocumento.Text) || !int.TryParse(txtNroDocumento.Text.Trim(), out int folio) || folio <= 0)
             {
-                MessageBox.Show("Debe ingresar un N° de Documento válido.", "Validación", MessageBoxButtons.OK, MessageBoxIcon.Warning);
+                MessageBox.Show("Debe ingresar un N° de Documento válido (solo números mayores a 0).", "Validación", MessageBoxButtons.OK, MessageBoxIcon.Warning);
                 txtNroDocumento.Focus();
                 return;
             }
 
+            // 3. 🔴 VALIDACIÓN DE FACTURA DUPLICADA EN BASE DE DATOS
+            using (var db = new AppDbContext())
+            {
+                // Limpiamos formato de RUT para comparar sin puntos ni guiones si fuera necesario
+                string rutProv = _proveedorSeleccionado.Rut.Trim();
+
+                bool facturaYaExiste = db.Compras.Any(c => 
+                    c.RutProveedor.Trim().ToLower() == rutProv.ToLower() && 
+                    c.NroFacturaProveedor == folio
+                );
+
+                if (facturaYaExiste)
+                {
+                    MessageBox.Show(
+                        $"⛔ FACTURA DUPLICADA:\n\n" +
+                        $"El documento N° {folio} ya se encuentra registrado para el proveedor:\n" +
+                        $"'{_proveedorSeleccionado.RazonSocial}' (RUT: {_proveedorSeleccionado.Rut}).\n\n" +
+                        $"Por favor verifique el número de factura para evitar ingresos dobles de stock.",
+                        "Documento ya Utilizado",
+                        MessageBoxButtons.OK,
+                        MessageBoxIcon.Stop
+                    );
+                    txtNroDocumento.Focus();
+                    txtNroDocumento.SelectAll();
+                    return; // ⛔ Detiene el proceso y no guarda nada
+                }
+            }
+
+            // 4. Validar que la factura tenga ítems en la tabla
             if (_detalleFactura.Count == 0)
             {
                 MessageBox.Show("Agregue al menos un producto a la lista antes de procesar la recepción.", "Validación", MessageBoxButtons.OK, MessageBoxIcon.Warning);
+                txtBuscarProducto.Focus();
                 return;
             }
 
+            // 5. Cálculos de totales
             decimal neto = _detalleFactura.Sum(d => d.Subtotal);
             decimal iva = Math.Round(neto * 0.19m, 0);
             decimal total = neto + iva;
@@ -706,7 +739,17 @@ namespace SISTEMAACTUALIZADO
             try
             {
                 _compraService.RegistrarFacturaCompra(compra, _detalleFactura, actualizarPreciosVenta: true);
-                MessageBox.Show($"¡Documento N° {folio} procesado exitosamente!\n\n• Proveedor: {_proveedorSeleccionado.RazonSocial}\n• Stock incrementado en {_detalleFactura.Sum(d => d.Cantidad)} unidades.\n• Precios actualizados en inventario.", "Éxito", MessageBoxButtons.OK, MessageBoxIcon.Information);
+
+                MessageBox.Show(
+                    $"¡Documento N° {folio} procesado exitosamente!\n\n" +
+                    $"• Proveedor: {_proveedorSeleccionado.RazonSocial}\n" +
+                    $"• Stock incrementado en {_detalleFactura.Sum(d => d.Cantidad)} unidades.\n" +
+                    $"• Precios y costos actualizados correctamente en inventario.", 
+                    "Recepción Guardada", 
+                    MessageBoxButtons.OK, 
+                    MessageBoxIcon.Information
+                );
+
                 LimpiarFormularioCompleto();
             }
             catch (Exception ex)

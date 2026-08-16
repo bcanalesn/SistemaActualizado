@@ -29,6 +29,7 @@ namespace SISTEMAACTUALIZADO.Modals
 
         private readonly Producto? _productoAEditar;
         public Producto? ProductoResultado { get; private set; }
+        public int CantidadFactura { get; private set; } = 1;
 
         public FormNuevoProductoModal(Producto? producto = null)
         {
@@ -41,7 +42,7 @@ namespace SISTEMAACTUALIZADO.Modals
         {
             this.FormBorderStyle = FormBorderStyle.None;
             this.StartPosition = FormStartPosition.CenterParent;
-            this.Size = new Size(480, 560);
+            this.Size = new Size(480, 550);
             this.BackColor = Color.White;
 
             Panel pnlBorde = new Panel
@@ -56,13 +57,12 @@ namespace SISTEMAACTUALIZADO.Modals
                 ControlPaint.DrawBorder(e.Graphics, pnlBorde.ClientRectangle, Color.FromArgb(203, 213, 225), ButtonBorderStyle.Solid);
             };
 
-            // Cabecera arrastrable
             Panel pnlHeader = new Panel { Dock = DockStyle.Top, Height = 40, BackColor = Color.Transparent };
             pnlHeader.MouseDown += (s, e) => { ReleaseCapture(); SendMessage(this.Handle, 0x112, 0xf012, 0); };
 
             lblTitulo = new Label
             {
-                Text = _productoAEditar == null ? "📦 Registrar Nuevo Producto" : "✏️ Editar Producto",
+                Text = _productoAEditar == null ? "📦 Registrar Nuevo Producto en Catálogo" : "✏️ Editar Producto",
                 Font = new Font("Segoe UI", 11.5F, FontStyle.Bold),
                 ForeColor = Color.FromArgb(15, 23, 42),
                 Dock = DockStyle.Left,
@@ -99,7 +99,7 @@ namespace SISTEMAACTUALIZADO.Modals
             txtCodigoBarra = new TextBox { Width = 425, Font = new Font("Segoe UI", 9.5F) };
             txtNombre = new TextBox { Width = 425, Font = new Font("Segoe UI", 9.5F) };
             txtCategoria = new TextBox { Width = 425, Font = new Font("Segoe UI", 9.5F), Text = "General" };
-            
+
             txtPrecioCosto = new TextBox { Width = 205, Font = new Font("Segoe UI", 9.5F, FontStyle.Bold), Text = "0" };
             txtPrecioCosto.TextChanged += (s, e) => RecalcularPrecioVenta();
 
@@ -107,17 +107,16 @@ namespace SISTEMAACTUALIZADO.Modals
             txtMargenGanancia.TextChanged += (s, e) => RecalcularPrecioVenta();
 
             txtPrecioUnitario = new TextBox { Width = 425, Font = new Font("Segoe UI", 9.5F, FontStyle.Bold), Text = "0" };
-            txtStockInicial = new TextBox { Width = 205, Font = new Font("Segoe UI", 9.5F), Text = "0" };
+            txtStockInicial = new TextBox { Width = 205, Font = new Font("Segoe UI", 9.5F), Text = "1" };
             txtStockMinimo = new TextBox { Width = 205, Font = new Font("Segoe UI", 9.5F), Text = "5" };
 
-            // Panel de Costo y Margen en dos columnas
             Panel pnlCostoMargen = new Panel { Size = new Size(430, 52) };
             pnlCostoMargen.Controls.Add(CrearSubCampo("Costo Neto ($):", txtPrecioCosto, 0));
             pnlCostoMargen.Controls.Add(CrearSubCampo("Margen (%):", txtMargenGanancia, 220));
 
-            // Panel de Stocks
             Panel pnlStocks = new Panel { Size = new Size(430, 52) };
-            pnlStocks.Controls.Add(CrearSubCampo("Stock Inicial:", txtStockInicial, 0));
+            string labelStock = _productoAEditar == null ? "Cant. Recibida en Factura:" : "Stock Actual:";
+            pnlStocks.Controls.Add(CrearSubCampo(labelStock, txtStockInicial, 0));
             pnlStocks.Controls.Add(CrearSubCampo("Stock Mínimo Alerta:", txtStockMinimo, 220));
 
             flowCampos.Controls.Add(CrearRenglonCampo("Código de Barra / SKU:", txtCodigoBarra));
@@ -127,12 +126,11 @@ namespace SISTEMAACTUALIZADO.Modals
             flowCampos.Controls.Add(CrearRenglonCampo("Precio Venta Público (IVA Incluido):", txtPrecioUnitario));
             flowCampos.Controls.Add(pnlStocks);
 
-            // Botones inferiores
             Panel pnlBotones = new Panel { Dock = DockStyle.Bottom, Height = 45 };
 
             btnGuardar = new Button
             {
-                Text = _productoAEditar == null ? "💾 Guardar Producto" : "💾 Guardar Cambios",
+                Text = _productoAEditar == null ? "💾 Guardar y Usar" : "💾 Guardar Cambios",
                 Size = new Size(180, 38),
                 BackColor = Color.FromArgb(2, 132, 199),
                 ForeColor = Color.White,
@@ -190,7 +188,7 @@ namespace SISTEMAACTUALIZADO.Modals
 
         private void RecalcularPrecioVenta()
         {
-            if (decimal.TryParse(txtPrecioCosto.Text.Trim(), out decimal costo) && 
+            if (decimal.TryParse(txtPrecioCosto.Text.Trim(), out decimal costo) &&
                 decimal.TryParse(txtMargenGanancia.Text.Trim(), out decimal margen) && costo > 0)
             {
                 decimal neto = costo * (1 + (margen / 100m));
@@ -212,7 +210,7 @@ namespace SISTEMAACTUALIZADO.Modals
                 txtPrecioUnitario.Text = _productoAEditar.PrecioUnitario.ToString("0");
                 txtStockInicial.Text = _productoAEditar.Stock.ToString();
                 txtStockMinimo.Text = _productoAEditar.StockMinimo.ToString();
-                txtStockInicial.Enabled = false; // No alterar stock manual en edición
+                txtStockInicial.Enabled = false;
             }
         }
 
@@ -228,40 +226,38 @@ namespace SISTEMAACTUALIZADO.Modals
             decimal.TryParse(txtPrecioCosto.Text.Trim(), out decimal costo);
             decimal.TryParse(txtMargenGanancia.Text.Trim(), out decimal margen);
             decimal.TryParse(txtPrecioUnitario.Text.Trim(), out decimal pvp);
-            int.TryParse(txtStockInicial.Text.Trim(), out int stock);
+            int.TryParse(txtStockInicial.Text.Trim(), out int cantFactura);
             int.TryParse(txtStockMinimo.Text.Trim(), out int stockMin);
 
-            if (pvp <= 0)
-            {
-                MessageBox.Show("El precio de venta al público debe ser mayor a 0.", "Validación", MessageBoxButtons.OK, MessageBoxIcon.Warning);
-                return;
-            }
+            if (cantFactura <= 0) cantFactura = 1;
+            CantidadFactura = cantFactura;
 
             try
             {
-                using var db = new AppDbContext();
-
                 if (_productoAEditar == null)
                 {
-                    var nuevo = new Producto
+                    // Producto nuevo: creado en memoria (ID = 0)
+                    var nuevoEnMemoria = new Producto
                     {
+                        ProductoID = 0,
                         CodigoBarra = string.IsNullOrWhiteSpace(txtCodigoBarra.Text) ? "GEN-" + DateTime.Now.Ticks.ToString().Substring(12) : txtCodigoBarra.Text.Trim(),
                         Nombre = nombre,
                         Categoria = string.IsNullOrWhiteSpace(txtCategoria.Text) ? "General" : txtCategoria.Text.Trim(),
                         PrecioCosto = costo,
                         MargenGanancia = margen > 0 ? margen : 30m,
                         PrecioUnitario = pvp,
-                        Stock = stock,
+                        Stock = 0,
                         StockMinimo = stockMin > 0 ? stockMin : 5,
+                        ImagenPath = "",
                         Estado = true
                     };
 
-                    db.Productos.Add(nuevo);
-                    db.SaveChanges();
-                    ProductoResultado = nuevo;
+                    ProductoResultado = nuevoEnMemoria;
                 }
                 else
                 {
+                    // Edición de producto existente en base de datos
+                    using var db = new AppDbContext();
                     var prodBd = db.Productos.Find(_productoAEditar.ProductoID);
                     if (prodBd != null)
                     {
@@ -282,7 +278,8 @@ namespace SISTEMAACTUALIZADO.Modals
             }
             catch (Exception ex)
             {
-                MessageBox.Show($"Error al guardar el producto:\n{ex.Message}", "Error DB", MessageBoxButtons.OK, MessageBoxIcon.Error);
+                string mensajeDetalle = ex.InnerException != null ? $"\nDetalle: {ex.InnerException.Message}" : "";
+                MessageBox.Show($"Error al preparar producto:\n{ex.Message}{mensajeDetalle}", "Error", MessageBoxButtons.OK, MessageBoxIcon.Error);
             }
         }
     }

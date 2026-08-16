@@ -18,37 +18,67 @@ namespace SISTEMAACTUALIZADO.Services
             using var transaction = db.Database.BeginTransaction();
             try
             {
-                // 1. Guardar encabezado
+                // 1. Guardar encabezado de la compra
                 db.Compras.Add(compra);
-                db.SaveChanges(); // Genera el CompraID autoincremental
+                db.SaveChanges();
 
-                // 2. Procesar ítems y actualizar inventario
+                // 2. Procesar ítems
                 foreach (var item in detalles)
                 {
-                    // Asignar el ID de compra y limpiar navegación para evitar inserciones duplicadas
                     item.CompraID = compra.CompraID;
                     item.Compra = null;
-                    item.Producto = null;
 
-                    db.DetalleCompras.Add(item);
+                    Producto? producto = null;
 
-                    // Actualizar el producto en BD
-                    var producto = db.Productos.FirstOrDefault(p => p.ProductoID == item.ProductoID);
-                    if (producto != null)
+                    // Si es un producto nuevo creado durante la compra (ID == 0)
+                    if (item.ProductoID == 0)
                     {
-                        producto.Stock += item.Cantidad;
-                        producto.PrecioCosto = item.PrecioCostoUnitario;
+                        var nuevoProd = new Producto
+                        {
+                            CodigoBarra = "SKU-" + DateTime.Now.Ticks.ToString().Substring(12),
+                            Nombre = item.NombreProducto,
+                            Categoria = "General",
+                            PrecioCosto = item.PrecioCostoUnitario,
+                            MargenGanancia = 30.00m,
+                            Stock = item.Cantidad, // Inicia con el stock de esta factura
+                            StockMinimo = 5,
+                            ImagenPath = "",
+                            Estado = true
+                        };
 
                         if (actualizarPreciosVenta)
                         {
-                            decimal margen = producto.MargenGanancia > 0 ? producto.MargenGanancia : 30.00m;
-                            decimal netoVenta = producto.PrecioCosto * (1 + (margen / 100m));
-                            decimal pvpCalculado = netoVenta * 1.19m;
+                            decimal netoVenta = nuevoProd.PrecioCosto * 1.30m;
+                            decimal pvp = netoVenta * 1.19m;
+                            nuevoProd.PrecioUnitario = Math.Round(pvp / 10m, 0, MidpointRounding.AwayFromZero) * 10m;
+                        }
 
-                            // 🟢 Redondeo a la decena más cercana (Regla de redondeo comercial CLP)
-                            producto.PrecioUnitario = Math.Round(pvpCalculado / 10m, 0, MidpointRounding.AwayFromZero) * 10m;
+                        db.Productos.Add(nuevoProd);
+                        db.SaveChanges(); // Obtiene su ProductoID real generado por MySQL
+
+                        item.ProductoID = nuevoProd.ProductoID;
+                    }
+                    else
+                    {
+                        // Producto existente en catálogo
+                        producto = db.Productos.FirstOrDefault(p => p.ProductoID == item.ProductoID);
+                        if (producto != null)
+                        {
+                            producto.Stock += item.Cantidad;
+                            producto.PrecioCosto = item.PrecioCostoUnitario;
+
+                            if (actualizarPreciosVenta)
+                            {
+                                decimal margen = producto.MargenGanancia > 0 ? producto.MargenGanancia : 30.00m;
+                                decimal netoVenta = producto.PrecioCosto * (1 + (margen / 100m));
+                                decimal pvp = netoVenta * 1.19m;
+                                producto.PrecioUnitario = Math.Round(pvp / 10m, 0, MidpointRounding.AwayFromZero) * 10m;
+                            }
                         }
                     }
+
+                    item.Producto = null;
+                    db.DetalleCompras.Add(item);
                 }
 
                 db.SaveChanges();
