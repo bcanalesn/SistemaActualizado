@@ -1,19 +1,24 @@
 using System;
+using System.Collections.Generic;
+using System.ComponentModel.DataAnnotations;
 
 namespace SISTEMAACTUALIZADO.Models
 {
     public class Compra
     {
+        [Key]
         public int CompraID { get; set; }
-        public int ProveedorID { get; set; }
         public string RutProveedor { get; set; } = string.Empty;
         public string RazonSocialProveedor { get; set; } = string.Empty;
-        public string TipoDocumento { get; set; } = "Factura de Compra"; // Factura de Compra / Guía de Recepción
-        public int FolioDocumento { get; set; }
+        public int NroFacturaProveedor { get; set; }
+        public DateTime FechaEmision { get; set; } = DateTime.Now;
         public DateTime FechaRecepcion { get; set; } = DateTime.Now;
-        public decimal TotalNeto { get; set; }
-        public decimal IVA { get; set; }
-        public decimal Total { get; set; }
-        public string Usuario { get; set; } = "barbara";
+        public decimal MontoNeto { get; set; }
+        public decimal MontoIva { get; set; }
+        public decimal MontoTotal { get; set; }
+        public string UsuarioReceptor { get; set; } = "Bárbara";
+        public string Estado { get; set; } = "Recibida";
+
+        public List<DetalleCompra> Detalles { get; set; } = new List<DetalleCompra>();
     }
 }

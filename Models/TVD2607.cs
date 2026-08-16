@@ -1,13 +1,15 @@
 using System;
 using System.ComponentModel.DataAnnotations;
+using System.ComponentModel.DataAnnotations.Schema;
 
 namespace SISTEMAACTUALIZADO.Models
 {
+    [Table("TVD2607")]
     public class TVD2607
     {
         [Key]
         public int idTvd { get; set; }
-        public int idTve { get; set; } // Clave foranea hacia TVE2607
+        public int idTve { get; set; }
         public int idLocal { get; set; } = 1;
         public int iddocDTE { get; set; } = 39;
         public string Documento { get; set; } = "Boleta Electrónica";
@@ -33,6 +35,8 @@ namespace SISTEMAACTUALIZADO.Models
         public string nGrupo { get; set; } = string.Empty;
         public string Unidad { get; set; } = "UN";
 
+        // Clave foránea declarada únicamente aquí
+        [ForeignKey("idTve")]
         public TVE2607? VentaEncabezado { get; set; }
     }
 }

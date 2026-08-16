@@ -14,13 +14,12 @@ namespace SISTEMAACTUALIZADO
         private Label lblTituloVista = null!;
         private Label lblUsuarioInfo = null!;
 
-        // Botones del Menú Lateral (Orden Lógico de Operación)
+        // Botones del Menú Lateral (Orden Operativo sin Proveedores en el menú principal)
         private Button btnCaja = new Button();
         private Button btnVentas = new Button();
         private Button btnHistorial = new Button();
         private Button btnLibroVentas = new Button();
         private Button btnFolios = new Button();
-        private Button btnProveedores = new Button();
         private Button btnCompras = new Button();
         private Button btnClientes = new Button();
         private Button btnProductos = new Button();
@@ -40,7 +39,7 @@ namespace SISTEMAACTUALIZADO
             InitializeComponent();
             AplicarPermisosPorRol();
 
-            // Inicio lógico: Abrir Control de Caja primero para aperturar turno
+            // Inicio lógico: Abrir Control de Caja primero
             AbrirFormEnContent(new FormCaja(_usuarioActual), "Apertura y Cierre de Caja", btnCaja);
         }
 
@@ -60,12 +59,12 @@ namespace SISTEMAACTUALIZADO
             this.MinimumSize = new Size(1150, 700);
             this.BackColor = Color.FromArgb(244, 246, 249);
 
-            // Panel de Navegación Lateral (Sidebar)
+            // Sidebar
             this.pnlSidebar.Dock = DockStyle.Left;
             this.pnlSidebar.Width = 240;
             this.pnlSidebar.BackColor = Color.FromArgb(24, 28, 36);
 
-            // Logotipo de Cabecera
+            // Logotipo
             this.lblLogo.Text = "⚡ POS SYSTEM";
             this.lblLogo.Dock = DockStyle.Top;
             this.lblLogo.Height = 70;
@@ -80,7 +79,7 @@ namespace SISTEMAACTUALIZADO
                 AutoScroll = true
             };
 
-            // Configuración del Orden Operativo de Botones (Caja Primero)
+            // Posicionamiento de botones sin botón de proveedores
             int yPos = 10;
             int espaciado = 48;
 
@@ -89,7 +88,6 @@ namespace SISTEMAACTUALIZADO
             ConfigurarBotonSidebar(this.btnHistorial, "📜  Historial Ventas", yPos); yPos += espaciado;
             ConfigurarBotonSidebar(this.btnLibroVentas, "📚  Libro Ventas LVE", yPos); yPos += espaciado;
             ConfigurarBotonSidebar(this.btnFolios, "📄  Control de Folios", yPos); yPos += espaciado;
-            ConfigurarBotonSidebar(this.btnProveedores, "🚚  Proveedores", yPos); yPos += espaciado;
             ConfigurarBotonSidebar(this.btnCompras, "📥  Recepción Compras", yPos); yPos += espaciado;
             ConfigurarBotonSidebar(this.btnClientes, "👥  Clientes", yPos); yPos += espaciado;
             ConfigurarBotonSidebar(this.btnProductos, "📦  Productos", yPos); yPos += espaciado;
@@ -101,7 +99,6 @@ namespace SISTEMAACTUALIZADO
             pnlNav.Controls.Add(this.btnProductos);
             pnlNav.Controls.Add(this.btnClientes);
             pnlNav.Controls.Add(this.btnCompras);
-            pnlNav.Controls.Add(this.btnProveedores);
             pnlNav.Controls.Add(this.btnFolios);
             pnlNav.Controls.Add(this.btnLibroVentas);
             pnlNav.Controls.Add(this.btnHistorial);
@@ -123,7 +120,6 @@ namespace SISTEMAACTUALIZADO
             this.btnHistorial.Click += (s, e) => AbrirFormEnContent(new FormHistorialVentas(), "Historial y Devoluciones de Ventas", btnHistorial);
             this.btnLibroVentas.Click += (s, e) => AbrirFormEnContent(new FormLibroVentas(), "Libro de Ventas Electrónico (LVE) y Formulario F29", btnLibroVentas);
             this.btnFolios.Click += (s, e) => AbrirFormEnContent(new FormFolios(), "Control de Folios Autorizados (SII)", btnFolios);
-            this.btnProveedores.Click += (s, e) => AbrirFormEnContent(new FormProveedores(), "Gestión de Proveedores (Catálogo)", btnProveedores);
             this.btnCompras.Click += (s, e) => AbrirFormEnContent(new FormCompras(), "Recepción de Compras e Incremento de Stock", btnCompras);
             this.btnClientes.Click += (s, e) => AbrirFormEnContent(new FormClientes(), "Gestión de Clientes (CRM)", btnClientes);
             this.btnProductos.Click += (s, e) => AbrirFormEnContent(new FormProductos(), "Gestión de Productos e Inventario", btnProductos);
@@ -149,6 +145,7 @@ namespace SISTEMAACTUALIZADO
             this.pnlSidebar.Controls.Add(pnlBottomNav);
             this.pnlSidebar.Controls.Add(this.lblLogo);
 
+            // Header Superior
             this.pnlHeader.Dock = DockStyle.Top;
             this.pnlHeader.Height = 65;
             this.pnlHeader.BackColor = Color.White;
@@ -177,6 +174,7 @@ namespace SISTEMAACTUALIZADO
             this.pnlHeader.Controls.Add(this.lblTituloVista);
             this.pnlHeader.Controls.Add(this.lblUsuarioInfo);
 
+            // Contenedor Central
             this.pnlContent.Dock = DockStyle.Fill;
             this.pnlContent.BackColor = Color.FromArgb(244, 246, 249);
             this.pnlContent.Padding = new Padding(15);
@@ -196,7 +194,6 @@ namespace SISTEMAACTUALIZADO
                 btnReportes.Visible = false;
                 btnFolios.Visible = false;
                 btnLibroVentas.Visible = false;
-                btnProveedores.Visible = false;
                 btnCompras.Visible = false;
             }
         }
@@ -238,9 +235,10 @@ namespace SISTEMAACTUALIZADO
         {
             Button[] botones = new[] { 
                 btnCaja, btnVentas, btnHistorial, btnLibroVentas, btnFolios, 
-                btnProveedores, btnCompras, btnClientes, btnProductos, 
+                btnCompras, btnClientes, btnProductos, 
                 btnUsuarios, btnReportes, btnCerrarSesion 
             };
+
             foreach (var b in botones)
             {
                 if (b != null)

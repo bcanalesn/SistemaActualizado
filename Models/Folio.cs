@@ -1,11 +1,13 @@
 using System;
+using System.ComponentModel.DataAnnotations;
 
 namespace SISTEMAACTUALIZADO.Models
 {
     public class Folio
     {
+        [Key]
         public int FolioID { get; set; }
-        public string TipoDocumento { get; set; } = "Boleta Electrónica"; // Boleta Electrónica, Factura Electrónica, Guía de Despacho
+        public string TipoDocumento { get; set; } = "Boleta Electrónica";
         public int FolioDesde { get; set; }
         public int FolioHasta { get; set; }
         public int FolioActual { get; set; }

@@ -1,16 +1,18 @@
 using System;
 using System.Collections.Generic;
 using System.ComponentModel.DataAnnotations;
+using System.ComponentModel.DataAnnotations.Schema;
 
 namespace SISTEMAACTUALIZADO.Models
 {
+    [Table("TVE2607")]
     public class TVE2607
     {
         [Key]
         public int idTve { get; set; }
         public int idLocal { get; set; } = 1;
         public string nmbLocal { get; set; } = "Local Principal";
-        public int iddocDTE { get; set; } = 39; // 39 Boleta, 33 Factura, 61 Nota Credito
+        public int iddocDTE { get; set; } = 39;
         public string Documento { get; set; } = "Boleta Electrónica";
         public int nroDTE { get; set; }
         public int nroInT { get; set; }
@@ -51,6 +53,8 @@ namespace SISTEMAACTUALIZADO.Models
         public string MedioPago { get; set; } = "Efectivo";
         public decimal Vuelto { get; set; } = 0;
 
+        // Relación inversa limpia
+        [InverseProperty("VentaEncabezado")]
         public List<TVD2607> Detalles { get; set; } = new List<TVD2607>();
     }
 }

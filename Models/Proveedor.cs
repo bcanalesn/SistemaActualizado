@@ -1,9 +1,13 @@
 using System;
+using System.ComponentModel.DataAnnotations;
+using System.ComponentModel.DataAnnotations.Schema;
 
 namespace SISTEMAACTUALIZADO.Models
 {
+    [Table("Proveedores")]
     public class Proveedor
     {
+        [Key]
         public int ProveedorID { get; set; }
         public string Rut { get; set; } = string.Empty;
         public string RazonSocial { get; set; } = string.Empty;

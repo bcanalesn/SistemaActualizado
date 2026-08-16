@@ -6,228 +6,221 @@ using System.Linq;
 using System.Windows.Forms;
 using SISTEMAACTUALIZADO.Data;
 using SISTEMAACTUALIZADO.Models;
+using SISTEMAACTUALIZADO.Services;
+using SISTEMAACTUALIZADO.Modals;
 
 namespace SISTEMAACTUALIZADO
 {
     public class FormCompras : Form
     {
-        private AppDbContext _db = new AppDbContext();
+        private readonly CompraService _compraService = new CompraService();
         private List<DetalleCompra> _detalleFactura = new List<DetalleCompra>();
         private List<Producto> _productosCache = new List<Producto>();
         private List<Proveedor> _proveedoresCache = new List<Proveedor>();
 
-        // Controles de Cabecera (Proveedor y Documento)
-        private ComboBox cbProveedores = null!;
-        private ComboBox cbTipoDocumento = null!;
-        private NumericUpDown numFolio = null!;
-        private DateTimePicker dtpFechaRecepcion = null!;
+        // 1. Buscador Inteligente Proveedor
+        private Proveedor? _proveedorSeleccionado = null;
+        private TextBox txtBuscarProveedor = null!;
+        private Button btnLimpiarBuscadorProv = null!;
+        private Button btnNuevoProveedor = null!;
+        private Button btnEditarProveedor = null!;
+        private ListBox lstSugerenciasProveedores = null!;
+        private const string PLACEHOLDER_PROV = "🔍 Buscar por RUT o Razón Social...";
 
-        // Controles de Añadir Producto
-        private ComboBox cbProductos = null!;
-        private NumericUpDown numCantidadRecibida = null!;
+        // Controles Documento
+        private ComboBox cbTipoDocumento = null!;
+        private TextBox txtNroDocumento = null!;
+        private DateTimePicker dtpFechaRecepcion = null!;
+        private Button btnAgregarDocumento = null!;
+
+        // 2. Buscador Inteligente Producto
+        private Producto? _productoSeleccionado = null;
+        private TextBox txtBuscarProducto = null!;
+        private Button btnLimpiarBuscadorProd = null!;
+        private Button btnNuevoProducto = null!;
+        private Button btnEditarProducto = null!;
+        private ListBox lstSugerenciasProductos = null!;
+        private const string PLACEHOLDER_PROD = "🔍 Buscar por Código o Nombre...";
+
+        // Controles de Ítems
+        private TextBox txtCantidadRecibida = null!; // Sin flechas
         private TextBox txtPrecioCosto = null!;
+        private Label lblPreviewPVP = null!;
         private Button btnAgregarItem = null!;
 
-        // DataGridView Detalle de Compra
+        // Grilla y Totales
         private DataGridView dgvDetalle = null!;
-
-        // Resumen y Totales (Neto, IVA Crédito Fiscal, Total)
         private Label lblTotalNeto = null!;
         private Label lblIvaCredito = null!;
         private Label lblTotalBruto = null!;
-
-        // Botones de Acción
         private Button btnRegistrarCompra = null!;
         private Button btnLimpiarFormulario = null!;
-        private Button btnDemoCompra = null!;
 
         public FormCompras()
         {
             InitializeComponent();
-            CargarProveedoresYProductos();
+            CargarDatosIniciales();
         }
 
         private void InitializeComponent()
         {
             this.SuspendLayout();
-            this.BackColor = Color.FromArgb(248, 250, 252);
+            this.BackColor = Color.FromArgb(241, 245, 249);
             this.Font = new Font("Segoe UI", 9.5F, FontStyle.Regular, GraphicsUnit.Point);
 
             Panel pnlMain = new Panel
             {
                 Dock = DockStyle.Fill,
-                Padding = new Padding(20, 12, 20, 20),
-                BackColor = Color.FromArgb(248, 250, 252),
+                Padding = new Padding(20, 15, 20, 20),
                 AutoScroll = true
             };
 
-            Label lblSubtitulo = new Label
-            {
-                Text = "Ingreso de mercancía por Factura/Guía de Proveedor e incremento automático de stock",
-                Font = new Font("Segoe UI", 9F, FontStyle.Regular),
-                ForeColor = Color.FromArgb(100, 116, 139),
-                Dock = DockStyle.Top,
-                Height = 24
-            };
+            // ==========================================
+            // TARJETA PASO 1: DATOS DEL DOCUMENTO
+            // ==========================================
+            Panel pnlPaso1 = CrearTarjeta(80, "PASO 1: DATOS DEL DOCUMENTO DE COMPRA", Color.FromArgb(30, 41, 59));
+            FlowLayoutPanel flowHeader = new FlowLayoutPanel { Dock = DockStyle.Fill, WrapContents = false, AutoScroll = false };
 
-            Panel pnlHeaderCard = new Panel
-            {
-                Dock = DockStyle.Top,
-                Height = 85,
-                BackColor = Color.White,
-                Padding = new Padding(14, 10, 14, 10),
-                Margin = new Padding(0, 0, 0, 12)
-            };
-            pnlHeaderCard.Paint += (s, e) =>
-            {
-                e.Graphics.SmoothingMode = SmoothingMode.AntiAlias;
-                ControlPaint.DrawBorder(e.Graphics, pnlHeaderCard.ClientRectangle, Color.FromArgb(226, 232, 240), ButtonBorderStyle.Solid);
-            };
+            Panel pnlProvContainer = new Panel { Size = new Size(345, 52), Margin = new Padding(0, 0, 8, 0) };
+            Label lblP = new Label { Text = "1. Proveedor (RUT o Nombre)", Font = new Font("Segoe UI", 7.5F, FontStyle.Bold), ForeColor = Color.FromArgb(71, 85, 105), Location = new Point(0, 0), AutoSize = true };
 
-            FlowLayoutPanel flowHeader = new FlowLayoutPanel
+            txtBuscarProveedor = new TextBox
             {
-                Dock = DockStyle.Fill,
-                WrapContents = false,
-                AutoScroll = false,
-                BackColor = Color.Transparent
+                Size = new Size(215, 28),
+                Font = new Font("Segoe UI", 9F, FontStyle.Italic),
+                ForeColor = Color.FromArgb(148, 163, 184),
+                Text = PLACEHOLDER_PROV,
+                Location = new Point(0, 16)
             };
+            ConfigurarEventosBuscadorProveedor();
 
-            // Proveedor
-            cbProveedores = new ComboBox
-            {
-                Size = new Size(260, 28),
-                DropDownStyle = ComboBoxStyle.DropDownList,
-                Font = new Font("Segoe UI", 9.5F)
-            };
-            Panel pnlGrpProv = CrearGrupoControl("🚚 Seleccionar Proveedor", cbProveedores);
+            btnLimpiarBuscadorProv = CrearBotonIcono("🗑️", 217, 16, (s, e) => ResetearBuscadorProveedor());
+            btnNuevoProveedor = CrearBotonAccionRapida("➕", Color.FromArgb(2, 132, 199), 246, 16, BtnNuevoProveedor_Click);
+            btnEditarProveedor = CrearBotonAccionRapida("✏️", Color.FromArgb(245, 158, 11), 276, 16, BtnEditarProveedor_Click);
 
-            // Tipo Documento
-            cbTipoDocumento = new ComboBox
-            {
-                Size = new Size(160, 28),
-                DropDownStyle = ComboBoxStyle.DropDownList,
-                Font = new Font("Segoe UI", 9.5F)
-            };
+            pnlProvContainer.Controls.AddRange(new Control[] { lblP, txtBuscarProveedor, btnLimpiarBuscadorProv, btnNuevoProveedor, btnEditarProveedor });
+
+            cbTipoDocumento = new ComboBox { Size = new Size(140, 28), DropDownStyle = ComboBoxStyle.DropDownList };
             cbTipoDocumento.Items.AddRange(new string[] { "Factura de Compra", "Guía de Recepción" });
             cbTipoDocumento.SelectedIndex = 0;
-            Panel pnlGrpTipo = CrearGrupoControl("📄 Tipo Documento", cbTipoDocumento);
 
-            // Folio N°
-            numFolio = new NumericUpDown
+            txtNroDocumento = new TextBox { Size = new Size(95, 28), Font = new Font("Segoe UI", 9.5F, FontStyle.Bold) };
+            txtNroDocumento.KeyPress += (s, e) => { if (!char.IsControl(e.KeyChar) && !char.IsDigit(e.KeyChar)) e.Handled = true; };
+            txtNroDocumento.KeyDown += (s, e) => { if (e.KeyCode == Keys.Enter) txtBuscarProducto.Focus(); };
+
+            dtpFechaRecepcion = new DateTimePicker { Size = new Size(105, 28), Format = DateTimePickerFormat.Short };
+
+            // Reemplaza btnAgregarDocumento por este botón:
+            btnAgregarDocumento = new Button
             {
-                Size = new Size(110, 28),
+                Text = "📋 Lista Proveedores",
+                Size = new Size(145, 28),
+                BackColor = Color.FromArgb(30, 41, 59),
+                ForeColor = Color.White,
+                FlatStyle = FlatStyle.Flat,
+                Font = new Font("Segoe UI", 8.5F, FontStyle.Bold),
+                Cursor = Cursors.Hand,
+                Margin = new Padding(6, 16, 0, 0)
+            };
+            btnAgregarDocumento.FlatAppearance.BorderSize = 0;
+            btnAgregarDocumento.Click += BtnListaProveedores_Click;
+
+            flowHeader.Controls.AddRange(new Control[] {
+                pnlProvContainer,
+                CrearCampo("2. Tipo Doc.", cbTipoDocumento),
+                CrearCampo("3. N° de Documento", txtNroDocumento),
+                CrearCampo("4. Fecha Emisión", dtpFechaRecepcion),
+                btnAgregarDocumento
+            });
+            pnlPaso1.Controls.Add(flowHeader);
+
+            // ==========================================
+            // TARJETA PASO 2: AGREGAR PRODUCTOS
+            // ==========================================
+            Panel pnlPaso2 = CrearTarjeta(85, "PASO 2: AGREGAR PRODUCTOS A LA FACTURA", Color.FromArgb(2, 132, 199));
+            pnlPaso2.Margin = new Padding(0, 10, 0, 10);
+            FlowLayoutPanel flowItem = new FlowLayoutPanel { Dock = DockStyle.Fill, WrapContents = false };
+
+            // Panel Buscador Producto + Botones
+            Panel pnlProdContainer = new Panel { Size = new Size(345, 52), Margin = new Padding(0, 0, 8, 0) };
+            Label lblProd = new Label { Text = "Seleccionar Producto (Código o Nombre)", Font = new Font("Segoe UI", 7.5F, FontStyle.Bold), ForeColor = Color.FromArgb(71, 85, 105), Location = new Point(0, 0), AutoSize = true };
+
+            txtBuscarProducto = new TextBox
+            {
+                Size = new Size(215, 28),
+                Font = new Font("Segoe UI", 9F, FontStyle.Italic),
+                ForeColor = Color.FromArgb(148, 163, 184),
+                Text = PLACEHOLDER_PROD,
+                Location = new Point(0, 16)
+            };
+            ConfigurarEventosBuscadorProducto();
+
+            btnLimpiarBuscadorProd = CrearBotonIcono("🗑️", 217, 16, (s, e) => ResetearBuscadorProducto());
+            btnNuevoProducto = CrearBotonAccionRapida("➕", Color.FromArgb(2, 132, 199), 246, 16, BtnNuevoProducto_Click);
+            btnEditarProducto = CrearBotonAccionRapida("✏️", Color.FromArgb(245, 158, 11), 276, 16, BtnEditarProducto_Click);
+
+            pnlProdContainer.Controls.AddRange(new Control[] { lblProd, txtBuscarProducto, btnLimpiarBuscadorProd, btnNuevoProducto, btnEditarProducto });
+
+            // Cantidad Recibida (TextBox numérico sin flechas)
+            txtCantidadRecibida = new TextBox
+            {
+                Size = new Size(65, 28),
                 Font = new Font("Segoe UI", 9.5F, FontStyle.Bold),
-                Minimum = 1,
-                Maximum = 99999999,
-                Value = 1050
+                Text = "1",
+                TextAlign = HorizontalAlignment.Center
             };
-            Panel pnlGrpFolio = CrearGrupoControl("🔢 Folio N°", numFolio);
+            txtCantidadRecibida.KeyPress += (s, e) => { if (!char.IsControl(e.KeyChar) && !char.IsDigit(e.KeyChar)) e.Handled = true; };
+            txtCantidadRecibida.KeyDown += (s, e) => { if (e.KeyCode == Keys.Enter) txtPrecioCosto.Focus(); };
 
-            // Fecha Recepción
-            dtpFechaRecepcion = new DateTimePicker
+            txtPrecioCosto = new TextBox { Size = new Size(95, 28), Font = new Font("Segoe UI", 9.5F, FontStyle.Bold), Text = "0" };
+            txtPrecioCosto.TextChanged += (s, e) => CalcularPreviewPrecioVenta();
+            txtPrecioCosto.KeyDown += (s, e) => { if (e.KeyCode == Keys.Enter) BtnAgregarItem_Click(s, e); };
+
+            lblPreviewPVP = new Label { Size = new Size(130, 28), Text = "PVP Sug: $0", ForeColor = Color.FromArgb(16, 185, 129), Font = new Font("Segoe UI", 9F, FontStyle.Bold), TextAlign = ContentAlignment.MiddleLeft };
+
+            btnAgregarItem = new Button
             {
-                Size = new Size(120, 28),
-                Format = DateTimePickerFormat.Short,
-                Font = new Font("Segoe UI", 9.5F)
+                Text = "➕ AGREGAR A LA LISTA",
+                Size = new Size(160, 30),
+                BackColor = Color.FromArgb(2, 132, 199),
+                ForeColor = Color.White,
+                FlatStyle = FlatStyle.Flat,
+                Font = new Font("Segoe UI", 8.5F, FontStyle.Bold),
+                Cursor = Cursors.Hand,
+                Margin = new Padding(6, 16, 0, 0)
             };
-            Panel pnlGrpFecha = CrearGrupoControl("📅 Fecha Recepción", dtpFechaRecepcion);
-
-            btnDemoCompra = CrearBotonEstilizado("✨ Cargar Demo", Color.FromArgb(124, 58, 237), Color.White, new Size(120, 30));
-            btnDemoCompra.Margin = new Padding(6, 18, 0, 0);
-            btnDemoCompra.Click += BtnDemoCompra_Click;
-
-            flowHeader.Controls.AddRange(new Control[] { pnlGrpProv, pnlGrpTipo, pnlGrpFolio, pnlGrpFecha, btnDemoCompra });
-            pnlHeaderCard.Controls.Add(flowHeader);
-
-            Panel pnlItemCard = new Panel
-            {
-                Dock = DockStyle.Top,
-                Height = 78,
-                BackColor = Color.FromArgb(240, 249, 255),
-                Padding = new Padding(14, 8, 14, 8),
-                Margin = new Padding(0, 0, 0, 12)
-            };
-            pnlItemCard.Paint += (s, e) =>
-            {
-                ControlPaint.DrawBorder(e.Graphics, pnlItemCard.ClientRectangle, Color.FromArgb(186, 230, 253), ButtonBorderStyle.Solid);
-            };
-
-            FlowLayoutPanel flowItem = new FlowLayoutPanel
-            {
-                Dock = DockStyle.Fill,
-                WrapContents = false,
-                AutoScroll = false,
-                BackColor = Color.Transparent
-            };
-
-            // Producto
-            cbProductos = new ComboBox
-            {
-                Size = new Size(260, 28),
-                DropDownStyle = ComboBoxStyle.DropDownList,
-                Font = new Font("Segoe UI", 9.5F)
-            };
-            cbProductos.SelectedIndexChanged += CbProductos_SelectedIndexChanged;
-            Panel pnlGrpProd = CrearGrupoControl("📦 Seleccionar Producto", cbProductos);
-
-            // Cantidad
-            numCantidadRecibida = new NumericUpDown
-            {
-                Size = new Size(90, 28),
-                Font = new Font("Segoe UI", 9.5F, FontStyle.Bold),
-                Minimum = 1,
-                Maximum = 10000,
-                Value = 10
-            };
-            Panel pnlGrpCant = CrearGrupoControl("📥 Cantidad", numCantidadRecibida);
-
-            // Precio Costo Unitario
-            txtPrecioCosto = new TextBox
-            {
-                Size = new Size(110, 28),
-                Font = new Font("Segoe UI", 9.5F, FontStyle.Bold),
-                Text = "0"
-            };
-            Panel pnlGrpCosto = CrearGrupoControl("💲 Costo Unitario ($)", txtPrecioCosto);
-
-            btnAgregarItem = CrearBotonEstilizado("➕ Agregar Ítem", Color.FromArgb(2, 132, 199), Color.White, new Size(125, 30));
-            btnAgregarItem.Margin = new Padding(6, 18, 0, 0);
+            btnAgregarItem.FlatAppearance.BorderSize = 0;
             btnAgregarItem.Click += BtnAgregarItem_Click;
 
-            flowItem.Controls.AddRange(new Control[] { pnlGrpProd, pnlGrpCant, pnlGrpCosto, btnAgregarItem });
-            pnlItemCard.Controls.Add(flowItem);
+            flowItem.Controls.AddRange(new Control[] {
+                pnlProdContainer,
+                CrearCampo("Cant. Recibida", txtCantidadRecibida),
+                CrearCampo("Costo Neto ($)", txtPrecioCosto),
+                CrearCampo("Precio Venta (IVA Inc.)", lblPreviewPVP),
+                btnAgregarItem
+            });
+            pnlPaso2.Controls.Add(flowItem);
 
-            TableLayoutPanel pnlGridAndSummary = new TableLayoutPanel
-            {
-                Dock = DockStyle.Top,
-                Height = 440,
-                ColumnCount = 2,
-                RowCount = 1,
-                Margin = new Padding(0, 4, 0, 0)
-            };
-            pnlGridAndSummary.ColumnStyles.Add(new ColumnStyle(SizeType.Percent, 72F));
-            pnlGridAndSummary.ColumnStyles.Add(new ColumnStyle(SizeType.Percent, 28F));
-
-            // Grid Detalle
-            Panel pnlTableCard = new Panel
+            // ==========================================
+            // PASO 3: GRILLA DE DETALLE Y TOTALES
+            // ==========================================
+            TableLayoutPanel pnlBottom = new TableLayoutPanel
             {
                 Dock = DockStyle.Fill,
-                BackColor = Color.White,
-                Padding = new Padding(10),
-                Margin = new Padding(0, 0, 8, 0)
+                ColumnCount = 2,
+                RowCount = 1,
+                Margin = new Padding(0, 10, 0, 0)
             };
-            pnlTableCard.Paint += (s, e) =>
-            {
-                ControlPaint.DrawBorder(e.Graphics, pnlTableCard.ClientRectangle, Color.FromArgb(226, 232, 240), ButtonBorderStyle.Solid);
-            };
+            pnlBottom.ColumnStyles.Add(new ColumnStyle(SizeType.Percent, 72F));
+            pnlBottom.ColumnStyles.Add(new ColumnStyle(SizeType.Percent, 28F));
 
+            // Grilla
+            Panel pnlTableCard = new Panel { Dock = DockStyle.Fill, BackColor = Color.White, Padding = new Padding(10), Margin = new Padding(0, 0, 10, 0) };
             dgvDetalle = new DataGridView
             {
                 Dock = DockStyle.Fill,
                 BackgroundColor = Color.White,
                 BorderStyle = BorderStyle.None,
-                CellBorderStyle = DataGridViewCellBorderStyle.SingleHorizontal,
-                ColumnHeadersBorderStyle = DataGridViewHeaderBorderStyle.None,
                 SelectionMode = DataGridViewSelectionMode.FullRowSelect,
                 MultiSelect = false,
                 AllowUserToAddRows = false,
@@ -237,310 +230,412 @@ namespace SISTEMAACTUALIZADO
             };
             ConfigurarEstiloTabla(dgvDetalle);
 
-            Panel pnlGridActions = new Panel
+            Button btnQuitar = new Button { Text = "🗑️ Quitar Ítem", Size = new Size(120, 26), BackColor = Color.FromArgb(254, 226, 226), ForeColor = Color.FromArgb(185, 28, 28), FlatStyle = FlatStyle.Flat, Font = new Font("Segoe UI", 8F, FontStyle.Bold), Dock = DockStyle.Bottom };
+            btnQuitar.FlatAppearance.BorderSize = 0;
+            btnQuitar.Click += (s, e) =>
             {
-                Dock = DockStyle.Bottom,
-                Height = 34,
-                Padding = new Padding(0, 4, 0, 0)
+                if (dgvDetalle.CurrentRow?.DataBoundItem is DetalleCompra item)
+                {
+                    _detalleFactura.Remove(item);
+                    ActualizarTablaDetalle();
+                }
             };
-            Button btnQuitarItem = CrearBotonEstilizado("🗑️ Quitar Ítem Seleccionado", Color.FromArgb(254, 226, 226), Color.FromArgb(185, 28, 28), new Size(185, 28));
-            btnQuitarItem.Click += BtnQuitarItem_Click;
-            pnlGridActions.Controls.Add(btnQuitarItem);
-
             pnlTableCard.Controls.Add(dgvDetalle);
-            pnlTableCard.Controls.Add(pnlGridActions);
+            pnlTableCard.Controls.Add(btnQuitar);
 
-            Panel pnlSummaryCard = new Panel
-            {
-                Dock = DockStyle.Fill,
-                BackColor = Color.White,
-                Padding = new Padding(14)
-            };
-            pnlSummaryCard.Paint += (s, e) =>
-            {
-                ControlPaint.DrawBorder(e.Graphics, pnlSummaryCard.ClientRectangle, Color.FromArgb(226, 232, 240), ButtonBorderStyle.Solid);
-            };
+            // Resumen Lateral
+            Panel pnlSummaryCard = new Panel { Dock = DockStyle.Fill, BackColor = Color.White, Padding = new Padding(14) };
+            Label lblResumenTit = new Label { Text = "PASO 3: CONFIRMAR RECEPCIÓN", Dock = DockStyle.Top, Height = 25, Font = new Font("Segoe UI", 9.5F, FontStyle.Bold), ForeColor = Color.FromArgb(15, 23, 42) };
 
-            Label lblTituloResumen = new Label
-            {
-                Text = "🧾 Resumen de la Recepción",
-                Font = new Font("Segoe UI", 11F, FontStyle.Bold),
-                ForeColor = Color.FromArgb(15, 23, 42),
-                Dock = DockStyle.Top,
-                Height = 26
-            };
+            Panel pnlTotales = new Panel { Dock = DockStyle.Top, Height = 110 };
+            int y = 5;
+            lblTotalNeto = CrearRenglon("Neto Factura:", "$ 0", ref y, pnlTotales);
+            lblIvaCredito = CrearRenglon("IVA Crédito (19%):", "$ 0", ref y, pnlTotales);
 
-            Panel pnlTotalesContainer = new Panel
-            {
-                Dock = DockStyle.Top,
-                Height = 150,
-                Padding = new Padding(0, 8, 0, 0)
-            };
-
-            int yPos = 0;
-            lblTotalNeto = CrearRenglonMonto("Monto Neto Afecto:", "$ 0", ref yPos, pnlTotalesContainer);
-            lblIvaCredito = CrearRenglonMonto("IVA Compra Crédito (19%):", "$ 0", ref yPos, pnlTotalesContainer);
-
-            Panel pnlTotalHighlight = new Panel
-            {
-                Dock = DockStyle.Top,
-                Height = 70,
-                BackColor = Color.FromArgb(240, 253, 244),
-                Padding = new Padding(10, 6, 10, 6),
-                Margin = new Padding(0, 8, 0, 8)
-            };
-            pnlTotalHighlight.Paint += (s, e) =>
-            {
-                ControlPaint.DrawBorder(e.Graphics, pnlTotalHighlight.ClientRectangle, Color.FromArgb(187, 247, 208), ButtonBorderStyle.Solid);
-            };
-
-            Label lblTotalCap = new Label
-            {
-                Text = "TOTAL FACTURA BRUTO",
-                Font = new Font("Segoe UI", 8F, FontStyle.Bold),
-                ForeColor = Color.FromArgb(21, 128, 61),
-                Dock = DockStyle.Top,
-                TextAlign = ContentAlignment.MiddleCenter,
-                Height = 16
-            };
-
-            lblTotalBruto = new Label
-            {
-                Text = "$ 0",
-                Font = new Font("Segoe UI", 16F, FontStyle.Bold),
-                ForeColor = Color.FromArgb(16, 185, 129),
-                Dock = DockStyle.Fill,
-                TextAlign = ContentAlignment.MiddleCenter
-            };
-
-            pnlTotalHighlight.Controls.Add(lblTotalBruto);
-            pnlTotalHighlight.Controls.Add(lblTotalCap);
+            Panel pnlTotalBox = new Panel { Dock = DockStyle.Top, Height = 60, BackColor = Color.FromArgb(240, 253, 244), Padding = new Padding(6) };
+            lblTotalBruto = new Label { Text = "$ 0", Font = new Font("Segoe UI", 15F, FontStyle.Bold), ForeColor = Color.FromArgb(16, 185, 129), Dock = DockStyle.Fill, TextAlign = ContentAlignment.MiddleCenter };
+            pnlTotalBox.Controls.Add(lblTotalBruto);
 
             btnRegistrarCompra = new Button
             {
-                Text = "💾 REGISTRAR RECEPCIÓN\nE INCREMENTAR STOCK",
+                Text = "💾 PROCESAR RECEPCIÓN\nE INCREMENTAR STOCK",
                 Dock = DockStyle.Bottom,
                 Height = 52,
                 BackColor = Color.FromArgb(16, 185, 129),
                 ForeColor = Color.White,
                 FlatStyle = FlatStyle.Flat,
-                Font = new Font("Segoe UI", 9.5F, FontStyle.Bold),
+                Font = new Font("Segoe UI", 9F, FontStyle.Bold),
                 Cursor = Cursors.Hand
             };
             btnRegistrarCompra.FlatAppearance.BorderSize = 0;
             btnRegistrarCompra.Click += BtnRegistrarCompra_Click;
 
-            Panel pnlSpacerBtn = new Panel { Dock = DockStyle.Bottom, Height = 8 };
-
             btnLimpiarFormulario = new Button
             {
-                Text = "🔄 Limpiar Formulario",
+                Text = "🔄 Limpiar Todo",
                 Dock = DockStyle.Bottom,
-                Height = 34,
+                Height = 30,
                 BackColor = Color.FromArgb(241, 245, 249),
                 ForeColor = Color.FromArgb(51, 65, 85),
                 FlatStyle = FlatStyle.Flat,
-                Font = new Font("Segoe UI", 8.5F, FontStyle.Bold),
-                Cursor = Cursors.Hand
+                Font = new Font("Segoe UI", 8F, FontStyle.Bold)
             };
             btnLimpiarFormulario.FlatAppearance.BorderSize = 0;
-            btnLimpiarFormulario.Click += (s, e) => LimpiarFormulario();
+            btnLimpiarFormulario.Click += (s, e) => LimpiarFormularioCompleto();
 
             pnlSummaryCard.Controls.Add(btnRegistrarCompra);
-            pnlSummaryCard.Controls.Add(pnlSpacerBtn);
+            pnlSummaryCard.Controls.Add(new Panel { Dock = DockStyle.Bottom, Height = 6 });
             pnlSummaryCard.Controls.Add(btnLimpiarFormulario);
-            pnlSummaryCard.Controls.Add(pnlTotalHighlight);
-            pnlSummaryCard.Controls.Add(pnlTotalesContainer);
-            pnlSummaryCard.Controls.Add(lblTituloResumen);
+            pnlSummaryCard.Controls.Add(pnlTotalBox);
+            pnlSummaryCard.Controls.Add(pnlTotales);
+            pnlSummaryCard.Controls.Add(lblResumenTit);
 
-            pnlGridAndSummary.Controls.Add(pnlTableCard, 0, 0);
-            pnlGridAndSummary.Controls.Add(pnlSummaryCard, 1, 0);
+            pnlBottom.Controls.Add(pnlTableCard, 0, 0);
+            pnlBottom.Controls.Add(pnlSummaryCard, 1, 0);
 
-            pnlMain.Controls.Add(pnlGridAndSummary);
-            pnlMain.Controls.Add(pnlItemCard);
-            pnlMain.Controls.Add(pnlHeaderCard);
-            pnlMain.Controls.Add(lblSubtitulo);
+            // Listas Predictivas Flotantes
+            lstSugerenciasProveedores = new ListBox { Size = new Size(320, 130), Location = new Point(34, 88), Font = new Font("Segoe UI", 9F), Visible = false, BorderStyle = BorderStyle.FixedSingle };
+            lstSugerenciasProveedores.Click += LstSugerenciasProveedores_Click;
+            lstSugerenciasProveedores.KeyDown += (s, e) => { if (e.KeyCode == Keys.Enter) LstSugerenciasProveedores_Click(s, e); if (e.KeyCode == Keys.Escape) lstSugerenciasProveedores.Visible = false; };
+
+            lstSugerenciasProductos = new ListBox { Size = new Size(320, 130), Location = new Point(34, 178), Font = new Font("Segoe UI", 9F), Visible = false, BorderStyle = BorderStyle.FixedSingle };
+            lstSugerenciasProductos.Click += LstSugerenciasProductos_Click;
+            lstSugerenciasProductos.KeyDown += (s, e) => { if (e.KeyCode == Keys.Enter) LstSugerenciasProductos_Click(s, e); if (e.KeyCode == Keys.Escape) lstSugerenciasProductos.Visible = false; };
+
+            pnlMain.Controls.Add(lstSugerenciasProductos);
+            pnlMain.Controls.Add(lstSugerenciasProveedores);
+            pnlMain.Controls.Add(pnlBottom);
+            pnlMain.Controls.Add(pnlPaso2);
+            pnlMain.Controls.Add(pnlPaso1);
 
             this.Controls.Add(pnlMain);
             this.ResumeLayout(false);
         }
 
-        private Panel CrearGrupoControl(string titulo, Control ctrl)
+        // ========================================================
+        // BUSCADOR PROVEEDOR
+        // ========================================================
+        private void ConfigurarEventosBuscadorProveedor()
         {
-            Panel pnl = new Panel
+            txtBuscarProveedor.GotFocus += (s, e) =>
             {
-                Size = new Size(ctrl.Width + 4, 48),
-                Margin = new Padding(0, 0, 8, 0)
+                if (txtBuscarProveedor.Text == PLACEHOLDER_PROV)
+                {
+                    txtBuscarProveedor.Text = "";
+                    txtBuscarProveedor.Font = new Font("Segoe UI", 9.5F, FontStyle.Regular);
+                    txtBuscarProveedor.ForeColor = Color.FromArgb(15, 23, 42);
+                }
             };
 
-            Label lbl = new Label
+            txtBuscarProveedor.LostFocus += (s, e) =>
             {
-                Text = titulo,
-                Font = new Font("Segoe UI", 8F, FontStyle.Bold),
-                ForeColor = Color.FromArgb(51, 65, 85),
-                Location = new Point(0, 0),
-                AutoSize = true
+                if (string.IsNullOrWhiteSpace(txtBuscarProveedor.Text)) ResetearBuscadorProveedor();
             };
 
-            ctrl.Location = new Point(0, 18);
-            pnl.Controls.Add(lbl);
-            pnl.Controls.Add(ctrl);
-            return pnl;
+            txtBuscarProveedor.TextChanged += (s, e) =>
+            {
+                if (txtBuscarProveedor.Text == PLACEHOLDER_PROV) return;
+
+                string q = txtBuscarProveedor.Text.Trim().ToLower();
+                if (q.Length >= 1)
+                {
+                    var f = _proveedoresCache.Where(p => p.RazonSocial.ToLower().Contains(q) || p.Rut.ToLower().Contains(q)).Take(7).ToList();
+                    if (f.Count > 0)
+                    {
+                        lstSugerenciasProveedores.DataSource = null;
+                        lstSugerenciasProveedores.DataSource = f;
+                        lstSugerenciasProveedores.DisplayMember = "RazonSocial";
+                        lstSugerenciasProveedores.ValueMember = "ProveedorID";
+                        lstSugerenciasProveedores.Visible = true;
+                        lstSugerenciasProveedores.BringToFront();
+                    }
+                    else lstSugerenciasProveedores.Visible = false;
+                }
+                else { lstSugerenciasProveedores.Visible = false; _proveedorSeleccionado = null; }
+            };
+
+            txtBuscarProveedor.KeyDown += (s, e) =>
+            {
+                if (e.KeyCode == Keys.Down && lstSugerenciasProveedores.Visible && lstSugerenciasProveedores.Items.Count > 0) lstSugerenciasProveedores.Focus();
+                if (e.KeyCode == Keys.Escape) lstSugerenciasProveedores.Visible = false;
+                if (e.KeyCode == Keys.Enter && _proveedorSeleccionado != null) txtNroDocumento.Focus();
+            };
         }
 
-        private Button CrearBotonEstilizado(string texto, Color back, Color fore, Size size)
+        private void ResetearBuscadorProveedor()
         {
-            Button b = new Button
-            {
-                Text = texto,
-                Size = size,
-                BackColor = back,
-                ForeColor = fore,
-                FlatStyle = FlatStyle.Flat,
-                Font = new Font("Segoe UI", 8.5F, FontStyle.Bold),
-                Cursor = Cursors.Hand
-            };
-            b.FlatAppearance.BorderSize = 0;
-            return b;
+            _proveedorSeleccionado = null;
+            txtBuscarProveedor.Text = PLACEHOLDER_PROV;
+            txtBuscarProveedor.Font = new Font("Segoe UI", 9F, FontStyle.Italic);
+            txtBuscarProveedor.ForeColor = Color.FromArgb(148, 163, 184);
+            lstSugerenciasProveedores.Visible = false;
         }
 
-        private Label CrearRenglonMonto(string titulo, string valorInicial, ref int y, Panel container)
+        private void LstSugerenciasProveedores_Click(object? sender, EventArgs e)
         {
-            Label lblT = new Label
+            if (lstSugerenciasProveedores.SelectedItem is Proveedor p)
             {
-                Text = titulo,
-                Font = new Font("Segoe UI", 8.5F),
-                ForeColor = Color.FromArgb(100, 116, 139),
-                Location = new Point(0, y),
-                AutoSize = true
-            };
-
-            Label lblV = new Label
-            {
-                Text = valorInicial,
-                Font = new Font("Segoe UI", 10F, FontStyle.Bold),
-                ForeColor = Color.FromArgb(15, 23, 42),
-                Location = new Point(0, y + 16),
-                AutoSize = true
-            };
-
-            container.Controls.Add(lblT);
-            container.Controls.Add(lblV);
-            y += 42;
-            return lblV;
+                _proveedorSeleccionado = p;
+                txtBuscarProveedor.Font = new Font("Segoe UI", 9.5F, FontStyle.Bold);
+                txtBuscarProveedor.ForeColor = Color.FromArgb(2, 132, 199);
+                txtBuscarProveedor.Text = $"{p.RazonSocial} ({p.Rut})";
+                lstSugerenciasProveedores.Visible = false;
+                txtNroDocumento.Focus();
+            }
         }
 
-        private void ConfigurarEstiloTabla(DataGridView dgv)
+        // ========================================================
+        // BUSCADOR PRODUCTO
+        // ========================================================
+        private void ConfigurarEventosBuscadorProducto()
         {
-            dgv.EnableHeadersVisualStyles = false;
-            dgv.ColumnHeadersDefaultCellStyle.BackColor = Color.FromArgb(30, 41, 59);
-            dgv.ColumnHeadersDefaultCellStyle.ForeColor = Color.White;
-            dgv.ColumnHeadersDefaultCellStyle.Font = new Font("Segoe UI", 9F, FontStyle.Bold);
-            dgv.ColumnHeadersHeight = 34;
+            txtBuscarProducto.GotFocus += (s, e) =>
+            {
+                if (txtBuscarProducto.Text == PLACEHOLDER_PROD)
+                {
+                    txtBuscarProducto.Text = "";
+                    txtBuscarProducto.Font = new Font("Segoe UI", 9.5F, FontStyle.Regular);
+                    txtBuscarProducto.ForeColor = Color.FromArgb(15, 23, 42);
+                }
+            };
 
-            dgv.DefaultCellStyle.Font = new Font("Segoe UI", 8.5F);
-            dgv.DefaultCellStyle.ForeColor = Color.FromArgb(51, 65, 85);
-            dgv.DefaultCellStyle.SelectionBackColor = Color.FromArgb(224, 242, 254);
-            dgv.DefaultCellStyle.SelectionForeColor = Color.FromArgb(15, 23, 42);
-            dgv.RowTemplate.Height = 32;
-            dgv.AlternatingRowsDefaultCellStyle.BackColor = Color.FromArgb(248, 250, 252);
-            dgv.GridColor = Color.FromArgb(226, 232, 240);
+            txtBuscarProducto.LostFocus += (s, e) =>
+            {
+                if (string.IsNullOrWhiteSpace(txtBuscarProducto.Text)) ResetearBuscadorProducto();
+            };
+
+            txtBuscarProducto.TextChanged += (s, e) =>
+            {
+                if (txtBuscarProducto.Text == PLACEHOLDER_PROD) return;
+
+                string q = txtBuscarProducto.Text.Trim().ToLower();
+                if (q.Length >= 1)
+                {
+                    var f = _productosCache.Where(p => p.Nombre.ToLower().Contains(q) || p.CodigoBarra.ToLower().Contains(q)).Take(7).ToList();
+                    if (f.Count > 0)
+                    {
+                        lstSugerenciasProductos.DataSource = null;
+                        lstSugerenciasProductos.DataSource = f;
+                        lstSugerenciasProductos.DisplayMember = "Nombre";
+                        lstSugerenciasProductos.ValueMember = "ProductoID";
+                        lstSugerenciasProductos.Visible = true;
+                        lstSugerenciasProductos.BringToFront();
+                    }
+                    else lstSugerenciasProductos.Visible = false;
+                }
+                else { lstSugerenciasProductos.Visible = false; _productoSeleccionado = null; }
+            };
+
+            txtBuscarProducto.KeyDown += (s, e) =>
+            {
+                if (e.KeyCode == Keys.Down && lstSugerenciasProductos.Visible && lstSugerenciasProductos.Items.Count > 0) lstSugerenciasProductos.Focus();
+                if (e.KeyCode == Keys.Escape) lstSugerenciasProductos.Visible = false;
+                if (e.KeyCode == Keys.Enter && _productoSeleccionado != null) txtCantidadRecibida.Focus();
+            };
         }
 
-        private void CargarProveedoresYProductos()
+        private void ResetearBuscadorProducto()
         {
+            _productoSeleccionado = null;
+            txtBuscarProducto.Text = PLACEHOLDER_PROD;
+            txtBuscarProducto.Font = new Font("Segoe UI", 9F, FontStyle.Italic);
+            txtBuscarProducto.ForeColor = Color.FromArgb(148, 163, 184);
+            lstSugerenciasProductos.Visible = false;
+            txtPrecioCosto.Text = "0";
+            lblPreviewPVP.Text = "PVP Sug: $0";
+        }
+
+        private void LstSugerenciasProductos_Click(object? sender, EventArgs e)
+        {
+            if (lstSugerenciasProductos.SelectedItem is Producto p)
+            {
+                _productoSeleccionado = p;
+                txtBuscarProducto.Font = new Font("Segoe UI", 9.5F, FontStyle.Bold);
+                txtBuscarProducto.ForeColor = Color.FromArgb(2, 132, 199);
+                txtBuscarProducto.Text = $"{p.Nombre} (SKU: {p.CodigoBarra})";
+                lstSugerenciasProductos.Visible = false;
+
+                decimal costo = p.PrecioCosto > 0 ? p.PrecioCosto : Math.Round(p.PrecioUnitario / 1.19m / 1.30m, 0);
+                txtPrecioCosto.Text = costo.ToString("0");
+                CalcularPreviewPrecioVenta();
+
+                txtCantidadRecibida.Focus();
+                txtCantidadRecibida.SelectAll();
+            }
+        }
+
+        // ========================================================
+        // CARGA DE DATOS Y MODALES
+        // ========================================================
+        private void CargarDatosIniciales()
+        {
+            using var db = new AppDbContext();
             try
             {
-                _proveedoresCache = _db.Proveedores.Where(p => p.Estado).OrderBy(p => p.RazonSocial).ToList();
-                cbProveedores.DataSource = null;
-                cbProveedores.DataSource = _proveedoresCache;
-                cbProveedores.DisplayMember = "RazonSocial";
-                cbProveedores.ValueMember = "ProveedorID";
-
-                _productosCache = _db.Productos.Where(p => p.Estado).OrderBy(p => p.Nombre).ToList();
-                cbProductos.DataSource = null;
-                cbProductos.DataSource = _productosCache;
-                cbProductos.DisplayMember = "Nombre";
-                cbProductos.ValueMember = "ProductoID";
+                _proveedoresCache = db.Proveedores.Where(p => p.Estado).OrderBy(p => p.RazonSocial).ToList();
+                _productosCache = db.Productos.Where(p => p.Estado).OrderBy(p => p.Nombre).ToList();
             }
-            catch
+            catch (Exception ex)
             {
-                // Fallback de demostración si la base de datos no está disponible
-                _proveedoresCache = new List<Proveedor>
-                {
-                    new Proveedor { ProveedorID = 1, Rut = "76.888.999-1", RazonSocial = "DISTRIBUIDORA LÁCTEOS SUR S.A." },
-                    new Proveedor { ProveedorID = 2, Rut = "96.543.210-5", RazonSocial = "COMERCIALIZADORA DE ABARROTES CENTRAL LTDA" }
-                };
-                cbProveedores.DataSource = _proveedoresCache;
-                cbProveedores.DisplayMember = "RazonSocial";
-                cbProveedores.ValueMember = "ProveedorID";
-
-                _productosCache = new List<Producto>
-                {
-                    new Producto { ProductoID = 1, Nombre = "Leche Entera 1L", PrecioUnitario = 1150, Stock = 40 },
-                    new Producto { ProductoID = 2, Nombre = "Queso Gauda 250g", PrecioUnitario = 2490, Stock = 25 },
-                    new Producto { ProductoID = 3, Nombre = "Azúcar Blanca 1kg", PrecioUnitario = 1290, Stock = 60 }
-                };
-                cbProductos.DataSource = _productosCache;
-                cbProductos.DisplayMember = "Nombre";
-                cbProductos.ValueMember = "ProductoID";
+                MessageBox.Show($"Error al cargar datos: {ex.Message}", "Error DB", MessageBoxButtons.OK, MessageBoxIcon.Error);
             }
-
-            CbProductos_SelectedIndexChanged(null, EventArgs.Empty);
         }
 
-        private void CbProductos_SelectedIndexChanged(object? sender, EventArgs e)
+        private void BtnNuevoProveedor_Click(object? sender, EventArgs e)
         {
-            if (cbProductos.SelectedItem is Producto p)
+            using (var modal = new FormNuevoProveedorModal())
             {
-                decimal costoSugerido = Math.Round(p.PrecioUnitario * 0.70m, 0);
-                txtPrecioCosto.Text = costoSugerido.ToString("0");
+                if (modal.ShowDialog(this) == DialogResult.OK && modal.ProveedorResultado != null)
+                {
+                    CargarDatosIniciales();
+                    _proveedorSeleccionado = modal.ProveedorResultado;
+                    txtBuscarProveedor.Font = new Font("Segoe UI", 9.5F, FontStyle.Bold);
+                    txtBuscarProveedor.ForeColor = Color.FromArgb(2, 132, 199);
+                    txtBuscarProveedor.Text = $"{modal.ProveedorResultado.RazonSocial} ({modal.ProveedorResultado.Rut})";
+                    txtNroDocumento.Focus();
+                }
+            }
+        }
+
+        private void BtnEditarProveedor_Click(object? sender, EventArgs e)
+        {
+            if (_proveedorSeleccionado == null)
+            {
+                MessageBox.Show("Busque y seleccione primero un proveedor antes de editar.", "Validación", MessageBoxButtons.OK, MessageBoxIcon.Warning);
+                txtBuscarProveedor.Focus();
+                return;
+            }
+
+            using (var modal = new FormNuevoProveedorModal(_proveedorSeleccionado))
+            {
+                if (modal.ShowDialog(this) == DialogResult.OK && modal.ProveedorResultado != null)
+                {
+                    CargarDatosIniciales();
+                    _proveedorSeleccionado = modal.ProveedorResultado;
+                    txtBuscarProveedor.Text = $"{modal.ProveedorResultado.RazonSocial} ({modal.ProveedorResultado.Rut})";
+                }
+            }
+        }
+
+        private void BtnNuevoProducto_Click(object? sender, EventArgs e)
+        {
+            using (var modal = new FormNuevoProductoModal())
+            {
+                if (modal.ShowDialog(this) == DialogResult.OK && modal.ProductoResultado != null)
+                {
+                    CargarDatosIniciales();
+                    _productoSeleccionado = modal.ProductoResultado;
+                    txtBuscarProducto.Font = new Font("Segoe UI", 9.5F, FontStyle.Bold);
+                    txtBuscarProducto.ForeColor = Color.FromArgb(2, 132, 199);
+                    txtBuscarProducto.Text = $"{modal.ProductoResultado.Nombre} (SKU: {modal.ProductoResultado.CodigoBarra})";
+
+                    decimal costo = modal.ProductoResultado.PrecioCosto;
+                    txtPrecioCosto.Text = costo.ToString("0");
+                    CalcularPreviewPrecioVenta();
+
+                    txtCantidadRecibida.Focus();
+                    txtCantidadRecibida.SelectAll();
+                }
+            }
+        }
+
+        private void BtnEditarProducto_Click(object? sender, EventArgs e)
+        {
+            if (_productoSeleccionado == null)
+            {
+                MessageBox.Show("Busque y seleccione primero un producto antes de editar.", "Validación", MessageBoxButtons.OK, MessageBoxIcon.Warning);
+                txtBuscarProducto.Focus();
+                return;
+            }
+
+            using (var modal = new FormNuevoProductoModal(_productoSeleccionado))
+            {
+                if (modal.ShowDialog(this) == DialogResult.OK && modal.ProductoResultado != null)
+                {
+                    CargarDatosIniciales();
+                    _productoSeleccionado = modal.ProductoResultado;
+                    txtBuscarProducto.Text = $"{modal.ProductoResultado.Nombre} (SKU: {modal.ProductoResultado.CodigoBarra})";
+                    txtPrecioCosto.Text = modal.ProductoResultado.PrecioCosto.ToString("0");
+                    CalcularPreviewPrecioVenta();
+                }
+            }
+        }
+
+        private void BtnListaProveedores_Click(object? sender, EventArgs e)
+        {
+            using (var modal = new FormListaProveedoresModal())
+            {
+                if (modal.ShowDialog(this) == DialogResult.OK && modal.ProveedorSeleccionado != null)
+                {
+                    CargarDatosIniciales();
+                    _proveedorSeleccionado = modal.ProveedorSeleccionado;
+                    txtBuscarProveedor.Font = new Font("Segoe UI", 9.5F, FontStyle.Bold);
+                    txtBuscarProveedor.ForeColor = Color.FromArgb(2, 132, 199);
+                    txtBuscarProveedor.Text = $"{modal.ProveedorSeleccionado.RazonSocial} ({modal.ProveedorSeleccionado.Rut})";
+                    txtNroDocumento.Focus();
+                }
+            }
+        }
+
+        private void CalcularPreviewPrecioVenta()
+        {
+            if (decimal.TryParse(txtPrecioCosto.Text.Trim(), out decimal costo) && _productoSeleccionado != null)
+            {
+                decimal margen = _productoSeleccionado.MargenGanancia > 0 ? _productoSeleccionado.MargenGanancia : 30.00m;
+                decimal netoVenta = costo * (1 + (margen / 100m));
+                decimal pvpCalculado = netoVenta * 1.19m;
+                decimal pvpRedondeado = Math.Round(pvpCalculado / 10m, 0, MidpointRounding.AwayFromZero) * 10m;
+                lblPreviewPVP.Text = $"PVP Sug: ${pvpRedondeado:N0}";
             }
         }
 
         private void BtnAgregarItem_Click(object? sender, EventArgs e)
         {
-            if (cbProductos.SelectedItem is not Producto prod)
+            if (_productoSeleccionado == null)
             {
-                MessageBox.Show("Debe seleccionar un producto válido.", "Validación", MessageBoxButtons.OK, MessageBoxIcon.Warning);
+                MessageBox.Show("Busque y seleccione un producto.", "Validación", MessageBoxButtons.OK, MessageBoxIcon.Warning);
+                txtBuscarProducto.Focus();
+                return;
+            }
+
+            if (!int.TryParse(txtCantidadRecibida.Text.Trim(), out int cantidad) || cantidad <= 0)
+            {
+                MessageBox.Show("Ingrese una cantidad válida mayor a cero.", "Validación", MessageBoxButtons.OK, MessageBoxIcon.Warning);
+                txtCantidadRecibida.Focus();
                 return;
             }
 
             if (!decimal.TryParse(txtPrecioCosto.Text.Trim(), out decimal costo) || costo <= 0)
             {
-                MessageBox.Show("Ingrese un precio de costo unitario válido.", "Validación", MessageBoxButtons.OK, MessageBoxIcon.Warning);
+                MessageBox.Show("Ingrese un precio de costo válido.", "Validación", MessageBoxButtons.OK, MessageBoxIcon.Warning);
+                txtPrecioCosto.Focus();
                 return;
             }
 
-            int cantidad = (int)numCantidadRecibida.Value;
+            var item = _detalleFactura.FirstOrDefault(d => d.ProductoID == _productoSeleccionado.ProductoID);
 
-            var itemExistente = _detalleFactura.FirstOrDefault(d => d.ProductoID == prod.ProductoID);
-            if (itemExistente != null)
+            if (item != null)
             {
-                itemExistente.Cantidad += cantidad;
-                itemExistente.PrecioCostoUnitario = costo;
+                item.Cantidad += cantidad;
+                item.PrecioCostoUnitario = costo;
+                item.Subtotal = item.Cantidad * costo;
             }
             else
             {
                 _detalleFactura.Add(new DetalleCompra
                 {
-                    ProductoID = prod.ProductoID,
-                    NombreProducto = prod.Nombre,
+                    ProductoID = _productoSeleccionado.ProductoID,
+                    NombreProducto = _productoSeleccionado.Nombre,
                     Cantidad = cantidad,
-                    PrecioCostoUnitario = costo
+                    PrecioCostoUnitario = costo,
+                    Subtotal = cantidad * costo
                 });
             }
 
             ActualizarTablaDetalle();
-        }
-
-        private void BtnQuitarItem_Click(object? sender, EventArgs e)
-        {
-            if (dgvDetalle.CurrentRow != null && dgvDetalle.CurrentRow.DataBoundItem is DetalleCompra item)
-            {
-                _detalleFactura.Remove(item);
-                ActualizarTablaDetalle();
-            }
+            ResetearBuscadorProducto();
+            txtCantidadRecibida.Text = "1";
+            txtBuscarProducto.Focus();
         }
 
         private void ActualizarTablaDetalle()
@@ -548,14 +643,16 @@ namespace SISTEMAACTUALIZADO
             dgvDetalle.DataSource = null;
             dgvDetalle.DataSource = _detalleFactura;
 
-            if (dgvDetalle.Columns["DetalleCompraID"] != null) dgvDetalle.Columns["DetalleCompraID"].Visible = false;
+            if (dgvDetalle.Columns["IdDetalleCompra"] != null) dgvDetalle.Columns["IdDetalleCompra"].Visible = false;
             if (dgvDetalle.Columns["CompraID"] != null) dgvDetalle.Columns["CompraID"].Visible = false;
             if (dgvDetalle.Columns["ProductoID"] != null) dgvDetalle.Columns["ProductoID"].Visible = false;
+            if (dgvDetalle.Columns["Compra"] != null) dgvDetalle.Columns["Compra"].Visible = false;
+            if (dgvDetalle.Columns["Producto"] != null) dgvDetalle.Columns["Producto"].Visible = false;
 
             if (dgvDetalle.Columns["NombreProducto"] != null) dgvDetalle.Columns["NombreProducto"].HeaderText = "Producto";
-            if (dgvDetalle.Columns["Cantidad"] != null) dgvDetalle.Columns["Cantidad"].HeaderText = "Cant. Recibida";
-            if (dgvDetalle.Columns["PrecioCostoUnitario"] != null) { dgvDetalle.Columns["PrecioCostoUnitario"].HeaderText = "Costo Unitario"; dgvDetalle.Columns["PrecioCostoUnitario"].DefaultCellStyle.Format = "$#,##0"; }
-            if (dgvDetalle.Columns["Subtotal"] != null) { dgvDetalle.Columns["Subtotal"].HeaderText = "Subtotal Neto"; dgvDetalle.Columns["Subtotal"].DefaultCellStyle.Format = "$#,##0"; dgvDetalle.Columns["Subtotal"].DefaultCellStyle.Font = new Font("Segoe UI", 8.5F, FontStyle.Bold); }
+            if (dgvDetalle.Columns["Cantidad"] != null) dgvDetalle.Columns["Cantidad"].HeaderText = "Cant.";
+            if (dgvDetalle.Columns["PrecioCostoUnitario"] != null) { dgvDetalle.Columns["PrecioCostoUnitario"].HeaderText = "Costo Unit."; dgvDetalle.Columns["PrecioCostoUnitario"].DefaultCellStyle.Format = "$#,##0"; }
+            if (dgvDetalle.Columns["Subtotal"] != null) { dgvDetalle.Columns["Subtotal"].HeaderText = "Subtotal"; dgvDetalle.Columns["Subtotal"].DefaultCellStyle.Format = "$#,##0"; }
 
             decimal neto = _detalleFactura.Sum(d => d.Subtotal);
             decimal iva = Math.Round(neto * 0.19m, 0);
@@ -568,67 +665,148 @@ namespace SISTEMAACTUALIZADO
 
         private void BtnRegistrarCompra_Click(object? sender, EventArgs e)
         {
-            if (_detalleFactura.Count == 0)
+            if (_proveedorSeleccionado == null)
             {
-                MessageBox.Show("La recepción de compra no contiene productos agregados.", "Validación", MessageBoxButtons.OK, MessageBoxIcon.Warning);
+                MessageBox.Show("Debe buscar y seleccionar un proveedor.", "Validación", MessageBoxButtons.OK, MessageBoxIcon.Warning);
+                txtBuscarProveedor.Focus();
                 return;
             }
 
-            Proveedor prov = (Proveedor)cbProveedores.SelectedItem!;
-            string tipoDoc = cbTipoDocumento.SelectedItem?.ToString() ?? "Factura de Compra";
-            int folio = (int)numFolio.Value;
+            if (string.IsNullOrWhiteSpace(txtNroDocumento.Text) || !int.TryParse(txtNroDocumento.Text.Trim(), out int folio) || folio <= 0)
+            {
+                MessageBox.Show("Debe ingresar un N° de Documento válido.", "Validación", MessageBoxButtons.OK, MessageBoxIcon.Warning);
+                txtNroDocumento.Focus();
+                return;
+            }
+
+            if (_detalleFactura.Count == 0)
+            {
+                MessageBox.Show("Agregue al menos un producto a la lista antes de procesar la recepción.", "Validación", MessageBoxButtons.OK, MessageBoxIcon.Warning);
+                return;
+            }
 
             decimal neto = _detalleFactura.Sum(d => d.Subtotal);
             decimal iva = Math.Round(neto * 0.19m, 0);
             decimal total = neto + iva;
 
+            Compra compra = new Compra
+            {
+                RutProveedor = _proveedorSeleccionado.Rut,
+                RazonSocialProveedor = _proveedorSeleccionado.RazonSocial,
+                NroFacturaProveedor = folio,
+                FechaEmision = dtpFechaRecepcion.Value,
+                FechaRecepcion = DateTime.Now,
+                MontoNeto = neto,
+                MontoIva = iva,
+                MontoTotal = total,
+                UsuarioReceptor = "Bárbara",
+                Estado = "Recibida"
+            };
+
             try
             {
-                // Incremento de existencias en base de datos
-                foreach (var item in _detalleFactura)
-                {
-                    var productoBd = _db.Productos.FirstOrDefault(p => p.ProductoID == item.ProductoID);
-                    if (productoBd != null)
-                    {
-                        productoBd.Stock += item.Cantidad; // Suma stock recibido
-                    }
-                }
-
-                _db.SaveChanges();
-
-                MessageBox.Show($"¡Recepción de {tipoDoc} N° {folio} registrada con éxito!\n\n" +
-                                $"• Proveedor: {prov.RazonSocial}\n" +
-                                $"• Total Factura: ${total:N0}\n" +
-                                $"• Se incrementó el stock de {_detalleFactura.Sum(d => d.Cantidad)} unidades en el inventario.",
-                                "Éxito Recepción", MessageBoxButtons.OK, MessageBoxIcon.Information);
-
-                LimpiarFormulario();
+                _compraService.RegistrarFacturaCompra(compra, _detalleFactura, actualizarPreciosVenta: true);
+                MessageBox.Show($"¡Documento N° {folio} procesado exitosamente!\n\n• Proveedor: {_proveedorSeleccionado.RazonSocial}\n• Stock incrementado en {_detalleFactura.Sum(d => d.Cantidad)} unidades.\n• Precios actualizados en inventario.", "Éxito", MessageBoxButtons.OK, MessageBoxIcon.Information);
+                LimpiarFormularioCompleto();
             }
             catch (Exception ex)
             {
-                MessageBox.Show($"Recepción procesada localmente (Modo Demo):\n{ex.Message}", "Información", MessageBoxButtons.OK, MessageBoxIcon.Information);
-                LimpiarFormulario();
+                MessageBox.Show($"Error al guardar: {ex.Message}", "Error", MessageBoxButtons.OK, MessageBoxIcon.Error);
             }
         }
 
-        private void LimpiarFormulario()
+        private void LimpiarFormularioCompleto()
         {
             _detalleFactura.Clear();
-            numFolio.Value = numFolio.Value + 1;
-            numCantidadRecibida.Value = 10;
+            ResetearBuscadorProveedor();
+            ResetearBuscadorProducto();
+            txtNroDocumento.Text = "";
+            txtCantidadRecibida.Text = "1";
             ActualizarTablaDetalle();
         }
 
-        private void BtnDemoCompra_Click(object? sender, EventArgs e)
+        // ========================================================
+        // HELPERS VISUALES
+        // ========================================================
+        private Button CrearBotonIcono(string texto, int x, int y, EventHandler onClick)
         {
-            _detalleFactura.Clear();
+            Button b = new Button
+            {
+                Text = texto,
+                Size = new Size(28, 28),
+                BackColor = Color.FromArgb(241, 245, 249),
+                ForeColor = Color.FromArgb(100, 116, 139),
+                FlatStyle = FlatStyle.Flat,
+                Font = new Font("Segoe UI", 8F),
+                Cursor = Cursors.Hand,
+                Location = new Point(x, y)
+            };
+            b.FlatAppearance.BorderColor = Color.FromArgb(203, 213, 225);
+            b.Click += onClick;
+            return b;
+        }
 
-            _detalleFactura.Add(new DetalleCompra { ProductoID = 1, NombreProducto = "Leche Entera 1L", Cantidad = 50, PrecioCostoUnitario = 800 });
-            _detalleFactura.Add(new DetalleCompra { ProductoID = 2, NombreProducto = "Queso Gauda 250g", Cantidad = 30, PrecioCostoUnitario = 1750 });
-            _detalleFactura.Add(new DetalleCompra { ProductoID = 3, NombreProducto = "Azúcar Blanca 1kg", Cantidad = 40, PrecioCostoUnitario = 900 });
+        private Button CrearBotonAccionRapida(string texto, Color back, int x, int y, EventHandler onClick)
+        {
+            Button b = new Button
+            {
+                Text = texto,
+                Size = new Size(28, 28),
+                BackColor = back,
+                ForeColor = Color.White,
+                FlatStyle = FlatStyle.Flat,
+                Font = new Font("Segoe UI", 8.5F, FontStyle.Bold),
+                Cursor = Cursors.Hand,
+                Location = new Point(x, y)
+            };
+            b.FlatAppearance.BorderSize = 0;
+            b.Click += onClick;
+            return b;
+        }
 
-            ActualizarTablaDetalle();
-            MessageBox.Show("Se cargó la Factura de Compra de demostración con 3 ítems y 120 unidades de stock.", "Éxito Demo Compra", MessageBoxButtons.OK, MessageBoxIcon.Information);
+        private Panel CrearTarjeta(int height, string titulo, Color colorBorde)
+        {
+            Panel pnl = new Panel { Dock = DockStyle.Top, Height = height, BackColor = Color.White, Padding = new Padding(12, 6, 12, 6), Margin = new Padding(0, 0, 0, 8) };
+            pnl.Paint += (s, e) =>
+            {
+                ControlPaint.DrawBorder(e.Graphics, pnl.ClientRectangle, Color.FromArgb(226, 232, 240), ButtonBorderStyle.Solid);
+                e.Graphics.FillRectangle(new SolidBrush(colorBorde), 0, 0, 4, pnl.Height);
+            };
+            return pnl;
+        }
+
+        private Panel CrearCampo(string label, Control ctrl)
+        {
+            Panel p = new Panel { Size = new Size(ctrl.Width + 4, 46), Margin = new Padding(0, 0, 8, 0) };
+            Label l = new Label { Text = label, Font = new Font("Segoe UI", 7.5F, FontStyle.Bold), ForeColor = Color.FromArgb(71, 85, 105), Location = new Point(0, 0), AutoSize = true };
+            ctrl.Location = new Point(0, 16);
+            p.Controls.Add(l);
+            p.Controls.Add(ctrl);
+            return p;
+        }
+
+        private Label CrearRenglon(string titulo, string valor, ref int y, Panel c)
+        {
+            Label lt = new Label { Text = titulo, Font = new Font("Segoe UI", 8F), ForeColor = Color.FromArgb(100, 116, 139), Location = new Point(0, y), AutoSize = true };
+            Label lv = new Label { Text = valor, Font = new Font("Segoe UI", 9.5F, FontStyle.Bold), ForeColor = Color.FromArgb(15, 23, 42), Location = new Point(0, y + 14), AutoSize = true };
+            c.Controls.Add(lt);
+            c.Controls.Add(lv);
+            y += 38;
+            return lv;
+        }
+
+        private void ConfigurarEstiloTabla(DataGridView dgv)
+        {
+            dgv.EnableHeadersVisualStyles = false;
+            dgv.ColumnHeadersDefaultCellStyle.BackColor = Color.FromArgb(30, 41, 59);
+            dgv.ColumnHeadersDefaultCellStyle.ForeColor = Color.White;
+            dgv.ColumnHeadersDefaultCellStyle.Font = new Font("Segoe UI", 8.5F, FontStyle.Bold);
+            dgv.ColumnHeadersHeight = 30;
+            dgv.DefaultCellStyle.Font = new Font("Segoe UI", 8.5F);
+            dgv.DefaultCellStyle.SelectionBackColor = Color.FromArgb(224, 242, 254);
+            dgv.DefaultCellStyle.SelectionForeColor = Color.FromArgb(15, 23, 42);
+            dgv.RowTemplate.Height = 28;
+            dgv.GridColor = Color.FromArgb(226, 232, 240);
         }
     }
 }
