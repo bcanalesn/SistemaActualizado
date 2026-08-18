@@ -28,7 +28,7 @@ namespace SISTEMAACTUALIZADO
         }
 
         private void InitializeComponent()
-{
+        {
             this.SuspendLayout();
             this.BackColor = Color.FromArgb(241, 245, 249);
             this.Font = new Font("Segoe UI", 9.5F, FontStyle.Regular, GraphicsUnit.Point);
@@ -78,14 +78,14 @@ namespace SISTEMAACTUALIZADO
                 Font = new Font("Segoe UI", 9.5F),
                 Margin = new Padding(0, 3, 6, 0)
             };
-            txtBuscar.TextChanged += (s, e) => FiltrarProductos();
+            txtBuscar.TextChanged += (s, e) => FiltrarProductosInteligente();
 
-            btnBuscar = CrearBoton("Buscar", Color.FromArgb(30, 41, 59), Color.White, (s, e) => FiltrarProductos());
+            btnBuscar = CrearBoton("Buscar", Color.FromArgb(30, 41, 59), Color.White, (s, e) => FiltrarProductosInteligente());
             btnRecargar = CrearBoton("🔄 Recargar", Color.FromArgb(241, 245, 249), Color.FromArgb(51, 65, 85), (s, e) => CargarProductos());
 
             pnlLeft.Controls.AddRange(new Control[] { lblBuscar, txtBuscar, btnBuscar, btnRecargar });
 
-            // Sección Derecha: Botones de Acción (Siempre visibles y alineados)
+            // Sección Derecha: Botones de Acción
             FlowLayoutPanel pnlRight = new FlowLayoutPanel
             {
                 Dock = DockStyle.Right,
@@ -162,32 +162,19 @@ namespace SISTEMAACTUALIZADO
             return b;
         }
 
-        private Button CrearBoton(string texto, Color back, Color fore, Point loc, EventHandler onClick)
-        {
-            Button b = new Button
-            {
-                Text = texto,
-                Location = loc,
-                Size = new Size(110, 32),
-                BackColor = back,
-                ForeColor = fore,
-                FlatStyle = FlatStyle.Flat,
-                Font = new Font("Segoe UI", 9F, FontStyle.Bold),
-                Cursor = Cursors.Hand,
-                AutoSize = true
-            };
-            b.FlatAppearance.BorderSize = 0;
-            b.Click += onClick;
-            return b;
-        }
-
         private void ConfigurarEstiloTabla(DataGridView dgv)
         {
             dgv.EnableHeadersVisualStyles = false;
+
+            // Encabezados fijos: mantienen el color oscuro incluso al seleccionar la fila
             dgv.ColumnHeadersDefaultCellStyle.BackColor = Color.FromArgb(30, 41, 59);
             dgv.ColumnHeadersDefaultCellStyle.ForeColor = Color.White;
+            dgv.ColumnHeadersDefaultCellStyle.SelectionBackColor = Color.FromArgb(30, 41, 59);
+            dgv.ColumnHeadersDefaultCellStyle.SelectionForeColor = Color.White;
             dgv.ColumnHeadersDefaultCellStyle.Font = new Font("Segoe UI", 9F, FontStyle.Bold);
             dgv.ColumnHeadersHeight = 34;
+
+            // Filas
             dgv.DefaultCellStyle.Font = new Font("Segoe UI", 9F);
             dgv.DefaultCellStyle.SelectionBackColor = Color.FromArgb(224, 242, 254);
             dgv.DefaultCellStyle.SelectionForeColor = Color.FromArgb(15, 23, 42);
@@ -214,34 +201,103 @@ namespace SISTEMAACTUALIZADO
             dgvProductos.DataSource = null;
             dgvProductos.DataSource = lista;
 
-            if (dgvProductos.Columns["ProductoID"] != null) { dgvProductos.Columns["ProductoID"].Width = 60; dgvProductos.Columns["ProductoID"].HeaderText = "ID"; }
-            if (dgvProductos.Columns["CodigoBarra"] != null) { dgvProductos.Columns["CodigoBarra"].Width = 130; dgvProductos.Columns["CodigoBarra"].HeaderText = "SKU/Barra"; }
-            if (dgvProductos.Columns["Nombre"] != null) dgvProductos.Columns["Nombre"].HeaderText = "Descripción Producto";
-            if (dgvProductos.Columns["Categoria"] != null) dgvProductos.Columns["Categoria"].HeaderText = "Categoría";
-            if (dgvProductos.Columns["Stock"] != null) { dgvProductos.Columns["Stock"].Width = 90; dgvProductos.Columns["Stock"].HeaderText = "Stock"; dgvProductos.Columns["Stock"].DefaultCellStyle.Alignment = DataGridViewContentAlignment.MiddleRight; dgvProductos.Columns["Stock"].DefaultCellStyle.Font = new Font("Segoe UI", 9F, FontStyle.Bold); }
-            if (dgvProductos.Columns["PrecioCosto"] != null) { dgvProductos.Columns["PrecioCosto"].Width = 100; dgvProductos.Columns["PrecioCosto"].HeaderText = "Costo Neto"; dgvProductos.Columns["PrecioCosto"].DefaultCellStyle.Format = "$#,##0"; }
-            if (dgvProductos.Columns["MargenGanancia"] != null) { dgvProductos.Columns["MargenGanancia"].Width = 80; dgvProductos.Columns["MargenGanancia"].HeaderText = "Margen %"; dgvProductos.Columns["MargenGanancia"].DefaultCellStyle.Format = "0.0'%'"; }
-            if (dgvProductos.Columns["PrecioUnitario"] != null) { dgvProductos.Columns["PrecioUnitario"].Width = 110; dgvProductos.Columns["PrecioUnitario"].HeaderText = "Precio Venta (IVA)"; dgvProductos.Columns["PrecioUnitario"].DefaultCellStyle.Format = "$#,##0"; dgvProductos.Columns["PrecioUnitario"].DefaultCellStyle.Font = new Font("Segoe UI", 9F, FontStyle.Bold); dgvProductos.Columns["PrecioUnitario"].DefaultCellStyle.ForeColor = Color.FromArgb(16, 185, 129); }
+            // Ocultar columnas secundarias
+            string[] columnasOcultar = new string[] 
+            { 
+                "NmbLargo", "NmbCorto", "IdFamilia", "Categoria1", "Categoria2", "Categoria3", 
+                "StockMinimo", "ImagenPath", "Estado", "Activo" 
+            };
 
-            if (dgvProductos.Columns["StockMinimo"] != null) dgvProductos.Columns["StockMinimo"].Visible = false;
-            if (dgvProductos.Columns["ImagenPath"] != null) dgvProductos.Columns["ImagenPath"].Visible = false;
-            if (dgvProductos.Columns["Estado"] != null) dgvProductos.Columns["Estado"].Visible = false;
-            if (dgvProductos.Columns["Activo"] != null) dgvProductos.Columns["Activo"].Visible = false;
+            foreach (string col in columnasOcultar)
+            {
+                if (dgvProductos.Columns[col] != null)
+                {
+                    dgvProductos.Columns[col].Visible = false;
+                }
+            }
+
+            // Configurar columnas principales
+            if (dgvProductos.Columns["ProductoID"] != null) 
+            { 
+                dgvProductos.Columns["ProductoID"].Width = 55; 
+                dgvProductos.Columns["ProductoID"].HeaderText = "ID";
+                dgvProductos.Columns["ProductoID"].DefaultCellStyle.Alignment = DataGridViewContentAlignment.MiddleCenter;
+            }
+
+            if (dgvProductos.Columns["CodigoBarra"] != null) 
+            { 
+                dgvProductos.Columns["CodigoBarra"].Width = 125; 
+                dgvProductos.Columns["CodigoBarra"].HeaderText = "SKU/Barra"; 
+            }
+
+            if (dgvProductos.Columns["Nombre"] != null) 
+            { 
+                dgvProductos.Columns["Nombre"].HeaderText = "Descripción Producto";
+                dgvProductos.Columns["Nombre"].FillWeight = 160;
+            }
+
+            if (dgvProductos.Columns["Categoria"] != null) 
+            { 
+                dgvProductos.Columns["Categoria"].Width = 110;
+                dgvProductos.Columns["Categoria"].HeaderText = "Categoría"; 
+            }
+
+            if (dgvProductos.Columns["NFamilia"] != null) 
+            { 
+                dgvProductos.Columns["NFamilia"].Width = 110;
+                dgvProductos.Columns["NFamilia"].HeaderText = "Familia"; 
+            }
+
+            if (dgvProductos.Columns["PrecioUnitario"] != null) 
+            { 
+                dgvProductos.Columns["PrecioUnitario"].Width = 120; 
+                dgvProductos.Columns["PrecioUnitario"].HeaderText = "Precio Venta (IVA)"; 
+                dgvProductos.Columns["PrecioUnitario"].DefaultCellStyle.Format = "$#,##0"; 
+                dgvProductos.Columns["PrecioUnitario"].DefaultCellStyle.Font = new Font("Segoe UI", 9.5F, FontStyle.Bold); 
+                dgvProductos.Columns["PrecioUnitario"].DefaultCellStyle.ForeColor = Color.FromArgb(16, 185, 129);
+                dgvProductos.Columns["PrecioUnitario"].DefaultCellStyle.Alignment = DataGridViewContentAlignment.MiddleRight;
+            }
+
+            if (dgvProductos.Columns["Stock"] != null) 
+            { 
+                dgvProductos.Columns["Stock"].Width = 80; 
+                dgvProductos.Columns["Stock"].HeaderText = "Stock"; 
+                dgvProductos.Columns["Stock"].DefaultCellStyle.Alignment = DataGridViewContentAlignment.MiddleRight; 
+                dgvProductos.Columns["Stock"].DefaultCellStyle.Font = new Font("Segoe UI", 9F, FontStyle.Bold); 
+            }
+
+            if (dgvProductos.Columns["PrecioCosto"] != null) 
+            { 
+                dgvProductos.Columns["PrecioCosto"].Width = 95; 
+                dgvProductos.Columns["PrecioCosto"].HeaderText = "Costo Neto"; 
+                dgvProductos.Columns["PrecioCosto"].DefaultCellStyle.Format = "$#,##0";
+                dgvProductos.Columns["PrecioCosto"].DefaultCellStyle.Alignment = DataGridViewContentAlignment.MiddleRight;
+            }
+
+            if (dgvProductos.Columns["MargenGanancia"] != null) 
+            { 
+                dgvProductos.Columns["MargenGanancia"].Width = 85; 
+                dgvProductos.Columns["MargenGanancia"].HeaderText = "Margen %"; 
+                dgvProductos.Columns["MargenGanancia"].DefaultCellStyle.Format = "0.0'%'";
+                dgvProductos.Columns["MargenGanancia"].DefaultCellStyle.Alignment = DataGridViewContentAlignment.MiddleCenter;
+            }
         }
 
-        private void FiltrarProductos()
+        private void FiltrarProductosInteligente()
         {
-            string q = txtBuscar.Text.Trim().ToLower();
+            string q = txtBuscar.Text.Trim();
             if (string.IsNullOrEmpty(q))
             {
                 ActualizarGrilla(_listaProductos);
                 return;
             }
 
+            // Búsqueda inteligente restringida únicamente a:
+            // 1. Cada palabra de la descripción del producto (prefijo / StartsWith)
+            // 2. Código de barra / SKU
             var filtrados = _listaProductos.Where(p =>
-                p.Nombre.ToLower().Contains(q) ||
-                p.CodigoBarra.ToLower().Contains(q) ||
-                p.Categoria.ToLower().Contains(q)
+                (!string.IsNullOrEmpty(p.Nombre) && p.Nombre.Split(' ', StringSplitOptions.RemoveEmptyEntries).Any(palabra => palabra.StartsWith(q, StringComparison.OrdinalIgnoreCase))) ||
+                (!string.IsNullOrEmpty(p.CodigoBarra) && p.CodigoBarra.StartsWith(q, StringComparison.OrdinalIgnoreCase))
             ).ToList();
 
             ActualizarGrilla(filtrados);
@@ -251,9 +307,25 @@ namespace SISTEMAACTUALIZADO
         {
             using (var modal = new FormNuevoProductoModal())
             {
-                if (modal.ShowDialog(this) == DialogResult.OK)
+                if (modal.ShowDialog(this) == DialogResult.OK && modal.ProductoResultado != null)
                 {
-                    CargarProductos();
+                    try
+                    {
+                        using var db = new AppDbContext();
+                        if (modal.ProductoResultado.ProductoID == 0)
+                        {
+                            modal.ProductoResultado.Stock = modal.CantidadFactura;
+                            db.Productos.Add(modal.ProductoResultado);
+                            db.SaveChanges();
+                        }
+                        
+                        CargarProductos();
+                        MessageBox.Show("Producto registrado exitosamente en el catálogo.", "Éxito", MessageBoxButtons.OK, MessageBoxIcon.Information);
+                    }
+                    catch (Exception ex)
+                    {
+                        MessageBox.Show($"Error al guardar en catálogo: {ex.Message}", "Error DB", MessageBoxButtons.OK, MessageBoxIcon.Error);
+                    }
                 }
             }
         }
@@ -293,7 +365,6 @@ namespace SISTEMAACTUALIZADO
                     var p = db.Productos.Find(prod.ProductoID);
                     if (p != null)
                     {
-                        // Eliminación lógica segura (Estado = false)
                         p.Estado = false;
                         db.SaveChanges();
                         MessageBox.Show("Producto eliminado exitosamente.", "Éxito", MessageBoxButtons.OK, MessageBoxIcon.Information);

@@ -1,6 +1,7 @@
 using System;
 using System.Collections.Generic;
 using System.Linq;
+using Microsoft.EntityFrameworkCore;
 using SISTEMAACTUALIZADO.Data;
 using SISTEMAACTUALIZADO.Models;
 
@@ -8,73 +9,120 @@ namespace SISTEMAACTUALIZADO.Services
 {
     public class ProductoService
     {
-        private readonly AppDbContext _db = new AppDbContext();
-
-        public List<Producto> ObtenerProductos(string filtro = "")
+        public List<Producto> ObtenerProductosActivos(string filtro = "", string categoria = "Todas", string familia = "Todas")
         {
-            var query = _db.Productos.AsQueryable();
+            using var db = new AppDbContext();
+            var query = db.Productos.Where(p => p.Estado).AsQueryable();
+
+            if (!string.IsNullOrWhiteSpace(categoria) && categoria != "Todas")
+            {
+                query = query.Where(p => p.Categoria == categoria);
+            }
+
+            if (!string.IsNullOrWhiteSpace(familia) && familia != "Todas")
+            {
+                query = query.Where(p => p.NFamilia == familia);
+            }
 
             if (!string.IsNullOrWhiteSpace(filtro))
             {
-                query = query.Where(p => (p.Nombre != null && p.Nombre.Contains(filtro)) || 
-                                         (p.CodigoBarra != null && p.CodigoBarra.Contains(filtro)));
+                string q = filtro.Trim().ToLower();
+                query = query.Where(p => p.Nombre.ToLower().Contains(q) || 
+                                         p.CodigoBarra.ToLower().Contains(q) || 
+                                         p.ProductoID.ToString().Contains(q));
             }
 
             return query.OrderBy(p => p.Nombre).ToList();
         }
 
+        public List<string> ObtenerCategoriasRegistradas()
+        {
+            using var db = new AppDbContext();
+            return db.Productos
+                .Where(p => p.Estado && !string.IsNullOrEmpty(p.Categoria))
+                .Select(p => p.Categoria)
+                .Distinct()
+                .OrderBy(c => c)
+                .ToList();
+        }
+
+        public List<string> ObtenerFamiliasPorCategoria(string categoria)
+        {
+            using var db = new AppDbContext();
+            var query = db.Productos.Where(p => p.Estado);
+
+            if (!string.IsNullOrWhiteSpace(categoria) && categoria != "Todas")
+            {
+                query = query.Where(p => p.Categoria == categoria);
+            }
+
+            return query
+                .Where(p => !string.IsNullOrEmpty(p.NFamilia) && p.NFamilia != p.Categoria)
+                .Select(p => p.NFamilia!)
+                .Distinct()
+                .OrderBy(f => f)
+                .ToList();
+        }
+
+        public decimal ObtenerPrecioSegunCantidad(int productoId, int cantidad, decimal precioBase)
+        {
+            using var db = new AppDbContext();
+            var escala = db.PreciosQ
+                .FirstOrDefault(pq => pq.IdProducto == productoId && 
+                                      pq.Bloqueo == 0 && 
+                                      cantidad >= pq.Qini && 
+                                      cantidad <= pq.Qfin);
+
+            return escala != null && escala.NPrecio > 0 ? escala.NPrecio : precioBase;
+        }
+
         public void GuardarProducto(Producto producto, bool esNuevo)
         {
+            using var db = new AppDbContext();
+
+            if (string.IsNullOrWhiteSpace(producto.Categoria))
+            {
+                producto.Categoria = "General";
+            }
+
+            if (string.IsNullOrWhiteSpace(producto.NFamilia))
+            {
+                producto.NFamilia = producto.Categoria;
+            }
+
             if (esNuevo)
             {
-                _db.Productos.Add(producto);
+                db.Productos.Add(producto);
             }
-            _db.SaveChanges();
-        }
-
-        public void CambiarEstado(int productoId)
-        {
-            var p = _db.Productos.FirstOrDefault(x => x.ProductoID == productoId);
-            if (p != null)
+            else
             {
-                p.Estado = !p.Estado;
-                _db.SaveChanges();
-            }
-        }
-
-        public int CargarProductosDemo()
-        {
-            var productosDemo = new List<Producto>
-            {
-                new Producto { CodigoBarra = "780123456781", Nombre = "Leche Entera 1L", PrecioUnitario = 1150, Stock = 40, Estado = true },
-                new Producto { CodigoBarra = "780123456782", Nombre = "Queso Gauda 250g", PrecioUnitario = 2490, Stock = 25, Estado = true },
-                new Producto { CodigoBarra = "780123456783", Nombre = "Jamón Pierna 200g", PrecioUnitario = 1990, Stock = 20, Estado = true },
-                new Producto { CodigoBarra = "780123456784", Nombre = "Bebida Sprite 1.5L", PrecioUnitario = 1500, Stock = 30, Estado = true },
-                new Producto { CodigoBarra = "780123456785", Nombre = "Galletas Tritón 126g", PrecioUnitario = 850, Stock = 50, Estado = true },
-                new Producto { CodigoBarra = "780123456786", Nombre = "Café Nescafé 170g", PrecioUnitario = 4200, Stock = 15, Estado = true },
-                new Producto { CodigoBarra = "780123456787", Nombre = "Azúcar Blanca 1kg", PrecioUnitario = 1290, Stock = 60, Estado = true },
-                new Producto { CodigoBarra = "780123456788", Nombre = "Aceite Vegetal 900ml", PrecioUnitario = 2190, Stock = 35, Estado = true },
-                new Producto { CodigoBarra = "780123456789", Nombre = "Papas Chips 130g", PrecioUnitario = 1490, Stock = 45, Estado = true },
-                new Producto { CodigoBarra = "780123456790", Nombre = "Yogurt Frutilla 125g", PrecioUnitario = 450, Stock = 80, Estado = true }
-            };
-
-            int agregados = 0;
-            foreach (var p in productosDemo)
-            {
-                bool existe = _db.Productos.Any(x => x.CodigoBarra == p.CodigoBarra || x.Nombre == p.Nombre);
-                if (!existe)
+                var prodBd = db.Productos.Find(producto.ProductoID);
+                if (prodBd != null)
                 {
-                    _db.Productos.Add(p);
-                    agregados++;
+                    prodBd.CodigoBarra = producto.CodigoBarra;
+                    prodBd.Nombre = producto.Nombre;
+                    prodBd.Categoria = producto.Categoria;
+                    prodBd.NFamilia = producto.NFamilia;
+                    prodBd.PrecioCosto = producto.PrecioCosto;
+                    prodBd.MargenGanancia = producto.MargenGanancia;
+                    prodBd.PrecioUnitario = producto.PrecioUnitario;
+                    prodBd.StockMinimo = producto.StockMinimo;
+                    prodBd.ImagenPath = producto.ImagenPath;
                 }
             }
 
-            if (agregados > 0)
-            {
-                _db.SaveChanges();
-            }
+            db.SaveChanges();
+        }
 
-            return agregados;
+        public void EliminarProductoLogico(int productoId)
+        {
+            using var db = new AppDbContext();
+            var p = db.Productos.Find(productoId);
+            if (p != null)
+            {
+                p.Estado = false;
+                db.SaveChanges();
+            }
         }
     }
 }

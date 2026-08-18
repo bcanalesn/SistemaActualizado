@@ -34,32 +34,43 @@ namespace SISTEMAACTUALIZADO.Modals
         private void InitializeComponent()
         {
             this.Text = "Asignar Cliente a la Venta";
-            this.Size = new Size(420, 520);
+            this.ClientSize = new Size(410, 520); // ClientSize asegura centrado exacto
             this.StartPosition = FormStartPosition.CenterParent;
             this.FormBorderStyle = FormBorderStyle.FixedDialog;
             this.MaximizeBox = false;
             this.MinimizeBox = false;
-            
-            // 1. HABILITAR BOTÓN "X" ESTÁNDAR DE WINDOWS
             this.ControlBox = true;
-            
             this.BackColor = Color.White;
             this.KeyPreview = true;
 
-            // 2. SE ELIMINÓ EL BOTÓN PERSONALIZADO btnClose QUE REPETÍA LA "✕" DENTRO DEL PANEL
+            const int margenX = 18;
+            const int anchoControles = 374;
 
             Label lblT = new Label 
             { 
                 Text = "👤 Buscar Cliente", 
-                Location = new Point(20, 15), 
+                Location = new Point(margenX, 15), 
                 Font = new Font("Segoe UI", 12F, FontStyle.Bold), 
                 ForeColor = Color.FromArgb(15, 23, 42),
                 AutoSize = true 
             };
 
-            Label lblRut = new Label { Text = "RUT / DNI Cliente:", Location = new Point(20, 50), AutoSize = true, Font = new Font("Segoe UI", 8.5F, FontStyle.Bold) };
+            Label lblRut = new Label 
+            { 
+                Text = "RUT / DNI Cliente:", 
+                Location = new Point(margenX, 50), 
+                AutoSize = true, 
+                Font = new Font("Segoe UI", 8.5F, FontStyle.Bold),
+                ForeColor = Color.FromArgb(71, 85, 105)
+            };
             
-            txtRutBuscar = new TextBox { Location = new Point(20, 72), Size = new Size(380, 26), Font = new Font("Segoe UI", 10.5F), MaxLength = 12 };
+            txtRutBuscar = new TextBox 
+            { 
+                Location = new Point(margenX, 72), 
+                Size = new Size(anchoControles, 26), 
+                Font = new Font("Segoe UI", 10.5F), 
+                MaxLength = 12 
+            };
             
             txtRutBuscar.TextChanged += (s, e) =>
             {
@@ -81,7 +92,8 @@ namespace SISTEMAACTUALIZADO.Modals
                 if (e.KeyCode == Keys.Down && lstSugerencias.Visible && lstSugerencias.Items.Count > 0)
                 {
                     lstSugerencias.Focus();
-                    lstSugerencias.SelectedIndex = 0;
+                    // Si hay más de 1, baja directo al segundo; si hay 1 solo, selecciona el primero
+                    lstSugerencias.SelectedIndex = lstSugerencias.Items.Count > 1 ? 1 : 0;
                     e.SuppressKeyPress = true;
                 }
                 else if (e.KeyCode == Keys.Enter) 
@@ -98,8 +110,8 @@ namespace SISTEMAACTUALIZADO.Modals
 
             lstSugerencias = new ListBox
             {
-                Location = new Point(20, 100),
-                Size = new Size(380, 90),
+                Location = new Point(margenX, 102),
+                Size = new Size(anchoControles, 95),
                 Font = new Font("Segoe UI", 9.5F),
                 Visible = false
             };
@@ -115,14 +127,21 @@ namespace SISTEMAACTUALIZADO.Modals
                 else if (e.KeyCode == Keys.Up && lstSugerencias.SelectedIndex == 0)
                 {
                     txtRutBuscar.Focus();
+                    txtRutBuscar.SelectionStart = txtRutBuscar.Text.Length;
+                    e.SuppressKeyPress = true;
+                }
+                else if (e.KeyCode == Keys.Escape)
+                {
+                    lstSugerencias.Visible = false;
+                    txtRutBuscar.Focus();
                     e.SuppressKeyPress = true;
                 }
             };
 
             pnlInfoCliente = new Panel
             {
-                Location = new Point(20, 110),
-                Size = new Size(380, 260),
+                Location = new Point(margenX, 105),
+                Size = new Size(anchoControles, 265),
                 BackColor = Color.FromArgb(248, 250, 252),
                 Visible = false
             };
@@ -131,12 +150,12 @@ namespace SISTEMAACTUALIZADO.Modals
             lblNombreCliente = new Label { Location = new Point(12, 10), Size = new Size(350, 22), Font = new Font("Segoe UI", 10F, FontStyle.Bold), ForeColor = Color.FromArgb(15, 23, 42) };
             lblEstadoCliente = new Label { Location = new Point(12, 34), AutoSize = true, Font = new Font("Segoe UI", 8F, FontStyle.Bold) };
 
-            Label lblHistorialHeader = new Label { Text = "🕒 ÚLTIMAS 2 COMPRAS", Location = new Point(12, 60), AutoSize = true, Font = new Font("Segoe UI", 8F, FontStyle.Bold), ForeColor = Color.FromArgb(100, 116, 139) };
+            Label lblHistorialHeader = new Label { Text = "🕒 ÚLTIMAS COMPRAS", Location = new Point(12, 60), AutoSize = true, Font = new Font("Segoe UI", 8F, FontStyle.Bold), ForeColor = Color.FromArgb(100, 116, 139) };
 
             flpUltimasCompras = new FlowLayoutPanel
             {
                 Location = new Point(12, 80),
-                Size = new Size(355, 170),
+                Size = new Size(350, 175),
                 AutoScroll = true,
                 FlowDirection = FlowDirection.TopDown,
                 WrapContents = false
@@ -150,8 +169,8 @@ namespace SISTEMAACTUALIZADO.Modals
             btnConfirmar = new Button
             {
                 Text = "🔍 Ingrese RUT para buscar",
-                Location = new Point(20, 385),
-                Size = new Size(380, 42),
+                Location = new Point(margenX, 385),
+                Size = new Size(anchoControles, 42),
                 BackColor = Color.FromArgb(0, 102, 255),
                 ForeColor = Color.White,
                 FlatStyle = FlatStyle.Flat,
@@ -160,13 +179,13 @@ namespace SISTEMAACTUALIZADO.Modals
                 Enabled = false
             };
             btnConfirmar.FlatAppearance.BorderSize = 0;
-            btnConfirmar.Click += (s, e) => ProcesarSeleccionEnter();
+            btnConfirmar.Click += (s, e) => ConfirmarYSalir();
 
             Button btnAnonimo = new Button
             {
                 Text = "👤 Consumidor Final (Sin RUT)",
-                Location = new Point(20, 435),
-                Size = new Size(380, 30),
+                Location = new Point(margenX, 435),
+                Size = new Size(anchoControles, 34),
                 BackColor = Color.FromArgb(241, 245, 249),
                 ForeColor = Color.FromArgb(51, 65, 85),
                 FlatStyle = FlatStyle.Flat,
@@ -211,8 +230,6 @@ namespace SISTEMAACTUALIZADO.Modals
             {
                 MostrarInformacionCliente(directo);
                 lstSugerencias.Visible = false;
-                btnConfirmar.Text = "✔ Asignar Cliente";
-                btnConfirmar.Enabled = true;
             }
             else if (resultados.Count > 0)
             {
@@ -241,14 +258,12 @@ namespace SISTEMAACTUALIZADO.Modals
                 txtRutBuscar.Text = RutHelper.Formatear(clienteSel.Rut);
                 MostrarInformacionCliente(clienteSel);
                 lstSugerencias.Visible = false;
-                btnConfirmar.Text = "✔ Asignar Cliente";
-                btnConfirmar.Enabled = true;
-                btnConfirmar.Focus();
             }
         }
 
         private void ProcesarSeleccionEnter()
         {
+            // Paso 1: Si hay sugerencias desplegadas, selecciona y muestra la ficha SIN cerrar
             if (lstSugerencias.Visible && lstSugerencias.Items.Count > 0)
             {
                 var seleccionado = lstSugerencias.SelectedItem as Cliente ?? lstSugerencias.Items[0] as Cliente;
@@ -257,39 +272,47 @@ namespace SISTEMAACTUALIZADO.Modals
                     txtRutBuscar.Text = RutHelper.Formatear(seleccionado.Rut);
                     MostrarInformacionCliente(seleccionado);
                     lstSugerencias.Visible = false;
-
-                    this.DialogResult = DialogResult.OK;
-                    this.Close();
-                    return;
+                    return; // No se cierra: muestra la info y pasa el foco al botón azul
                 }
             }
 
+            // Paso 2: Si ya está la ficha del cliente visible, el Enter confirma la venta
             if (pnlInfoCliente.Visible && !string.IsNullOrEmpty(RutCliente))
             {
-                this.DialogResult = DialogResult.OK;
-                this.Close();
+                ConfirmarYSalir();
                 return;
             }
 
+            // Paso 3: Si no estaba seleccionando sugerencias, busca directo
             string rutLimpio = RutHelper.Limpiar(txtRutBuscar.Text);
             var clienteBD = _clienteService.BuscarPorRut(rutLimpio);
 
             if (clienteBD != null)
             {
                 MostrarInformacionCliente(clienteBD);
-                this.DialogResult = DialogResult.OK;
-                this.Close();
             }
             else
             {
-                if (rutLimpio.Length < 9)
+                if (rutLimpio.Length < 8)
                 {
-                    MessageBox.Show("Para registrar un nuevo cliente, debe ingresar un RUT válido de 9 dígitos.", "RUT Incompleto", MessageBoxButtons.OK, MessageBoxIcon.Warning);
+                    MessageBox.Show("Para registrar un nuevo cliente, debe ingresar un RUT válido (mínimo 8 dígitos).", "RUT Incompleto", MessageBoxButtons.OK, MessageBoxIcon.Warning);
                     return;
                 }
 
                 AbrirModalRegistrarNuevoCliente(txtRutBuscar.Text);
             }
+        }
+
+        private void ConfirmarYSalir()
+        {
+            if (btnConfirmar.Text.Contains("Registrar"))
+            {
+                AbrirModalRegistrarNuevoCliente(txtRutBuscar.Text);
+                return;
+            }
+
+            this.DialogResult = DialogResult.OK;
+            this.Close();
         }
 
         private void MostrarInformacionCliente(Cliente cliente)
@@ -304,8 +327,9 @@ namespace SISTEMAACTUALIZADO.Modals
             CargarUltimasDosCompras(cliente.Rut);
 
             pnlInfoCliente.Visible = true;
-            btnConfirmar.Text = "✔ Asignar Cliente";
+            btnConfirmar.Text = "✔ Asignar Cliente (Enter)";
             btnConfirmar.Enabled = true;
+            btnConfirmar.Focus(); // Pasa el foco al botón para que el siguiente Enter confirme
         }
 
         private void CargarUltimasDosCompras(string rut)
@@ -316,7 +340,7 @@ namespace SISTEMAACTUALIZADO.Modals
             {
                 var ultimasVentas = _clienteService.ObtenerUltimasComprasPorRut(rut, 2);
 
-                if (ultimasVentas.Count == 0)
+                if (ultimasVentas == null || ultimasVentas.Count == 0)
                 {
                     Label lblSinCompras = new Label
                     {
@@ -365,7 +389,7 @@ namespace SISTEMAACTUALIZADO.Modals
             }
             catch
             {
-                Label lblError = new Label { Text = "No se pudo cargar el historial de compras.", ForeColor = Color.Red, AutoSize = true };
+                Label lblError = new Label { Text = "No se pudo cargar el historial de compras.", ForeColor = Color.Gray, Font = new Font("Segoe UI", 8F, FontStyle.Italic), AutoSize = true };
                 flpUltimasCompras.Controls.Add(lblError);
             }
         }
@@ -375,7 +399,7 @@ namespace SISTEMAACTUALIZADO.Modals
             Form modalNuevo = new Form
             {
                 Text = "Registrar Nuevo Cliente",
-                Size = new Size(390, 480),
+                ClientSize = new Size(370, 470),
                 StartPosition = FormStartPosition.CenterParent,
                 FormBorderStyle = FormBorderStyle.FixedDialog,
                 MaximizeBox = false,
@@ -383,10 +407,13 @@ namespace SISTEMAACTUALIZADO.Modals
                 BackColor = Color.White
             };
 
-            Label lblTitle = new Label { Text = "👤 Nuevo Cliente", Location = new Point(25, 15), Font = new Font("Segoe UI", 12F, FontStyle.Bold), AutoSize = true, ForeColor = Color.FromArgb(15, 23, 42) };
+            const int mX = 20;
+            const int aW = 330;
 
-            Label lblRut = new Label { Text = "RUT / DNI:", Location = new Point(25, 55), AutoSize = true, Font = new Font("Segoe UI", 8.5F, FontStyle.Bold) };
-            TextBox txtRut = new TextBox { Text = RutHelper.Formatear(rutInicial), Location = new Point(25, 75), Size = new Size(325, 26), Font = new Font("Segoe UI", 9.5F), MaxLength = 12 };
+            Label lblTitle = new Label { Text = "👤 Nuevo Cliente", Location = new Point(mX, 15), Font = new Font("Segoe UI", 12F, FontStyle.Bold), AutoSize = true, ForeColor = Color.FromArgb(15, 23, 42) };
+
+            Label lblRut = new Label { Text = "RUT / DNI:", Location = new Point(mX, 55), AutoSize = true, Font = new Font("Segoe UI", 8.5F, FontStyle.Bold) };
+            TextBox txtRut = new TextBox { Text = RutHelper.Formatear(rutInicial), Location = new Point(mX, 75), Size = new Size(aW, 26), Font = new Font("Segoe UI", 9.5F), MaxLength = 12 };
 
             txtRut.TextChanged += (s, e) =>
             {
@@ -400,8 +427,8 @@ namespace SISTEMAACTUALIZADO.Modals
                 }
             };
 
-            Label lblNom = new Label { Text = "Nombre Completo:", Location = new Point(25, 115), AutoSize = true, Font = new Font("Segoe UI", 8.5F, FontStyle.Bold) };
-            TextBox txtNom = new TextBox { Location = new Point(25, 135), Size = new Size(325, 26), Font = new Font("Segoe UI", 9.5F) };
+            Label lblNom = new Label { Text = "Nombre Completo:", Location = new Point(mX, 115), AutoSize = true, Font = new Font("Segoe UI", 8.5F, FontStyle.Bold) };
+            TextBox txtNom = new TextBox { Location = new Point(mX, 135), Size = new Size(aW, 26), Font = new Font("Segoe UI", 9.5F) };
 
             txtNom.KeyPress += (s, e) =>
             {
@@ -411,8 +438,8 @@ namespace SISTEMAACTUALIZADO.Modals
                 }
             };
 
-            Label lblTel = new Label { Text = "Teléfono de Contacto (9 dígitos):", Location = new Point(25, 175), AutoSize = true, Font = new Font("Segoe UI", 8.5F, FontStyle.Bold) };
-            TextBox txtTel = new TextBox { Text = "9", Location = new Point(25, 195), Size = new Size(325, 26), Font = new Font("Segoe UI", 9.5F), MaxLength = 9 };
+            Label lblTel = new Label { Text = "Teléfono de Contacto (9 dígitos):", Location = new Point(mX, 175), AutoSize = true, Font = new Font("Segoe UI", 8.5F, FontStyle.Bold) };
+            TextBox txtTel = new TextBox { Text = "9", Location = new Point(mX, 195), Size = new Size(aW, 26), Font = new Font("Segoe UI", 9.5F), MaxLength = 9 };
 
             txtTel.KeyPress += (s, e) =>
             {
@@ -422,17 +449,17 @@ namespace SISTEMAACTUALIZADO.Modals
                 }
             };
 
-            Label lblMail = new Label { Text = "Correo Electrónico:", Location = new Point(25, 235), AutoSize = true, Font = new Font("Segoe UI", 8.5F, FontStyle.Bold) };
-            TextBox txtMail = new TextBox { Location = new Point(25, 255), Size = new Size(325, 26), Font = new Font("Segoe UI", 9.5F) };
+            Label lblMail = new Label { Text = "Correo Electrónico:", Location = new Point(mX, 235), AutoSize = true, Font = new Font("Segoe UI", 8.5F, FontStyle.Bold) };
+            TextBox txtMail = new TextBox { Location = new Point(mX, 255), Size = new Size(aW, 26), Font = new Font("Segoe UI", 9.5F) };
 
-            Label lblDir = new Label { Text = "Dirección:", Location = new Point(25, 295), AutoSize = true, Font = new Font("Segoe UI", 8.5F, FontStyle.Bold) };
-            TextBox txtDir = new TextBox { Location = new Point(25, 315), Size = new Size(325, 26), Font = new Font("Segoe UI", 9.5F) };
+            Label lblDir = new Label { Text = "Dirección:", Location = new Point(mX, 295), AutoSize = true, Font = new Font("Segoe UI", 8.5F, FontStyle.Bold) };
+            TextBox txtDir = new TextBox { Location = new Point(mX, 315), Size = new Size(aW, 26), Font = new Font("Segoe UI", 9.5F) };
 
             Button btnGuardar = new Button
             {
                 Text = "💾 Guardar Cliente",
-                Location = new Point(25, 370),
-                Size = new Size(325, 42),
+                Location = new Point(mX, 370),
+                Size = new Size(aW, 42),
                 BackColor = Color.FromArgb(13, 110, 253),
                 ForeColor = Color.White,
                 FlatStyle = FlatStyle.Flat,
@@ -453,7 +480,7 @@ namespace SISTEMAACTUALIZADO.Modals
 
                 if (!RutHelper.EsValidoFormato(txtRut.Text))
                 {
-                    MessageBox.Show("El RUT ingresado no cumple con el largo requerido en Chile (9 dígitos).", "RUT Incompleto", MessageBoxButtons.OK, MessageBoxIcon.Warning);
+                    MessageBox.Show("El RUT ingresado no cumple con el formato requerido en Chile.", "RUT Incompleto", MessageBoxButtons.OK, MessageBoxIcon.Warning);
                     return;
                 }
 
