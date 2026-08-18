@@ -15,6 +15,7 @@ namespace SISTEMAACTUALIZADO
         [System.Runtime.InteropServices.DllImport("user32.dll", CharSet = System.Runtime.InteropServices.CharSet.Auto)]
         private static extern int SendMessage(IntPtr hWnd, int msg, int wParam, [System.Runtime.InteropServices.MarshalAs(System.Runtime.InteropServices.UnmanagedType.LPWStr)] string lParam);
         private const int EM_SETCUEBANNER = 0x1501;
+
         private static Dictionary<string, List<DetalleCarrito>> _carritosPorVendedor = new Dictionary<string, List<DetalleCarrito>>();
         private static Dictionary<string, (string Nombre, string Rut)> _clientesPorVendedor = new Dictionary<string, (string, string)>();
 
@@ -27,6 +28,7 @@ namespace SISTEMAACTUALIZADO
         private ComboBox cbVendedor = null!;
 
         // Categorías, Subfamilias y Productos
+        private TableLayoutPanel pnlIzquierda = null!;
         private Panel pnlCatSection = null!;
         private FlowLayoutPanel flowCategorias = null!;
         private FlowLayoutPanel flowSubFamilias = null!;
@@ -82,15 +84,26 @@ namespace SISTEMAACTUALIZADO
                 {
                     CargarCategoriasDesdeBD();
                     CargarProductosDesdeBD();
-                    this.ActiveControl = txtBuscar;
-                    txtBuscar.Focus();
+
+                    this.BeginInvoke(new Action(() =>
+                    {
+                        if (txtBuscar != null && txtBuscar.CanFocus)
+                        {
+                            txtBuscar.Focus();
+                        }
+                    }));
                 }
             };
 
-            this.Load += (s, e) =>
+            this.Shown += (s, e) =>
             {
-                this.ActiveControl = txtBuscar;
-                txtBuscar.Focus();
+                this.BeginInvoke(new Action(() =>
+                {
+                    if (txtBuscar != null && txtBuscar.CanFocus)
+                    {
+                        txtBuscar.Focus();
+                    }
+                }));
             };
 
             CargarCategoriasDesdeBD();
@@ -98,7 +111,6 @@ namespace SISTEMAACTUALIZADO
             RestaurarCarritoVendedorActual();
 
             this.KeyPreview = true;
-            
         }
 
         private void InitializeComponent()
@@ -106,8 +118,6 @@ namespace SISTEMAACTUALIZADO
             this.SuspendLayout();
             this.BackColor = Color.FromArgb(244, 246, 249);
             this.Font = new Font("Segoe UI", 9F, FontStyle.Regular, GraphicsUnit.Point);
-
-            
 
             // FOOTER DE ATAJOS
             Panel pnlAtajosFooter = new Panel
@@ -136,7 +146,7 @@ namespace SISTEMAACTUALIZADO
                 BackColor = Color.Transparent
             };
 
-            // DERECHA: CARRITO
+            // DERECHA: CARRITO LATERAL
             Panel pnlDerecha = new Panel
             {
                 Dock = DockStyle.Right,
@@ -244,7 +254,7 @@ namespace SISTEMAACTUALIZADO
             pnlDerecha.Controls.AddRange(new Control[] { flowCarritoItems, pnlCarritoVacio, pnlBottomCheckout, pnlCartHeader });
 
             // IZQUIERDA: TABLELAYOUTPANEL DINÁMICO
-            TableLayoutPanel pnlIzquierda = new TableLayoutPanel
+            pnlIzquierda = new TableLayoutPanel
             {
                 Dock = DockStyle.Fill,
                 ColumnCount = 1,
@@ -253,12 +263,17 @@ namespace SISTEMAACTUALIZADO
                 BackColor = Color.Transparent
             };
             pnlIzquierda.ColumnStyles.Add(new ColumnStyle(SizeType.Percent, 100F));
-            pnlIzquierda.RowStyles.Add(new RowStyle(SizeType.AutoSize));
-            pnlIzquierda.RowStyles.Add(new RowStyle(SizeType.AutoSize));
-            pnlIzquierda.RowStyles.Add(new RowStyle(SizeType.Percent, 100F));
+            pnlIzquierda.RowStyles.Add(new RowStyle(SizeType.Absolute, 46F));  // Fila 0: Buscador
+            pnlIzquierda.RowStyles.Add(new RowStyle(SizeType.Absolute, 70F));  // Fila 1: Categorías (se recalcula dinámicamente)
+            pnlIzquierda.RowStyles.Add(new RowStyle(SizeType.Percent, 100F));   // Fila 2: Productos
 
             // 1. Buscador y Vendedor
-            Panel pnlTopBar = new Panel { Dock = DockStyle.Top, Height = 42, BackColor = Color.Transparent, Margin = new Padding(0, 0, 0, 4) };
+            Panel pnlTopBar = new Panel 
+            { 
+                Dock = DockStyle.Fill, 
+                BackColor = Color.Transparent, 
+                Margin = new Padding(0, 0, 0, 4) 
+            };
 
             Panel pnlVendedor = new Panel { Dock = DockStyle.Right, Width = 220, Height = 38, BackColor = Color.Transparent };
             Label lblVendIcon = new Label { Text = "👤", Location = new Point(2, 7), AutoSize = true, Font = new Font("Segoe UI", 11F) };
@@ -308,7 +323,6 @@ namespace SISTEMAACTUALIZADO
                 ForeColor = Color.FromArgb(15, 23, 42)
             };
 
-            // Asignar el banner persistente en cuanto se cree el Handle del control
             txtBuscar.HandleCreated += (s, e) =>
             {
                 SendMessage(txtBuscar.Handle, EM_SETCUEBANNER, 1, "Buscar producto por nombre o código de barra...");
@@ -330,28 +344,31 @@ namespace SISTEMAACTUALIZADO
             // 2. Sección Categorías y Subfamilias
             pnlCatSection = new Panel
             {
-                Dock = DockStyle.Top,
-                AutoSize = true,
+                Dock = DockStyle.Fill,
                 BackColor = Color.Transparent,
                 Margin = new Padding(0, 0, 0, 6)
             };
 
-            Label lblCatTitle = new Label { Text = "CATEGORÍAS", Font = new Font("Segoe UI", 8F, FontStyle.Bold), ForeColor = Color.FromArgb(100, 116, 139), Dock = DockStyle.Top, Height = 18 };
+            Label lblCatTitle = new Label 
+            { 
+                Text = "CATEGORÍAS", 
+                Font = new Font("Segoe UI", 8F, FontStyle.Bold), 
+                ForeColor = Color.FromArgb(100, 116, 139), 
+                Dock = DockStyle.Top, 
+                Height = 18 
+            };
 
             flowCategorias = new FlowLayoutPanel
             {
                 Dock = DockStyle.Top,
-                AutoSize = true,
                 WrapContents = true,
                 Padding = new Padding(0),
                 Margin = new Padding(0)
             };
 
-            // Contenedor de Subfamilias (Submenú)
             flowSubFamilias = new FlowLayoutPanel
             {
                 Dock = DockStyle.Top,
-                AutoSize = true,
                 WrapContents = true,
                 Padding = new Padding(0, 4, 0, 4),
                 Margin = new Padding(0),
@@ -362,11 +379,23 @@ namespace SISTEMAACTUALIZADO
             pnlCatSection.Controls.Add(flowCategorias);
             pnlCatSection.Controls.Add(lblCatTitle);
 
-            pnlIzquierda.SizeChanged += (s, e) => RedimensionarBotonesCategorias();
+            // 3. Grid de Productos (Fila inferior)
+            Panel pnlProdMain = new Panel 
+            { 
+                Dock = DockStyle.Fill, 
+                BackColor = Color.White, 
+                Padding = new Padding(12),
+                Margin = new Padding(0)
+            };
 
-            // 3. Grid de Productos (Fila 2)
-            Panel pnlProdMain = new Panel { Dock = DockStyle.Fill, BackColor = Color.White, Padding = new Padding(12) };
-            Label lblProdHeader = new Label { Text = "PRODUCTOS", Font = new Font("Segoe UI", 8.5F, FontStyle.Bold), ForeColor = Color.FromArgb(100, 116, 139), Dock = DockStyle.Top, Height = 22 };
+            Label lblProdHeader = new Label 
+            { 
+                Text = "PRODUCTOS", 
+                Font = new Font("Segoe UI", 8.5F, FontStyle.Bold), 
+                ForeColor = Color.FromArgb(100, 116, 139), 
+                Dock = DockStyle.Top, 
+                Height = 24 
+            };
 
             pnlProductosGrid = new FlowLayoutPanel
             {
@@ -377,11 +406,14 @@ namespace SISTEMAACTUALIZADO
                 Padding = new Padding(0, 4, 0, 4)
             };
 
-            pnlProdMain.Controls.AddRange(new Control[] { pnlProductosGrid, lblProdHeader });
+            pnlProdMain.Controls.Add(pnlProductosGrid);
+            pnlProdMain.Controls.Add(lblProdHeader);
 
             pnlIzquierda.Controls.Add(pnlTopBar, 0, 0);
             pnlIzquierda.Controls.Add(pnlCatSection, 0, 1);
             pnlIzquierda.Controls.Add(pnlProdMain, 0, 2);
+
+            pnlIzquierda.SizeChanged += (s, e) => AjustarAnchoYAlturaCategorias();
 
             pnlCuerpo.Controls.Add(pnlIzquierda);
             pnlCuerpo.Controls.Add(pnlDerecha);
@@ -390,7 +422,7 @@ namespace SISTEMAACTUALIZADO
             this.Controls.Add(pnlAtajosFooter);
             this.ResumeLayout(false);
 
-            this.Load += (s, e) => RedimensionarBotonesCategorias();
+            this.Load += (s, e) => AjustarAnchoYAlturaCategorias();
         }
 
         private void CargarCategoriasDesdeBD()
@@ -425,7 +457,7 @@ namespace SISTEMAACTUALIZADO
                 colorIndex++;
             }
 
-            RedimensionarBotonesCategorias();
+            AjustarAnchoYAlturaCategorias();
             ActualizarSubFamiliasUI();
         }
 
@@ -436,6 +468,7 @@ namespace SISTEMAACTUALIZADO
             if (_categoriaActivaNombre == "Todas")
             {
                 flowSubFamilias.Visible = false;
+                AjustarAnchoYAlturaCategorias();
                 return;
             }
 
@@ -444,12 +477,12 @@ namespace SISTEMAACTUALIZADO
             if (familiasDeCategoria.Count == 0)
             {
                 flowSubFamilias.Visible = false;
+                AjustarAnchoYAlturaCategorias();
                 return;
             }
 
             flowSubFamilias.Visible = true;
 
-            // Botón 'Todas las familias' dentro de esta categoría
             Button btnTodasFam = CrearBotonSubFamilia("Todas", _familiaActivaNombre == "Todas");
             flowSubFamilias.Controls.Add(btnTodasFam);
 
@@ -458,6 +491,8 @@ namespace SISTEMAACTUALIZADO
                 Button btnFam = CrearBotonSubFamilia(fam, _familiaActivaNombre == fam);
                 flowSubFamilias.Controls.Add(btnFam);
             }
+
+            AjustarAnchoYAlturaCategorias();
         }
 
         private Button CrearBotonSubFamilia(string nombreFamilia, bool seleccionada)
@@ -487,20 +522,42 @@ namespace SISTEMAACTUALIZADO
             return btn;
         }
 
-        private void RedimensionarBotonesCategorias()
+        private void AjustarAnchoYAlturaCategorias()
         {
-            if (flowCategorias == null || flowCategorias.Width < 200) return;
+            if (flowCategorias == null || pnlIzquierda == null || pnlIzquierda.ClientSize.Width < 200) return;
 
-            int anchoDisponible = flowCategorias.ClientSize.Width - 10;
-            int anchoBoton = Math.Max(95, (anchoDisponible / 6) - 6);
+            int anchoDisponible = pnlIzquierda.ClientSize.Width - 20;
+            int columnas = Math.Max(1, anchoDisponible / 130);
+            int anchoBoton = (anchoDisponible / columnas) - 6;
 
             foreach (Control c in flowCategorias.Controls)
             {
                 if (c is Button b)
                 {
-                    b.Width = anchoBoton;
-                    b.Height = 34;
+                    b.Width = Math.Max(100, anchoBoton);
+                    b.Height = 36;
                 }
+            }
+
+            // Cálculo físico de filas
+            int cantBotones = flowCategorias.Controls.Count;
+            int filas = (int)Math.Ceiling((double)cantBotones / columnas);
+            if (filas < 1) filas = 1;
+
+            int altoCategorias = filas * 42;
+            flowCategorias.Height = altoCategorias;
+
+            int altoSubFamilias = (flowSubFamilias.Visible && flowSubFamilias.Controls.Count > 0) ? 34 : 0;
+            flowSubFamilias.Height = altoSubFamilias;
+
+            int altoTotalSeccion = 20 + altoCategorias + altoSubFamilias + 8;
+            pnlCatSection.Height = altoTotalSeccion;
+
+            // Modificar la altura de la fila en el TableLayoutPanel para empujar Productos
+            if (pnlIzquierda.RowStyles.Count > 1)
+            {
+                pnlIzquierda.RowStyles[1].SizeType = SizeType.Absolute;
+                pnlIzquierda.RowStyles[1].Height = altoTotalSeccion;
             }
         }
 
@@ -510,8 +567,8 @@ namespace SISTEMAACTUALIZADO
             {
                 Name = "cat_" + nombreCategoria.Replace(" ", "_"),
                 Text = $"{icono} {nombreCategoria}",
-                Height = 34,
-                Width = 100,
+                Height = 36,
+                Width = 120,
                 BackColor = back,
                 ForeColor = fore,
                 FlatStyle = FlatStyle.Flat,
@@ -548,7 +605,7 @@ namespace SISTEMAACTUALIZADO
                     btn.FlatAppearance.BorderSize = 2;
                     btn.FlatAppearance.BorderColor = seleccion.Borde;
                     _categoriaActivaNombre = seleccion.Nombre;
-                    _familiaActivaNombre = "Todas"; // Resetea la familia al cambiar de categoría
+                    _familiaActivaNombre = "Todas";
                     ActualizarSubFamiliasUI();
                     FiltrarProductosPorJerarquia();
                 }
@@ -737,7 +794,6 @@ namespace SISTEMAACTUALIZADO
 
             pnlProductosGrid.Controls.Clear();
 
-            // 1. Partir únicamente del universo de productos de la categoría y familia activas
             var queryJerarquica = _productosCache.AsQueryable();
 
             if (_categoriaActivaNombre != "Todas")
@@ -750,7 +806,6 @@ namespace SISTEMAACTUALIZADO
                 queryJerarquica = queryJerarquica.Where(p => p.NFamilia == _familiaActivaNombre);
             }
 
-            // 2. Aplicar el filtro de búsqueda solo sobre ese subconjunto
             var filtrados = queryJerarquica.Where(p =>
                 (!string.IsNullOrEmpty(p.Nombre) && p.Nombre.Split(' ', StringSplitOptions.RemoveEmptyEntries).Any(palabra => palabra.StartsWith(query, StringComparison.OrdinalIgnoreCase))) ||
                 (!string.IsNullOrEmpty(p.CodigoBarra) && p.CodigoBarra.StartsWith(query, StringComparison.OrdinalIgnoreCase)) ||
@@ -800,7 +855,6 @@ namespace SISTEMAACTUALIZADO
             string query = txtBuscar.Text.Trim();
             if (string.IsNullOrEmpty(query)) return;
 
-            // 1. Buscar coincidencia en la categoría/familia activa
             var queryJerarquica = _productosCache.AsQueryable();
 
             if (_categoriaActivaNombre != "Todas")
@@ -820,7 +874,6 @@ namespace SISTEMAACTUALIZADO
 
             if (prod != null)
             {
-                // 2. Limpiar el texto antes de abrir el modal para que no queden residuos
                 txtBuscar.Clear();
                 SolicitarCantidadYAgregar(prod);
             }
