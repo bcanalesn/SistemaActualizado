@@ -118,6 +118,7 @@ namespace SISTEMAACTUALIZADO
                 ControlPaint.DrawBorder(e.Graphics, pnlGridCard.ClientRectangle, Color.FromArgb(226, 232, 240), ButtonBorderStyle.Solid);
             };
 
+            // 1. En InitializeComponent, habilitar ScrollBars para deslizamiento horizontal:
             dgvProductos = new DataGridView
             {
                 Dock = DockStyle.Fill,
@@ -128,8 +129,10 @@ namespace SISTEMAACTUALIZADO
                 AllowUserToAddRows = false,
                 ReadOnly = true,
                 RowHeadersVisible = false,
-                AutoSizeColumnsMode = DataGridViewAutoSizeColumnsMode.Fill
+                ScrollBars = ScrollBars.Both, // Barra horizontal y vertical activa
+                AutoSizeColumnsMode = DataGridViewAutoSizeColumnsMode.None // Permite que las columnas mantengan su ancho y se active el scroll
             };
+
             ConfigurarEstiloTabla(dgvProductos);
             dgvProductos.DoubleClick += (s, e) => BtnEditar_Click(s, e);
 
@@ -196,91 +199,69 @@ namespace SISTEMAACTUALIZADO
             }
         }
 
+        // 2. Método ActualizarGrilla con el orden y formatos exactos:
         private void ActualizarGrilla(List<Producto> lista)
         {
             dgvProductos.DataSource = null;
             dgvProductos.DataSource = lista;
 
-            // Ocultar columnas secundarias
-            string[] columnasOcultar = new string[] 
-            { 
-                "NmbLargo", "NmbCorto", "IdFamilia", "Categoria1", "Categoria2", "Categoria3", 
-                "StockMinimo", "ImagenPath", "Estado", "Activo" 
-            };
-
-            foreach (string col in columnasOcultar)
+            // 1. Ocultar todas las columnas por defecto
+            foreach (DataGridViewColumn col in dgvProductos.Columns)
             {
-                if (dgvProductos.Columns[col] != null)
+                col.Visible = false;
+            }
+
+            // 2. Función local auxiliar para configurar visibilidad, orden y estilo
+            void ConfigurarColumna(string propName, string titulo, int displayIndex, int ancho, 
+                                DataGridViewContentAlignment alineacion = DataGridViewContentAlignment.MiddleLeft, 
+                                string formato = "", Color? foreColor = null, bool bold = false)
+            {
+                if (dgvProductos.Columns[propName] is DataGridViewColumn c)
                 {
-                    dgvProductos.Columns[col].Visible = false;
+                    c.Visible = true;
+                    c.HeaderText = titulo;
+                    c.DisplayIndex = displayIndex;
+                    c.Width = ancho;
+                    c.DefaultCellStyle.Alignment = alineacion;
+
+                    if (!string.IsNullOrEmpty(formato))
+                        c.DefaultCellStyle.Format = formato;
+
+                    if (foreColor.HasValue)
+                        c.DefaultCellStyle.ForeColor = foreColor.Value;
+
+                    if (bold)
+                        c.DefaultCellStyle.Font = new Font("Segoe UI", 9.5F, FontStyle.Bold);
                 }
             }
 
-            // Configurar columnas principales
-            if (dgvProductos.Columns["ProductoID"] != null) 
-            { 
-                dgvProductos.Columns["ProductoID"].Width = 55; 
-                dgvProductos.Columns["ProductoID"].HeaderText = "ID";
-                dgvProductos.Columns["ProductoID"].DefaultCellStyle.Alignment = DataGridViewContentAlignment.MiddleCenter;
-            }
+            // 3. Aplicar configuración en el orden exacto solicitado
+            // 1° Descripción Producto
+            ConfigurarColumna("Nombre", "Descripción Producto", 0, 220);
 
-            if (dgvProductos.Columns["CodigoBarra"] != null) 
-            { 
-                dgvProductos.Columns["CodigoBarra"].Width = 125; 
-                dgvProductos.Columns["CodigoBarra"].HeaderText = "SKU/Barra"; 
-            }
+            // 2° Categoría
+            ConfigurarColumna("Categoria", "Categoría", 1, 120);
 
-            if (dgvProductos.Columns["Nombre"] != null) 
-            { 
-                dgvProductos.Columns["Nombre"].HeaderText = "Descripción Producto";
-                dgvProductos.Columns["Nombre"].FillWeight = 160;
-            }
+            // 3° Familia
+            ConfigurarColumna("NFamilia", "Familia", 2, 120);
 
-            if (dgvProductos.Columns["Categoria"] != null) 
-            { 
-                dgvProductos.Columns["Categoria"].Width = 110;
-                dgvProductos.Columns["Categoria"].HeaderText = "Categoría"; 
-            }
+            // 4° Stock
+            ConfigurarColumna("Stock", "Stock", 3, 75, DataGridViewContentAlignment.MiddleRight, "#,##0", null, true);
 
-            if (dgvProductos.Columns["NFamilia"] != null) 
-            { 
-                dgvProductos.Columns["NFamilia"].Width = 110;
-                dgvProductos.Columns["NFamilia"].HeaderText = "Familia"; 
-            }
+            // 5° Costo Neto
+            ConfigurarColumna("PrecioCosto", "Costo Neto", 4, 95, DataGridViewContentAlignment.MiddleRight, "$#,##0");
 
-            if (dgvProductos.Columns["PrecioUnitario"] != null) 
-            { 
-                dgvProductos.Columns["PrecioUnitario"].Width = 120; 
-                dgvProductos.Columns["PrecioUnitario"].HeaderText = "Precio Venta (IVA)"; 
-                dgvProductos.Columns["PrecioUnitario"].DefaultCellStyle.Format = "$#,##0"; 
-                dgvProductos.Columns["PrecioUnitario"].DefaultCellStyle.Font = new Font("Segoe UI", 9.5F, FontStyle.Bold); 
-                dgvProductos.Columns["PrecioUnitario"].DefaultCellStyle.ForeColor = Color.FromArgb(16, 185, 129);
-                dgvProductos.Columns["PrecioUnitario"].DefaultCellStyle.Alignment = DataGridViewContentAlignment.MiddleRight;
-            }
+            // 6° Precio Venta (Lista 1)
+            ConfigurarColumna("PrecioUnitario", "Precio Venta (L1)", 5, 125, DataGridViewContentAlignment.MiddleRight, "$#,##0", Color.FromArgb(16, 185, 129), true);
 
-            if (dgvProductos.Columns["Stock"] != null) 
-            { 
-                dgvProductos.Columns["Stock"].Width = 80; 
-                dgvProductos.Columns["Stock"].HeaderText = "Stock"; 
-                dgvProductos.Columns["Stock"].DefaultCellStyle.Alignment = DataGridViewContentAlignment.MiddleRight; 
-                dgvProductos.Columns["Stock"].DefaultCellStyle.Font = new Font("Segoe UI", 9F, FontStyle.Bold); 
-            }
+            // 7° a 10° Listas de Precios con Descuento (Precios 2 al 5)
+            ConfigurarColumna("Precio2", "Lista 2 (Desc.)", 6, 110, DataGridViewContentAlignment.MiddleRight, "$#,##0", Color.FromArgb(2, 132, 199));
+            ConfigurarColumna("Precio3", "Lista 3 (Desc.)", 7, 110, DataGridViewContentAlignment.MiddleRight, "$#,##0", Color.FromArgb(2, 132, 199));
+            ConfigurarColumna("Precio4", "Lista 4 (Desc.)", 8, 110, DataGridViewContentAlignment.MiddleRight, "$#,##0", Color.FromArgb(2, 132, 199));
+            ConfigurarColumna("Precio5", "Lista 5 (Desc.)", 9, 110, DataGridViewContentAlignment.MiddleRight, "$#,##0", Color.FromArgb(2, 132, 199));
 
-            if (dgvProductos.Columns["PrecioCosto"] != null) 
-            { 
-                dgvProductos.Columns["PrecioCosto"].Width = 95; 
-                dgvProductos.Columns["PrecioCosto"].HeaderText = "Costo Neto"; 
-                dgvProductos.Columns["PrecioCosto"].DefaultCellStyle.Format = "$#,##0";
-                dgvProductos.Columns["PrecioCosto"].DefaultCellStyle.Alignment = DataGridViewContentAlignment.MiddleRight;
-            }
-
-            if (dgvProductos.Columns["MargenGanancia"] != null) 
-            { 
-                dgvProductos.Columns["MargenGanancia"].Width = 85; 
-                dgvProductos.Columns["MargenGanancia"].HeaderText = "Margen %"; 
-                dgvProductos.Columns["MargenGanancia"].DefaultCellStyle.Format = "0.0'%'";
-                dgvProductos.Columns["MargenGanancia"].DefaultCellStyle.Alignment = DataGridViewContentAlignment.MiddleCenter;
-            }
+            // 11° SKU / Código de Barra
+            ConfigurarColumna("CodigoBarra", "SKU / Código Barra", 10, 130);
         }
 
         private void FiltrarProductosInteligente()
