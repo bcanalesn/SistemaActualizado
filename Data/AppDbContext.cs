@@ -20,7 +20,7 @@ namespace SISTEMAACTUALIZADO.Data
         {
             if (!optionsBuilder.IsConfigured)
             {
-                optionsBuilder.UseMySql("Server=localhost;Database=sistemaepos;Uid=root;Pwd=;", 
+                optionsBuilder.UseMySql("Server=localhost;Database=sistemaepos;Uid=root;Pwd=root;", 
                     new MySqlServerVersion(new Version(8, 0, 30)));
             }
         }

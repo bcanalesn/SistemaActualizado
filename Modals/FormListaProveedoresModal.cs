@@ -19,8 +19,6 @@ namespace SISTEMAACTUALIZADO.Modals
 
         private TextBox txtFiltro = null!;
         private DataGridView dgvProveedores = null!;
-        private Button btnSeleccionar = null!;
-        private Button btnCerrar = null!;
         private List<Proveedor> _listaOriginal = new List<Proveedor>();
 
         public Proveedor? ProveedorSeleccionado { get; private set; }
@@ -119,7 +117,7 @@ namespace SISTEMAACTUALIZADO.Modals
             // Panel Inferior de Botones
             Panel pnlBotones = new Panel { Dock = DockStyle.Bottom, Height = 48, Padding = new Padding(0, 8, 0, 0) };
 
-            btnSeleccionar = new Button
+            Button btnSeleccionar = new Button
             {
                 Text = "✔ Seleccionar Proveedor",
                 Size = new Size(180, 36),
@@ -133,7 +131,7 @@ namespace SISTEMAACTUALIZADO.Modals
             btnSeleccionar.FlatAppearance.BorderSize = 0;
             btnSeleccionar.Click += (s, e) => SeleccionarYSalir();
 
-            btnCerrar = new Button
+            Button btnCerrar = new Button
             {
                 Text = "Cerrar",
                 Size = new Size(100, 36),
@@ -177,7 +175,7 @@ namespace SISTEMAACTUALIZADO.Modals
             try
             {
                 using var db = new AppDbContext();
-                _listaOriginal = db.Proveedores.Where(p => p.Estado).OrderBy(p => p.RazonSocial).ToList() ?? new List<Proveedor>();
+                _listaOriginal = db.Proveedores.Where(p => p.Estado).OrderBy(p => p.RazonSocial).ToList();
                 ActualizarGrilla(_listaOriginal);
             }
             catch (Exception ex)
@@ -208,9 +206,7 @@ namespace SISTEMAACTUALIZADO.Modals
 
         private void TxtFiltro_TextChanged(object? sender, EventArgs e)
         {
-            if (_listaOriginal == null || txtFiltro == null) return;
-
-            string q = (txtFiltro.Text ?? "").Trim().ToLower();
+            string q = txtFiltro.Text.Trim().ToLower();
             if (string.IsNullOrEmpty(q))
             {
                 ActualizarGrilla(_listaOriginal);

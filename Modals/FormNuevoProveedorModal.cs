@@ -21,9 +21,6 @@ namespace SISTEMAACTUALIZADO.Modals
         private TextBox txtTelefono = null!;
         private TextBox txtEmail = null!;
         private TextBox txtDireccion = null!;
-        private Button btnGuardar = null!;
-        private Button btnCancelar = null!;
-        private Label lblTitulo = null!;
 
         private readonly Proveedor? _proveedorAEditar;
         public Proveedor? ProveedorResultado { get; private set; }
@@ -57,7 +54,7 @@ namespace SISTEMAACTUALIZADO.Modals
             Panel pnlHeader = new Panel { Dock = DockStyle.Top, Height = 42, BackColor = Color.Transparent };
             pnlHeader.MouseDown += (s, e) => { ReleaseCapture(); SendMessage(this.Handle, 0x112, 0xf012, 0); };
 
-            lblTitulo = new Label
+            Label lblTitulo = new Label
             {
                 Text = _proveedorAEditar == null ? "🚚 Registrar Nuevo Proveedor" : "✏️ Editar Proveedor",
                 Font = new Font("Segoe UI", 11.5F, FontStyle.Bold),
@@ -109,7 +106,7 @@ namespace SISTEMAACTUALIZADO.Modals
 
             Panel pnlBotones = new Panel { Dock = DockStyle.Bottom, Height = 45 };
 
-            btnGuardar = new Button
+            Button btnGuardar = new Button
             {
                 Text = _proveedorAEditar == null ? "💾 Guardar Proveedor" : "💾 Guardar Cambios",
                 Size = new Size(180, 38),
@@ -123,7 +120,7 @@ namespace SISTEMAACTUALIZADO.Modals
             btnGuardar.FlatAppearance.BorderSize = 0;
             btnGuardar.Click += BtnGuardar_Click;
 
-            btnCancelar = new Button
+            Button btnCancelar = new Button
             {
                 Text = "Cancelar",
                 Size = new Size(100, 38),

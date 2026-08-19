@@ -13,7 +13,7 @@ namespace SISTEMAACTUALIZADO
     public class FormCaja : Form
     {
         private readonly CajaService _cajaService = new CajaService();
-        private static CajaTurno? _turnoActual = null;
+        private static CajaTurno? _turnoActual;
         private Usuario? _usuarioActual;
 
         private Button btnAbrirCaja = null!;
@@ -22,10 +22,8 @@ namespace SISTEMAACTUALIZADO
         private Label lblHoraApertura = null!;
         private Label lblFondoInicial = null!;
         private Label lblVueltoEntregado = null!;
-        private Button btnVerResumen = null!;
 
         private TextBox txtBuscarTicket = null!;
-        private Button btnLimpiar = null!;
         private Label lblTotalResultados = null!;
         private Label lblUltimaActualizacion = null!;
 
@@ -46,7 +44,6 @@ namespace SISTEMAACTUALIZADO
         private string _medioPagoSeleccionado = "Efectivo";
 
         // SECCIÓN 3: DATOS DE COBRO
-        private Panel pnlDatosCobroCard = null!;
         private TextBox txtPagaCon = null!;
         private Label lblVuelto = null!;
         private Label lblTotalCobrar = null!;
@@ -58,16 +55,16 @@ namespace SISTEMAACTUALIZADO
 
         private Panel pnlBloqueoCaja = null!;
 
-        private TVE2607? _ticketSeleccionado = null;
+        private TVE2607? _ticketSeleccionado;
 
         // ACUMULADOR DE VUELTO ENTREGADO
-        private static decimal _totalVueltoEntregadoTurno = 0;
+        private static decimal _totalVueltoEntregadoTurno;
 
         // Variables Pago Múltiple
-        private decimal _pagoEfectivo = 0;
-        private decimal _pagoTarjeta = 0;
-        private decimal _pagoTransferencia = 0;
-        private decimal _vueltoMixto = 0;
+        private decimal _pagoEfectivo;
+        private decimal _pagoTarjeta;
+        private decimal _pagoTransferencia;
+        private decimal _vueltoMixto;
         private bool _pagoMixtoConfirmado = false;
 
         public FormCaja(Usuario? usuario = null)
@@ -142,7 +139,7 @@ namespace SISTEMAACTUALIZADO
             flpMetricas.Controls.Add(cardFondo);
             flpMetricas.Controls.Add(cardVueltoTurno);
 
-            btnVerResumen = new Button
+            Button btnVerResumen = new Button
             {
                 Text = "📈 Ver resumen del turno",
                 Location = new Point(870, 6),
@@ -191,7 +188,7 @@ namespace SISTEMAACTUALIZADO
             btnRecargar.FlatAppearance.BorderSize = 0;
             btnRecargar.Click += (s, e) => CargarTicketsPendientes();
 
-            btnLimpiar = new Button { Text = "🗑️ Limpiar", Location = new Point(340, 23), Size = new Size(76, 28), BackColor = Color.FromArgb(254, 242, 242), ForeColor = Color.FromArgb(239, 68, 68), FlatStyle = FlatStyle.Flat, Font = new Font("Segoe UI", 8.5F, FontStyle.Bold), Cursor = Cursors.Hand };
+            Button btnLimpiar = new Button { Text = "🗑️ Limpiar", Location = new Point(340, 23), Size = new Size(76, 28), BackColor = Color.FromArgb(254, 242, 242), ForeColor = Color.FromArgb(239, 68, 68), FlatStyle = FlatStyle.Flat, Font = new Font("Segoe UI", 8.5F, FontStyle.Bold), Cursor = Cursors.Hand };
             btnLimpiar.FlatAppearance.BorderSize = 0;
             btnLimpiar.Click += (s, e) => { txtBuscarTicket.Clear(); CargarTicketsPendientes(); };
 
@@ -291,7 +288,7 @@ namespace SISTEMAACTUALIZADO
             pnlSec2.Controls.AddRange(new Control[] { circle2, lblT2, lblSub2, btnPagoEfectivo, btnPagoDebito, btnPagoCredito, btnPagoTransferencia, btnPagoMultiple });
 
             // SECCIÓN 3: DATOS DE COBRO (ALINEACIÓN DE PAGA CON CORREGIDA)
-            pnlDatosCobroCard = CrearContenedorSeccion(231, 162, Color.FromArgb(16, 185, 129));
+            Panel pnlDatosCobroCard = CrearContenedorSeccion(231, 162, Color.FromArgb(16, 185, 129));
             Panel circle3 = CrearBadgeNumero("3", Color.FromArgb(16, 185, 129), new Point(10, 8));
             Label lblT3 = new Label { Text = "DATOS DE COBRO", Location = new Point(42, 6), AutoSize = true, Font = new Font("Segoe UI", 8.5F, FontStyle.Bold), ForeColor = Color.FromArgb(16, 185, 129) };
             Label lblSub3 = new Label { Text = "Ingresa el monto recibido (solo para Efectivo o Pago Múltiple)", Location = new Point(42, 22), AutoSize = true, Font = new Font("Segoe UI", 7.5F), ForeColor = Color.FromArgb(100, 116, 139) };

@@ -31,7 +31,7 @@ namespace SISTEMAACTUALIZADO.Modals
             InitializeComponent();
         }
 
-        // Constructor 2: Recibe parámetros individuales (Usado desde FormHistorialVentas)
+        // Constructor 2: Recibe parámetros individuales (usado para reimpresiones y vistas rápidas)
         public FormTicketModal(int nroTicket, DateTime fecha, List<DetalleCarrito> items, decimal total, decimal pagaCon, decimal vuelto, string medioPago)
         {
             _venta = new TVE2607

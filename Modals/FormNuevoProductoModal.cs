@@ -27,11 +27,6 @@ namespace SISTEMAACTUALIZADO.Modals
         private TextBox txtStockInicial = null!;
         private TextBox txtStockMinimo = null!;
         private PictureBox pbFoto = null!;
-        private Button btnCargarFoto = null!;
-        private Button btnQuitarFoto = null!;
-        private Button btnGuardar = null!;
-        private Button btnCancelar = null!;
-        private Label lblTitulo = null!;
 
         private string _rutaImagenSeleccionada = string.Empty;
         private readonly Producto? _productoAEditar;
@@ -69,7 +64,7 @@ namespace SISTEMAACTUALIZADO.Modals
             Panel pnlHeader = new Panel { Dock = DockStyle.Top, Height = 40, BackColor = Color.Transparent };
             pnlHeader.MouseDown += (s, e) => { ReleaseCapture(); SendMessage(this.Handle, 0x112, 0xf012, 0); };
 
-            lblTitulo = new Label
+            Label lblTitulo = new Label
             {
                 Text = _productoAEditar == null ? "📦 Registrar Nuevo Producto" : "✏️ Editar Producto",
                 Font = new Font("Segoe UI", 11.5F, FontStyle.Bold),
@@ -151,7 +146,7 @@ namespace SISTEMAACTUALIZADO.Modals
                 BackColor = Color.FromArgb(248, 250, 252)
             };
 
-            btnCargarFoto = new Button
+            Button btnCargarFoto = new Button
             {
                 Text = "📁 Seleccionar Imagen...",
                 Location = new Point(62, 26),
@@ -165,7 +160,7 @@ namespace SISTEMAACTUALIZADO.Modals
             btnCargarFoto.FlatAppearance.BorderColor = Color.FromArgb(203, 213, 225);
             btnCargarFoto.Click += BtnCargarFoto_Click;
 
-            btnQuitarFoto = new Button
+            Button btnQuitarFoto = new Button
             {
                 Text = "Quitar",
                 Location = new Point(228, 26),
@@ -197,7 +192,7 @@ namespace SISTEMAACTUALIZADO.Modals
             // Botonera Inferior
             Panel pnlBotones = new Panel { Dock = DockStyle.Bottom, Height = 48 };
 
-            btnGuardar = new Button
+            Button btnGuardar = new Button
             {
                 Text = _productoAEditar == null ? "💾 Guardar y Usar" : "💾 Guardar Cambios",
                 Size = new Size(180, 38),
@@ -211,7 +206,7 @@ namespace SISTEMAACTUALIZADO.Modals
             btnGuardar.FlatAppearance.BorderSize = 0;
             btnGuardar.Click += BtnGuardar_Click;
 
-            btnCancelar = new Button
+            Button btnCancelar = new Button
             {
                 Text = "Cancelar",
                 Size = new Size(100, 38),

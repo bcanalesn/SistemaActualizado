@@ -17,7 +17,6 @@ namespace SISTEMAACTUALIZADO
         // Botones del Menú Lateral (Orden Operativo sin Proveedores en el menú principal)
         private Button btnCaja = new Button();
         private Button btnVentas = new Button();
-        private Button btnHistorial = new Button();
         private Button btnLibroVentas = new Button();
         private Button btnFolios = new Button();
         private Button btnCompras = new Button();
@@ -85,7 +84,6 @@ namespace SISTEMAACTUALIZADO
 
             ConfigurarBotonSidebar(this.btnCaja, "💵  Control de Caja", yPos); yPos += espaciado;
             ConfigurarBotonSidebar(this.btnVentas, "🛒  Punto de Venta", yPos); yPos += espaciado;
-            ConfigurarBotonSidebar(this.btnHistorial, "📜  Historial Ventas", yPos); yPos += espaciado;
             ConfigurarBotonSidebar(this.btnLibroVentas, "📚  Libro Ventas LVE", yPos); yPos += espaciado;
             ConfigurarBotonSidebar(this.btnFolios, "📄  Control de Folios", yPos); yPos += espaciado;
             ConfigurarBotonSidebar(this.btnCompras, "📥  Recepción Compras", yPos); yPos += espaciado;
@@ -101,7 +99,6 @@ namespace SISTEMAACTUALIZADO
             pnlNav.Controls.Add(this.btnCompras);
             pnlNav.Controls.Add(this.btnFolios);
             pnlNav.Controls.Add(this.btnLibroVentas);
-            pnlNav.Controls.Add(this.btnHistorial);
             pnlNav.Controls.Add(this.btnVentas);
             pnlNav.Controls.Add(this.btnCaja);
 
@@ -117,7 +114,6 @@ namespace SISTEMAACTUALIZADO
 
             this.btnCaja.Click += (s, e) => AbrirFormEnContent(new FormCaja(_usuarioActual), "Apertura y Cierre de Caja", btnCaja);
             this.btnVentas.Click += (s, e) => AbrirFormEnContent(new FormVenta(_usuarioActual), "Punto de Venta DTE", btnVentas);
-            this.btnHistorial.Click += (s, e) => AbrirFormEnContent(new FormHistorialVentas(), "Historial y Devoluciones de Ventas", btnHistorial);
             this.btnLibroVentas.Click += (s, e) => AbrirFormEnContent(new FormLibroVentas(), "Libro de Ventas Electrónico (LVE) y Formulario F29", btnLibroVentas);
             this.btnFolios.Click += (s, e) => AbrirFormEnContent(new FormFolios(), "Control de Folios Autorizados (SII)", btnFolios);
             this.btnCompras.Click += (s, e) => AbrirFormEnContent(new FormCompras(), "Recepción de Compras e Incremento de Stock", btnCompras);
@@ -234,7 +230,7 @@ namespace SISTEMAACTUALIZADO
         private void ResaltarBotonActivo(Button btn)
         {
             Button[] botones = new[] { 
-                btnCaja, btnVentas, btnHistorial, btnLibroVentas, btnFolios, 
+                btnCaja, btnVentas, btnLibroVentas, btnFolios, 
                 btnCompras, btnClientes, btnProductos, 
                 btnUsuarios, btnReportes, btnCerrarSesion 
             };

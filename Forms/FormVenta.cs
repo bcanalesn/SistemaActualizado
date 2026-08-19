@@ -36,7 +36,6 @@ namespace SISTEMAACTUALIZADO
 
         // Carrito Lateral
         private Label lblCantItemsBadge = null!;
-        private Button btnLimpiarCarro = null!;
         private FlowLayoutPanel flowCarritoItems = null!;
         private Panel pnlCarritoVacio = null!;
 
@@ -45,7 +44,6 @@ namespace SISTEMAACTUALIZADO
         private Label lblDescuentoValue = null!;
         private Label lblTotalValue = null!;
         private Button btnCliente = null!;
-        private Button btnGenerarTicket = null!;
 
         private string _clienteSeleccionadoNombre = "Consumidor Final";
         private string _clienteSeleccionadoRut = "";
@@ -108,7 +106,7 @@ namespace SISTEMAACTUALIZADO
 
             CargarCategoriasDesdeBD();
             CargarProductosDesdeBD();
-            RestaurarCarritoVendedorActual();
+            ActualizarCarritoUI();
 
             this.KeyPreview = true;
         }
@@ -170,7 +168,7 @@ namespace SISTEMAACTUALIZADO
                 TextAlign = ContentAlignment.MiddleCenter
             };
 
-            btnLimpiarCarro = new Button
+            Button btnLimpiarCarro = new Button
             {
                 Text = "🗑️ Limpiar",
                 Dock = DockStyle.Right,
@@ -234,7 +232,7 @@ namespace SISTEMAACTUALIZADO
             btnCliente.FlatAppearance.BorderColor = Color.FromArgb(226, 232, 240);
             btnCliente.Click += BtnCliente_Click;
 
-            btnGenerarTicket = new Button
+            Button btnGenerarTicket = new Button
             {
                 Text = "🎟️ F4 GENERAR TICKET",
                 Location = new Point(114, 6),
@@ -647,7 +645,7 @@ namespace SISTEMAACTUALIZADO
         {
             pnlProductosGrid.Controls.Clear();
 
-            var filtrados = _productosCache.AsQueryable();
+            IEnumerable<Producto> filtrados = _productosCache;
 
             if (_categoriaActivaNombre != "Todas")
             {
@@ -794,7 +792,7 @@ namespace SISTEMAACTUALIZADO
 
             pnlProductosGrid.Controls.Clear();
 
-            var queryJerarquica = _productosCache.AsQueryable();
+            IEnumerable<Producto> queryJerarquica = _productosCache;
 
             if (_categoriaActivaNombre != "Todas")
             {
@@ -845,17 +843,12 @@ namespace SISTEMAACTUALIZADO
             ActualizarCarritoUI();
         }
 
-        private void RestaurarCarritoVendedorActual()
-        {
-            ActualizarCarritoUI();
-        }
-
         private void BuscarYAgregarProducto()
         {
             string query = txtBuscar.Text.Trim();
             if (string.IsNullOrEmpty(query)) return;
 
-            var queryJerarquica = _productosCache.AsQueryable();
+            IEnumerable<Producto> queryJerarquica = _productosCache;
 
             if (_categoriaActivaNombre != "Todas")
             {

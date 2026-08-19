@@ -9,13 +9,12 @@ using System.Windows.Forms;
 using SISTEMAACTUALIZADO.Data;
 using SISTEMAACTUALIZADO.Models;
 using SISTEMAACTUALIZADO.Modals;
+using SISTEMAACTUALIZADO.Services;
 
 namespace SISTEMAACTUALIZADO
 {
     public class FormLibroVentas : Form
     {
-        private AppDbContext _db = new AppDbContext();
-
         // Tarjetas KPI Superiores
         private Label lblKpiTotalVentas = null!;
         private Label lblKpiCantDocs = null!;
@@ -707,81 +706,18 @@ namespace SISTEMAACTUALIZADO
                 {
                     using (var db = new AppDbContext())
                     {
-                        foreach (var ventaOriginal in ventasParaAnular)
+                        var notaCreditoService = new NotaCreditoService(db);
+                        var idsVentas = ventasParaAnular.Select(v => v.idTve);
+                        int totalEmitidas = notaCreditoService.EmitirNotasCredito(idsVentas, txtMotivo.Text.Trim(), (cbCausa.SelectedIndex + 1).ToString(), chkRestock.Checked);
+
+                        if (totalEmitidas == 0)
                         {
-                            TVE2607 nc = new TVE2607
-                            {
-                                idLocal = ventaOriginal.idLocal,
-                                nmbLocal = ventaOriginal.nmbLocal,
-                                iddocDTE = 61,
-                                Documento = "Nota de Crédito Electrónica",
-                                nroDTE = (int)(DateTime.Now.Ticks % 100000),
-                                FecDoc = DateTime.Now,
-                                HoraDoc = DateTime.Now.ToString("HH:mm:ss"),
-                                SubTotal = ventaOriginal.SubTotal,
-                                Descuento = ventaOriginal.Descuento,
-                                Neto = ventaOriginal.Neto,
-                                IvA = ventaOriginal.IvA,
-                                Total = ventaOriginal.Total,
-                                RuT = ventaOriginal.RuT,
-                                RazonSocial = ventaOriginal.RazonSocial,
-                                Giro = ventaOriginal.Giro,
-                                idREF = ventaOriginal.idTve,
-                                nroREF = ventaOriginal.nroDTE,
-                                codigoREF = (cbCausa.SelectedIndex + 1).ToString(),
-                                UserDTE = ventaOriginal.UserDTE,
-                                Vendedor = ventaOriginal.Vendedor,
-                                status = "Emitido"
-                            };
-
-                            db.TVE2607.Add(nc);
-                            db.SaveChanges();
-
-                            var detallesOrigen = db.TVD2607.Where(d => d.idTve == ventaOriginal.idTve).ToList();
-
-                            foreach (var item in detallesOrigen)
-                            {
-                                TVD2607 ncDetalle = new TVD2607
-                                {
-                                    idTve = nc.idTve,
-                                    idLocal = item.idLocal,
-                                    iddocDTE = 61,
-                                    Documento = "Nota de Crédito Electrónica",
-                                    NroDTE = nc.nroDTE,
-                                    FecMoV = DateTime.Now,
-                                    HoraMoV = DateTime.Now.ToString("HH:mm:ss"),
-                                    IdProducto = item.IdProducto,
-                                    NmbProducto = item.NmbProducto,
-                                    Cantidad = item.Cantidad,
-                                    Precio = item.Precio,
-                                    PneTo = item.PneTo,
-                                    SubTotal = item.SubTotal,
-                                    SubNeto = item.SubNeto,
-                                    nmbVendedor = item.nmbVendedor
-                                };
-                                db.TVD2607.Add(ncDetalle);
-
-                                if (chkRestock.Checked)
-                                {
-                                    var prod = db.Productos.FirstOrDefault(p => p.ProductoID == item.IdProducto);
-                                    if (prod != null)
-                                    {
-                                        prod.Stock += item.Cantidad;
-                                    }
-                                }
-                            }
-
-                            var ventaBD = db.TVE2607.FirstOrDefault(v => v.idTve == ventaOriginal.idTve);
-                            if (ventaBD != null)
-                            {
-                                ventaBD.status = "Anulado NC";
-                            }
+                            MessageBox.Show("No se emitieron Notas de Crédito. Verifique que las ventas seleccionadas sean válidas.", "Sin cambios", MessageBoxButtons.OK, MessageBoxIcon.Warning);
+                            return;
                         }
-
-                        db.SaveChanges();
                     }
 
-                    MessageBox.Show($"¡Se emitieron las Notas de Crédito exitosamente para {ventasParaAnular.Count} documento(s)!\nSe reintegraron los productos al stock en inventario.", "Proceso Exitoso", MessageBoxButtons.OK, MessageBoxIcon.Information);
+                    MessageBox.Show($"¡Se emitieron las Notas de Crédito exitosamente para {ventasParaAnular.Count} documento(s)!", "Proceso Exitoso", MessageBoxButtons.OK, MessageBoxIcon.Information);
                     modalNC.Close();
                     AplicarFiltroFecha(dtpDesde.Value.Date, dtpHasta.Value.Date.AddDays(1).AddTicks(-1));
                 }
