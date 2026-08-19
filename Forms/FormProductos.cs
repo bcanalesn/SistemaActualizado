@@ -288,6 +288,8 @@ namespace SISTEMAACTUALIZADO
                 bool estaVisible = _listasVisibles[i - 2];
                 ConfigurarCol(propName, $"Lista {i}", orden++, 105, DataGridViewContentAlignment.MiddleRight, "$#,##0", Color.FromArgb(2, 132, 199), false, estaVisible);
             }
+            // Justo antes del SKU:
+            ConfigurarCol("ListaDefectoPOS", "Lista Activa POS", orden++, 100, DataGridViewContentAlignment.MiddleCenter, "Lista #0", Color.FromArgb(147, 51, 234), true);
 
             // SKU / Código Barra al final
             ConfigurarCol("CodigoBarra", "SKU / Código Barra", orden++, 130);
@@ -312,10 +314,9 @@ namespace SISTEMAACTUALIZADO
 
         private void BtnMargenes_Click(object? sender, EventArgs e)
         {
-            Producto? seleccionado = dgvProductos.CurrentRow?.DataBoundItem as Producto;
             var categorias = _listaProductos.Select(p => p.Categoria).Where(c => !string.IsNullOrEmpty(c)).Distinct().OrderBy(c => c).ToList();
 
-            using (var modal = new FormConfigurarMargenesModal(seleccionado, categorias))
+            using (var modal = new FormConfigurarMargenesModal(categorias))
             {
                 if (modal.ShowDialog(this) == DialogResult.OK)
                 {

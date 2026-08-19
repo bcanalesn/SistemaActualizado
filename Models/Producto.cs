@@ -19,6 +19,8 @@ namespace SISTEMAACTUALIZADO.Models
         [MaxLength(150)]
         public string Nombre { get; set; } = string.Empty;
 
+        public int ListaDefectoPOS { get; set; } = 1;
+
         [MaxLength(50)]
         public string? NmbCorto { get; set; } = "";
 

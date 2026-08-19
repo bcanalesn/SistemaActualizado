@@ -22,7 +22,7 @@ namespace SISTEMAACTUALIZADO.Modals
         private ComboBox cbCategoria = null!;
         private ComboBox cbFamilia = null!;
         private TextBox txtPrecioCosto = null!;
-        private TextBox txtMargenGanancia = null!;
+        private ComboBox cbListaPrecioPOS = null!;
         private TextBox txtPrecioUnitario = null!;
         private TextBox txtStockInicial = null!;
         private TextBox txtStockMinimo = null!;
@@ -108,32 +108,50 @@ namespace SISTEMAACTUALIZADO.Modals
             cbFamilia = new ComboBox { Width = 225, Font = new Font("Segoe UI", 9.5F), DropDownStyle = ComboBoxStyle.DropDown };
 
             txtPrecioCosto = new TextBox { Width = 225, Font = new Font("Segoe UI", 9.5F, FontStyle.Bold), Text = "0" };
-            txtPrecioCosto.TextChanged += (s, e) => RecalcularPrecioVenta();
+            txtPrecioCosto.TextChanged += (s, e) => RecalcularPrecioSegunLista();
 
-            txtMargenGanancia = new TextBox { Width = 225, Font = new Font("Segoe UI", 9.5F, FontStyle.Bold), Text = "30" };
-            txtMargenGanancia.TextChanged += (s, e) => RecalcularPrecioVenta();
+            // Selector de Lista de Precios POS
+            cbListaPrecioPOS = new ComboBox 
+            { 
+                Width = 225, 
+                Font = new Font("Segoe UI", 9F, FontStyle.Bold), 
+                DropDownStyle = ComboBoxStyle.DropDownList 
+            };
+            cbListaPrecioPOS.Items.AddRange(new object[]
+            {
+                "Lista 1 (Público General)",
+                "Lista 2 (Frecuente / Mayorista 1)",
+                "Lista 3 (Mayorista 2)",
+                "Lista 4 (Distribuidor)",
+                "Lista 5 (Liquidación / Por Vencer)",
+                "Lista 6",
+                "Lista 7",
+                "Lista 8",
+                "Lista 9",
+                "Lista 10"
+            });
+            cbListaPrecioPOS.SelectedIndex = 0;
+            cbListaPrecioPOS.SelectedIndexChanged += (s, e) => RecalcularPrecioSegunLista();
 
             txtPrecioUnitario = new TextBox { Width = 465, Font = new Font("Segoe UI", 9.5F, FontStyle.Bold), Text = "0" };
             txtStockInicial = new TextBox { Width = 225, Font = new Font("Segoe UI", 9.5F), Text = "1" };
             txtStockMinimo = new TextBox { Width = 225, Font = new Font("Segoe UI", 9.5F), Text = "5" };
 
-            // Panel dual para Categoría y Familia
+            // Paneles duales
             Panel pnlCatFam = new Panel { Size = new Size(470, 52) };
             pnlCatFam.Controls.Add(CrearSubCampo("Categoría:", cbCategoria, 0));
             pnlCatFam.Controls.Add(CrearSubCampo("Familia de Producto:", cbFamilia, 240));
 
-            // Panel dual para Costo y Margen
-            Panel pnlCostoMargen = new Panel { Size = new Size(470, 52) };
-            pnlCostoMargen.Controls.Add(CrearSubCampo("Costo Neto ($):", txtPrecioCosto, 0));
-            pnlCostoMargen.Controls.Add(CrearSubCampo("Margen (%):", txtMargenGanancia, 240));
+            Panel pnlCostoLista = new Panel { Size = new Size(470, 52) };
+            pnlCostoLista.Controls.Add(CrearSubCampo("Costo Neto ($):", txtPrecioCosto, 0));
+            pnlCostoLista.Controls.Add(CrearSubCampo("Lista de Precio en POS:", cbListaPrecioPOS, 240));
 
-            // Panel dual para Stocks
             Panel pnlStocks = new Panel { Size = new Size(470, 52) };
             string labelStock = _productoAEditar == null ? "Cant. Factura / Inicial:" : "Stock Actual:";
             pnlStocks.Controls.Add(CrearSubCampo(labelStock, txtStockInicial, 0));
             pnlStocks.Controls.Add(CrearSubCampo("Stock Mínimo Alerta:", txtStockMinimo, 240));
 
-            // Sección Foto del Producto
+            // Sección Foto
             Panel pnlFotoSection = new Panel { Size = new Size(470, 75), Margin = new Padding(0, 4, 0, 4) };
             Label lblFotoTitle = new Label { Text = "Foto del Producto:", Font = new Font("Segoe UI", 8F, FontStyle.Bold), ForeColor = Color.FromArgb(71, 85, 105), Location = new Point(0, 0), AutoSize = true };
 
@@ -175,21 +193,22 @@ namespace SISTEMAACTUALIZADO.Modals
             btnQuitarFoto.Click += (s, e) =>
             {
                 _rutaImagenSeleccionada = string.Empty;
+                pbFoto.Image?.Dispose();
                 pbFoto.Image = null;
             };
 
             pnlFotoSection.Controls.AddRange(new Control[] { lblFotoTitle, pbFoto, btnCargarFoto, btnQuitarFoto });
 
-            // Agregar renglones al layout
+            // Layout
             flowCampos.Controls.Add(CrearRenglonCampo("Código de Barra / SKU:", txtCodigoBarra));
             flowCampos.Controls.Add(CrearRenglonCampo("Nombre del Producto:", txtNombre));
             flowCampos.Controls.Add(pnlCatFam);
-            flowCampos.Controls.Add(pnlCostoMargen);
-            flowCampos.Controls.Add(CrearRenglonCampo("Precio Venta Público (IVA Incluido):", txtPrecioUnitario));
+            flowCampos.Controls.Add(pnlCostoLista);
+            flowCampos.Controls.Add(CrearRenglonCampo("Precio Venta POS (IVA Incluido):", txtPrecioUnitario));
             flowCampos.Controls.Add(pnlStocks);
             flowCampos.Controls.Add(pnlFotoSection);
 
-            // Botonera Inferior
+            // Botonera
             Panel pnlBotones = new Panel { Dock = DockStyle.Bottom, Height = 48 };
 
             Button btnGuardar = new Button
@@ -286,6 +305,22 @@ namespace SISTEMAACTUALIZADO.Modals
             }
         }
 
+        private void CargarImagenSinBloqueo(string ruta)
+        {
+            if (string.IsNullOrEmpty(ruta) || !File.Exists(ruta)) return;
+
+            try
+            {
+                using var stream = new MemoryStream(File.ReadAllBytes(ruta));
+                pbFoto.Image?.Dispose();
+                pbFoto.Image = new Bitmap(stream);
+            }
+            catch
+            {
+                pbFoto.Image = null;
+            }
+        }
+
         private void CargarDatosSiEsEdicion()
         {
             if (_productoAEditar != null)
@@ -295,52 +330,73 @@ namespace SISTEMAACTUALIZADO.Modals
                 cbCategoria.Text = !string.IsNullOrWhiteSpace(_productoAEditar.Categoria) ? _productoAEditar.Categoria : "General";
                 cbFamilia.Text = !string.IsNullOrWhiteSpace(_productoAEditar.NFamilia) ? _productoAEditar.NFamilia : cbCategoria.Text;
                 txtPrecioCosto.Text = _productoAEditar.PrecioCosto.ToString("0");
-                txtMargenGanancia.Text = _productoAEditar.MargenGanancia.ToString("0");
+
+                // Cargar lista configurada en el producto (1 a 10)
+                int listaIdx = Math.Max(1, Math.Min(10, _productoAEditar.ListaDefectoPOS)) - 1;
+                cbListaPrecioPOS.SelectedIndex = listaIdx;
+
                 txtPrecioUnitario.Text = _productoAEditar.PrecioUnitario.ToString("0");
                 txtStockInicial.Text = _productoAEditar.Stock.ToString();
                 txtStockMinimo.Text = _productoAEditar.StockMinimo.ToString();
                 txtStockInicial.Enabled = false;
 
                 _rutaImagenSeleccionada = _productoAEditar.ImagenPath ?? string.Empty;
-                if (!string.IsNullOrEmpty(_rutaImagenSeleccionada) && File.Exists(_rutaImagenSeleccionada))
-                {
-                    try { pbFoto.Image = Image.FromFile(_rutaImagenSeleccionada); } catch { }
-                }
+                CargarImagenSinBloqueo(_rutaImagenSeleccionada);
+
+                RecalcularPrecioSegunLista();
             }
         }
 
         private void BtnCargarFoto_Click(object? sender, EventArgs e)
         {
-            using (OpenFileDialog ofd = new OpenFileDialog())
+            using OpenFileDialog ofd = new OpenFileDialog
             {
-                ofd.Filter = "Imágenes (*.png;*.jpg;*.jpeg;*.webp)|*.png;*.jpg;*.jpeg;*.webp|Todos los archivos (*.*)|*.*";
-                ofd.Title = "Seleccionar Imagen del Producto";
+                Filter = "Imágenes (*.png;*.jpg;*.jpeg;*.webp)|*.png;*.jpg;*.jpeg;*.webp|Todos los archivos (*.*)|*.*",
+                Title = "Seleccionar Imagen del Producto"
+            };
 
-                if (ofd.ShowDialog(this) == DialogResult.OK)
-                {
-                    _rutaImagenSeleccionada = ofd.FileName;
-                    try
-                    {
-                        using var imgStream = File.OpenRead(_rutaImagenSeleccionada);
-                        pbFoto.Image = Image.FromStream(imgStream);
-                    }
-                    catch (Exception ex)
-                    {
-                        MessageBox.Show($"No se pudo cargar la imagen: {ex.Message}", "Error de Imagen", MessageBoxButtons.OK, MessageBoxIcon.Warning);
-                    }
-                }
+            if (ofd.ShowDialog(this) == DialogResult.OK)
+            {
+                _rutaImagenSeleccionada = ofd.FileName;
+                CargarImagenSinBloqueo(_rutaImagenSeleccionada);
             }
         }
 
-        private void RecalcularPrecioVenta()
+        private void RecalcularPrecioSegunLista()
         {
-            if (decimal.TryParse(txtPrecioCosto.Text.Trim(), out decimal costo) &&
-                decimal.TryParse(txtMargenGanancia.Text.Trim(), out decimal margen) && costo > 0)
+            if (!decimal.TryParse(txtPrecioCosto.Text.Trim(), out decimal costo) || costo <= 0)
             {
-                decimal neto = costo * (1 + (margen / 100m));
+                return;
+            }
+
+            int nroLista = cbListaPrecioPOS.SelectedIndex + 1;
+
+            // Obtener el precio correspondiente a la lista elegida
+            if (_productoAEditar != null)
+            {
+                decimal precioAMostrar = nroLista switch
+                {
+                    1 => _productoAEditar.PrecioUnitario,
+                    2 => _productoAEditar.Precio2 > 0 ? _productoAEditar.Precio2 : _productoAEditar.PrecioUnitario,
+                    3 => _productoAEditar.Precio3 > 0 ? _productoAEditar.Precio3 : _productoAEditar.PrecioUnitario,
+                    4 => _productoAEditar.Precio4 > 0 ? _productoAEditar.Precio4 : _productoAEditar.PrecioUnitario,
+                    5 => _productoAEditar.Precio5 > 0 ? _productoAEditar.Precio5 : _productoAEditar.PrecioUnitario,
+                    6 => _productoAEditar.Precio6 > 0 ? _productoAEditar.Precio6 : _productoAEditar.PrecioUnitario,
+                    7 => _productoAEditar.Precio7 > 0 ? _productoAEditar.Precio7 : _productoAEditar.PrecioUnitario,
+                    8 => _productoAEditar.Precio8 > 0 ? _productoAEditar.Precio8 : _productoAEditar.PrecioUnitario,
+                    9 => _productoAEditar.Precio9 > 0 ? _productoAEditar.Precio9 : _productoAEditar.PrecioUnitario,
+                    10 => _productoAEditar.Precio10 > 0 ? _productoAEditar.Precio10 : _productoAEditar.PrecioUnitario,
+                    _ => _productoAEditar.PrecioUnitario
+                };
+
+                txtPrecioUnitario.Text = precioAMostrar.ToString("0");
+            }
+            else
+            {
+                // Para productos nuevos que aún no están en la BD: calcular Lista 1
+                decimal neto = costo * 1.35m; // 35% de margen base
                 decimal pvp = neto * 1.19m;
-                decimal pvpRedondeado = Math.Round(pvp / 10m, 0, MidpointRounding.AwayFromZero) * 10m;
-                txtPrecioUnitario.Text = pvpRedondeado.ToString("0");
+                txtPrecioUnitario.Text = (Math.Round(pvp / 10m, 0, MidpointRounding.AwayFromZero) * 10m).ToString("0");
             }
         }
 
@@ -357,20 +413,21 @@ namespace SISTEMAACTUALIZADO.Modals
             string fam = string.IsNullOrWhiteSpace(cbFamilia.Text) ? cat : cbFamilia.Text.Trim();
 
             decimal.TryParse(txtPrecioCosto.Text.Trim(), out decimal costo);
-            decimal.TryParse(txtMargenGanancia.Text.Trim(), out decimal margen);
-            decimal.TryParse(txtPrecioUnitario.Text.Trim(), out decimal pvp);
             int.TryParse(txtStockInicial.Text.Trim(), out int cantFactura);
             int.TryParse(txtStockMinimo.Text.Trim(), out int stockMin);
 
             if (cantFactura <= 0) cantFactura = 1;
             CantidadFactura = cantFactura;
 
+            int listaSeleccionada = cbListaPrecioPOS.SelectedIndex + 1;
+
             try
             {
                 if (_productoAEditar == null)
                 {
-                    // Producto nuevo en memoria (ID = 0)
-                    var nuevoEnMemoria = new Producto
+                    decimal.TryParse(txtPrecioUnitario.Text.Trim(), out decimal pvpLista1);
+
+                    ProductoResultado = new Producto
                     {
                         ProductoID = 0,
                         CodigoBarra = string.IsNullOrWhiteSpace(txtCodigoBarra.Text) ? "GEN-" + DateTime.Now.Ticks.ToString().Substring(12) : txtCodigoBarra.Text.Trim(),
@@ -378,19 +435,17 @@ namespace SISTEMAACTUALIZADO.Modals
                         Categoria = cat,
                         NFamilia = fam,
                         PrecioCosto = costo,
-                        MargenGanancia = margen > 0 ? margen : 30m,
-                        PrecioUnitario = pvp,
+                        ListaDefectoPOS = listaSeleccionada,
+                        PrecioUnitario = pvpLista1, // Lista 1
                         Stock = 0,
                         StockMinimo = stockMin > 0 ? stockMin : 5,
                         ImagenPath = _rutaImagenSeleccionada,
-                        Estado = true
+                        Estado = true,
+                        FchUpd = DateTime.Now
                     };
-
-                    ProductoResultado = nuevoEnMemoria;
                 }
                 else
                 {
-                    // Edición directa en la base de datos
                     using var db = new AppDbContext();
                     var prodBd = db.Productos.Find(_productoAEditar.ProductoID);
                     if (prodBd != null)
@@ -400,11 +455,13 @@ namespace SISTEMAACTUALIZADO.Modals
                         prodBd.Categoria = cat;
                         prodBd.NFamilia = fam;
                         prodBd.PrecioCosto = costo;
-                        prodBd.MargenGanancia = margen;
-                        prodBd.PrecioUnitario = pvp;
+                        prodBd.ListaDefectoPOS = listaSeleccionada; // Solo actualiza qué lista utilizar
                         prodBd.StockMinimo = stockMin;
                         prodBd.ImagenPath = _rutaImagenSeleccionada;
+                        prodBd.FchUpd = DateTime.Now;
+                        prodBd.Sincro = 0;
                         db.SaveChanges();
+
                         ProductoResultado = prodBd;
                     }
                 }
@@ -415,7 +472,7 @@ namespace SISTEMAACTUALIZADO.Modals
             catch (Exception ex)
             {
                 string mensajeDetalle = ex.InnerException != null ? $"\nDetalle: {ex.InnerException.Message}" : "";
-                MessageBox.Show($"Error al preparar producto:\n{ex.Message}{mensajeDetalle}", "Error DB", MessageBoxButtons.OK, MessageBoxIcon.Error);
+                MessageBox.Show($"Error al guardar producto:\n{ex.Message}{mensajeDetalle}", "Error DB", MessageBoxButtons.OK, MessageBoxIcon.Error);
             }
         }
     }

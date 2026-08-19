@@ -492,6 +492,22 @@ namespace SISTEMAACTUALIZADO
 
             AjustarAnchoYAlturaCategorias();
         }
+        private decimal ObtenerPrecioActivoProducto(Producto prod)
+        {
+            return prod.ListaDefectoPOS switch
+            {
+                2 => prod.Precio2 > 0 ? prod.Precio2 : prod.PrecioUnitario,
+                3 => prod.Precio3 > 0 ? prod.Precio3 : prod.PrecioUnitario,
+                4 => prod.Precio4 > 0 ? prod.Precio4 : prod.PrecioUnitario,
+                5 => prod.Precio5 > 0 ? prod.Precio5 : prod.PrecioUnitario,
+                6 => prod.Precio6 > 0 ? prod.Precio6 : prod.PrecioUnitario,
+                7 => prod.Precio7 > 0 ? prod.Precio7 : prod.PrecioUnitario,
+                8 => prod.Precio8 > 0 ? prod.Precio8 : prod.PrecioUnitario,
+                9 => prod.Precio9 > 0 ? prod.Precio9 : prod.PrecioUnitario,
+                10 => prod.Precio10 > 0 ? prod.Precio10 : prod.PrecioUnitario,
+                _ => prod.PrecioUnitario
+            };
+        }
 
         private Button CrearBotonSubFamilia(string nombreFamilia, bool seleccionada)
         {
@@ -710,11 +726,15 @@ namespace SISTEMAACTUALIZADO
                 TextAlign = ContentAlignment.TopCenter
             };
 
+            // Obtener el precio dinámico según la lista configurada
+            decimal precioVenta = ObtenerPrecioActivoProducto(prod);
+            Color colorPrecio = prod.ListaDefectoPOS > 1 ? Color.FromArgb(2, 132, 199) : Color.FromArgb(0, 102, 255);
+
             Label lblPrecio = new Label
             {
-                Text = $"${prod.PrecioUnitario:N0}",
+                Text = $"${precioVenta:N0}",
                 Font = new Font("Segoe UI", 10.5F, FontStyle.Bold),
-                ForeColor = Color.FromArgb(0, 102, 255),
+                ForeColor = colorPrecio,
                 Location = new Point(4, 88),
                 Size = new Size(122, 20),
                 TextAlign = ContentAlignment.MiddleCenter
@@ -892,7 +912,10 @@ namespace SISTEMAACTUALIZADO
             var itemExistente = cart.FirstOrDefault(c => c.ProductoID == prod.ProductoID);
             int cantidadInicial = itemExistente != null ? itemExistente.Cantidad : 1;
 
-            using (FormCantidadModal modal = new FormCantidadModal(prod.Nombre, prod.PrecioUnitario, cantidadInicial, prod.Stock, prod.ImagenPath))
+            // Tomar el precio de la lista asignada al producto (Lista 2, 3, etc.)
+            decimal precioBaseVenta = ObtenerPrecioActivoProducto(prod);
+
+            using (FormCantidadModal modal = new FormCantidadModal(prod.Nombre, precioBaseVenta, cantidadInicial, prod.Stock, prod.ImagenPath))
             {
                 if (modal.ShowDialog(this) == DialogResult.OK)
                 {
@@ -910,7 +933,8 @@ namespace SISTEMAACTUALIZADO
                     }
                     else
                     {
-                        decimal precioAplicado = _productoService.ObtenerPrecioSegunCantidad(prod.ProductoID, nuevaCantidad, prod.PrecioUnitario);
+                        // Si existe escala de tramos (tabla PreciosQ), se evalúa; si no, mantiene el precio base de la lista
+                        decimal precioAplicado = _productoService.ObtenerPrecioSegunCantidad(prod.ProductoID, nuevaCantidad, precioBaseVenta);
 
                         if (itemExistente != null)
                         {
