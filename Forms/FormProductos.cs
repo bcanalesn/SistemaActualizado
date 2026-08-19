@@ -1,7 +1,6 @@
 using System;
 using System.Collections.Generic;
 using System.Drawing;
-using System.Drawing.Drawing2D;
 using System.Linq;
 using System.Windows.Forms;
 using SISTEMAACTUALIZADO.Data;
@@ -16,10 +15,16 @@ namespace SISTEMAACTUALIZADO
         private TextBox txtBuscar = null!;
         private Button btnBuscar = null!;
         private Button btnRecargar = null!;
+        private Button btnMargenes = null!;
+        private Button btnColumnasVisibles = null!;
+        private ContextMenuStrip menuListasVisibles = null!;
         private Button btnNuevo = null!;
         private Button btnEditar = null!;
         private Button btnEliminar = null!;
         private List<Producto> _listaProductos = new List<Producto>();
+
+        // Configuración de visibilidad de las listas 2 a 10 (Por defecto activas 2 a 5)
+        private bool[] _listasVisibles = new bool[] { true, true, true, true, false, false, false, false, false };
 
         public FormProductos()
         {
@@ -40,13 +45,13 @@ namespace SISTEMAACTUALIZADO
                 AutoScroll = true
             };
 
-            // Barra Superior de Controles Adaptable
+            // Barra Superior de Controles
             Panel pnlTop = new Panel
             {
                 Dock = DockStyle.Top,
                 Height = 65,
                 BackColor = Color.White,
-                Padding = new Padding(15, 12, 15, 12),
+                Padding = new Padding(12, 12, 12, 12),
                 Margin = new Padding(0, 0, 0, 12)
             };
             pnlTop.Paint += (s, e) =>
@@ -58,7 +63,7 @@ namespace SISTEMAACTUALIZADO
             FlowLayoutPanel pnlLeft = new FlowLayoutPanel
             {
                 Dock = DockStyle.Left,
-                Width = 480,
+                Width = 460,
                 Height = 40,
                 WrapContents = false,
                 BackColor = Color.Transparent
@@ -74,7 +79,7 @@ namespace SISTEMAACTUALIZADO
 
             txtBuscar = new TextBox 
             { 
-                Size = new Size(220, 28), 
+                Size = new Size(200, 28), 
                 Font = new Font("Segoe UI", 9.5F),
                 Margin = new Padding(0, 3, 6, 0)
             };
@@ -85,11 +90,11 @@ namespace SISTEMAACTUALIZADO
 
             pnlLeft.Controls.AddRange(new Control[] { lblBuscar, txtBuscar, btnBuscar, btnRecargar });
 
-            // Sección Derecha: Botones de Acción
+            // Sección Derecha: Acciones y Configuración de Listas
             FlowLayoutPanel pnlRight = new FlowLayoutPanel
             {
                 Dock = DockStyle.Right,
-                Width = 430,
+                Width = 650,
                 Height = 40,
                 FlowDirection = FlowDirection.RightToLeft,
                 WrapContents = false,
@@ -99,8 +104,16 @@ namespace SISTEMAACTUALIZADO
             btnEliminar = CrearBoton("🗑️ Eliminar", Color.FromArgb(239, 68, 68), Color.White, BtnEliminar_Click);
             btnEditar = CrearBoton("✏️ Editar", Color.FromArgb(2, 132, 199), Color.White, BtnEditar_Click);
             btnNuevo = CrearBoton("➕ Nuevo Producto", Color.FromArgb(16, 185, 129), Color.White, BtnNuevo_Click);
+            btnMargenes = CrearBoton("⚙️ Márgenes %", Color.FromArgb(245, 158, 11), Color.White, BtnMargenes_Click);
 
-            pnlRight.Controls.AddRange(new Control[] { btnEliminar, btnEditar, btnNuevo });
+            // Menú desplegable para activar/desactivar qué listas ver
+            CrearMenuListasVisibles();
+            btnColumnasVisibles = CrearBoton("👁️ Listas Visibles ▼", Color.FromArgb(241, 245, 249), Color.FromArgb(30, 41, 59), (s, e) =>
+            {
+                menuListasVisibles.Show(btnColumnasVisibles, new Point(0, btnColumnasVisibles.Height));
+            });
+
+            pnlRight.Controls.AddRange(new Control[] { btnEliminar, btnEditar, btnNuevo, btnMargenes, btnColumnasVisibles });
 
             pnlTop.Controls.Add(pnlRight);
             pnlTop.Controls.Add(pnlLeft);
@@ -118,7 +131,6 @@ namespace SISTEMAACTUALIZADO
                 ControlPaint.DrawBorder(e.Graphics, pnlGridCard.ClientRectangle, Color.FromArgb(226, 232, 240), ButtonBorderStyle.Solid);
             };
 
-            // 1. En InitializeComponent, habilitar ScrollBars para deslizamiento horizontal:
             dgvProductos = new DataGridView
             {
                 Dock = DockStyle.Fill,
@@ -129,10 +141,9 @@ namespace SISTEMAACTUALIZADO
                 AllowUserToAddRows = false,
                 ReadOnly = true,
                 RowHeadersVisible = false,
-                ScrollBars = ScrollBars.Both, // Barra horizontal y vertical activa
-                AutoSizeColumnsMode = DataGridViewAutoSizeColumnsMode.None // Permite que las columnas mantengan su ancho y se active el scroll
+                ScrollBars = ScrollBars.Both,
+                AutoSizeColumnsMode = DataGridViewAutoSizeColumnsMode.None
             };
-
             ConfigurarEstiloTabla(dgvProductos);
             dgvProductos.DoubleClick += (s, e) => BtnEditar_Click(s, e);
 
@@ -145,6 +156,32 @@ namespace SISTEMAACTUALIZADO
             this.ResumeLayout(false);
         }
 
+        private void CrearMenuListasVisibles()
+        {
+            menuListasVisibles = new ContextMenuStrip();
+
+            var itemL1 = new ToolStripMenuItem("Lista 1 (Precio Venta) [Fijo]") { Checked = true, Enabled = false };
+            menuListasVisibles.Items.Add(itemL1);
+
+            for (int i = 2; i <= 10; i++)
+            {
+                int index = i - 2;
+                var item = new ToolStripMenuItem($"Lista {i}")
+                {
+                    Checked = _listasVisibles[index],
+                    CheckOnClick = true
+                };
+
+                item.CheckedChanged += (s, e) =>
+                {
+                    _listasVisibles[index] = item.Checked;
+                    ActualizarGrilla(_listaProductos);
+                };
+
+                menuListasVisibles.Items.Add(item);
+            }
+        }
+
         private Button CrearBoton(string texto, Color back, Color fore, EventHandler onClick)
         {
             Button b = new Button
@@ -154,11 +191,11 @@ namespace SISTEMAACTUALIZADO
                 BackColor = back,
                 ForeColor = fore,
                 FlatStyle = FlatStyle.Flat,
-                Font = new Font("Segoe UI", 9F, FontStyle.Bold),
+                Font = new Font("Segoe UI", 8.5F, FontStyle.Bold),
                 Cursor = Cursors.Hand,
                 AutoSize = true,
                 Padding = new Padding(8, 0, 8, 0),
-                Margin = new Padding(4, 2, 4, 2)
+                Margin = new Padding(3, 2, 3, 2)
             };
             b.FlatAppearance.BorderSize = 0;
             b.Click += onClick;
@@ -168,8 +205,6 @@ namespace SISTEMAACTUALIZADO
         private void ConfigurarEstiloTabla(DataGridView dgv)
         {
             dgv.EnableHeadersVisualStyles = false;
-
-            // Encabezados fijos: mantienen el color oscuro incluso al seleccionar la fila
             dgv.ColumnHeadersDefaultCellStyle.BackColor = Color.FromArgb(30, 41, 59);
             dgv.ColumnHeadersDefaultCellStyle.ForeColor = Color.White;
             dgv.ColumnHeadersDefaultCellStyle.SelectionBackColor = Color.FromArgb(30, 41, 59);
@@ -177,7 +212,6 @@ namespace SISTEMAACTUALIZADO
             dgv.ColumnHeadersDefaultCellStyle.Font = new Font("Segoe UI", 9F, FontStyle.Bold);
             dgv.ColumnHeadersHeight = 34;
 
-            // Filas
             dgv.DefaultCellStyle.Font = new Font("Segoe UI", 9F);
             dgv.DefaultCellStyle.SelectionBackColor = Color.FromArgb(224, 242, 254);
             dgv.DefaultCellStyle.SelectionForeColor = Color.FromArgb(15, 23, 42);
@@ -199,69 +233,64 @@ namespace SISTEMAACTUALIZADO
             }
         }
 
-        // 2. Método ActualizarGrilla con el orden y formatos exactos:
         private void ActualizarGrilla(List<Producto> lista)
         {
             dgvProductos.DataSource = null;
             dgvProductos.DataSource = lista;
 
-            // 1. Ocultar todas las columnas por defecto
             foreach (DataGridViewColumn col in dgvProductos.Columns)
             {
                 col.Visible = false;
             }
 
-            // 2. Función local auxiliar para configurar visibilidad, orden y estilo
-            void ConfigurarColumna(string propName, string titulo, int displayIndex, int ancho, 
-                                DataGridViewContentAlignment alineacion = DataGridViewContentAlignment.MiddleLeft, 
-                                string formato = "", Color? foreColor = null, bool bold = false)
+            void ConfigurarCol(string prop, string titulo, int dispIndex, int ancho, 
+                              DataGridViewContentAlignment align = DataGridViewContentAlignment.MiddleLeft, 
+                              string formato = "", Color? fore = null, bool bold = false, bool visible = true)
             {
-                if (dgvProductos.Columns[propName] is DataGridViewColumn c)
+                if (dgvProductos.Columns[prop] is DataGridViewColumn c)
                 {
-                    c.Visible = true;
+                    c.Visible = visible;
                     c.HeaderText = titulo;
-                    c.DisplayIndex = displayIndex;
+                    c.DisplayIndex = dispIndex;
                     c.Width = ancho;
-                    c.DefaultCellStyle.Alignment = alineacion;
+                    c.DefaultCellStyle.Alignment = align;
 
-                    if (!string.IsNullOrEmpty(formato))
-                        c.DefaultCellStyle.Format = formato;
-
-                    if (foreColor.HasValue)
-                        c.DefaultCellStyle.ForeColor = foreColor.Value;
-
-                    if (bold)
-                        c.DefaultCellStyle.Font = new Font("Segoe UI", 9.5F, FontStyle.Bold);
+                    if (!string.IsNullOrEmpty(formato)) c.DefaultCellStyle.Format = formato;
+                    if (fore.HasValue) c.DefaultCellStyle.ForeColor = fore.Value;
+                    if (bold) c.DefaultCellStyle.Font = new Font("Segoe UI", 9F, FontStyle.Bold);
                 }
             }
 
-            // 3. Aplicar configuración en el orden exacto solicitado
+            int orden = 0;
+
             // 1° Descripción Producto
-            ConfigurarColumna("Nombre", "Descripción Producto", 0, 220);
+            ConfigurarCol("Nombre", "Descripción Producto", orden++, 220);
 
             // 2° Categoría
-            ConfigurarColumna("Categoria", "Categoría", 1, 120);
+            ConfigurarCol("Categoria", "Categoría", orden++, 110);
 
             // 3° Familia
-            ConfigurarColumna("NFamilia", "Familia", 2, 120);
+            ConfigurarCol("NFamilia", "Familia", orden++, 110);
 
             // 4° Stock
-            ConfigurarColumna("Stock", "Stock", 3, 75, DataGridViewContentAlignment.MiddleRight, "#,##0", null, true);
+            ConfigurarCol("Stock", "Stock", orden++, 75, DataGridViewContentAlignment.MiddleRight, "#,##0", null, true);
 
             // 5° Costo Neto
-            ConfigurarColumna("PrecioCosto", "Costo Neto", 4, 95, DataGridViewContentAlignment.MiddleRight, "$#,##0");
+            ConfigurarCol("PrecioCosto", "Costo Neto", orden++, 95, DataGridViewContentAlignment.MiddleRight, "$#,##0");
 
             // 6° Precio Venta (Lista 1)
-            ConfigurarColumna("PrecioUnitario", "Precio Venta (L1)", 5, 125, DataGridViewContentAlignment.MiddleRight, "$#,##0", Color.FromArgb(16, 185, 129), true);
+            ConfigurarCol("PrecioUnitario", "Precio Venta (L1)", orden++, 125, DataGridViewContentAlignment.MiddleRight, "$#,##0", Color.FromArgb(16, 185, 129), true);
 
-            // 7° a 10° Listas de Precios con Descuento (Precios 2 al 5)
-            ConfigurarColumna("Precio2", "Lista 2 (Desc.)", 6, 110, DataGridViewContentAlignment.MiddleRight, "$#,##0", Color.FromArgb(2, 132, 199));
-            ConfigurarColumna("Precio3", "Lista 3 (Desc.)", 7, 110, DataGridViewContentAlignment.MiddleRight, "$#,##0", Color.FromArgb(2, 132, 199));
-            ConfigurarColumna("Precio4", "Lista 4 (Desc.)", 8, 110, DataGridViewContentAlignment.MiddleRight, "$#,##0", Color.FromArgb(2, 132, 199));
-            ConfigurarColumna("Precio5", "Lista 5 (Desc.)", 9, 110, DataGridViewContentAlignment.MiddleRight, "$#,##0", Color.FromArgb(2, 132, 199));
+            // Listas 2 a 10 (Dinámicas según el menú de selección)
+            for (int i = 2; i <= 10; i++)
+            {
+                string propName = $"Precio{i}";
+                bool estaVisible = _listasVisibles[i - 2];
+                ConfigurarCol(propName, $"Lista {i}", orden++, 105, DataGridViewContentAlignment.MiddleRight, "$#,##0", Color.FromArgb(2, 132, 199), false, estaVisible);
+            }
 
-            // 11° SKU / Código de Barra
-            ConfigurarColumna("CodigoBarra", "SKU / Código Barra", 10, 130);
+            // SKU / Código Barra al final
+            ConfigurarCol("CodigoBarra", "SKU / Código Barra", orden++, 130);
         }
 
         private void FiltrarProductosInteligente()
@@ -273,15 +302,26 @@ namespace SISTEMAACTUALIZADO
                 return;
             }
 
-            // Búsqueda inteligente restringida únicamente a:
-            // 1. Cada palabra de la descripción del producto (prefijo / StartsWith)
-            // 2. Código de barra / SKU
             var filtrados = _listaProductos.Where(p =>
                 (!string.IsNullOrEmpty(p.Nombre) && p.Nombre.Split(' ', StringSplitOptions.RemoveEmptyEntries).Any(palabra => palabra.StartsWith(q, StringComparison.OrdinalIgnoreCase))) ||
                 (!string.IsNullOrEmpty(p.CodigoBarra) && p.CodigoBarra.StartsWith(q, StringComparison.OrdinalIgnoreCase))
             ).ToList();
 
             ActualizarGrilla(filtrados);
+        }
+
+        private void BtnMargenes_Click(object? sender, EventArgs e)
+        {
+            Producto? seleccionado = dgvProductos.CurrentRow?.DataBoundItem as Producto;
+            var categorias = _listaProductos.Select(p => p.Categoria).Where(c => !string.IsNullOrEmpty(c)).Distinct().OrderBy(c => c).ToList();
+
+            using (var modal = new FormConfigurarMargenesModal(seleccionado, categorias))
+            {
+                if (modal.ShowDialog(this) == DialogResult.OK)
+                {
+                    CargarProductos();
+                }
+            }
         }
 
         private void BtnNuevo_Click(object? sender, EventArgs e)
