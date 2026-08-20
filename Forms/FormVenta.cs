@@ -638,9 +638,10 @@ namespace SISTEMAACTUALIZADO
 
         private void CargarProductosDesdeBD()
         {
+            // 1. Recargar el catálogo fresco desde la base de datos
             _productosCache = _productoService.ObtenerProductosActivos();
 
-            // Restar stock temporal en carritos de vendedores
+            // 2. Recalcular los precios unitarios de los ítems en los carritos según los nuevos tramos o listas
             foreach (var carritoVendedor in _carritosPorVendedor.Values)
             {
                 foreach (var item in carritoVendedor)
@@ -648,12 +649,18 @@ namespace SISTEMAACTUALIZADO
                     var prod = _productosCache.FirstOrDefault(p => p.ProductoID == item.ProductoID);
                     if (prod != null)
                     {
+                        // Obtener el precio base activo y reevaluar la escala de tramos para la cantidad actual
+                        decimal precioBase = ObtenerPrecioActivoProducto(prod);
+                        item.PrecioUnitario = _productoService.ObtenerPrecioSegunCantidad(prod.ProductoID, item.Cantidad, precioBase);
+
+                        // Descontar del stock visible en las tarjetas
                         prod.Stock -= item.Cantidad;
                         if (prod.Stock < 0) prod.Stock = 0;
                     }
                 }
             }
 
+            // 3. Refrescar la cuadrícula de tarjetas de productos
             FiltrarProductosPorJerarquia();
         }
 
@@ -995,17 +1002,31 @@ namespace SISTEMAACTUALIZADO
 
                 var prodOriginal = _productosCache.FirstOrDefault(p => p.ProductoID == item.ProductoID);
 
+                // Botón Restar (-)
                 Button btnRestar = new Button { Name = "btnRestar", Text = "-", Size = new Size(22, 22), FlatStyle = FlatStyle.Flat, BackColor = Color.FromArgb(241, 245, 249), Font = new Font("Segoe UI", 8.5F, FontStyle.Bold), Cursor = Cursors.Hand };
                 btnRestar.FlatAppearance.BorderSize = 0;
                 btnRestar.Click += (s, e) =>
                 {
                     item.Cantidad--;
-                    if (item.Cantidad <= 0) cart.Remove(item);
+                    if (item.Cantidad <= 0)
+                    {
+                        cart.Remove(item);
+                    }
+                    else
+                    {
+                        // Recalcular precio unitario dinámicamente según el tramo de la nueva cantidad
+                        if (prodOriginal != null)
+                        {
+                            decimal precioBase = ObtenerPrecioActivoProducto(prodOriginal);
+                            item.PrecioUnitario = _productoService.ObtenerPrecioSegunCantidad(prodOriginal.ProductoID, item.Cantidad, precioBase);
+                        }
+                    }
                     ActualizarCarritoUI();
                 };
 
                 Label lblQty = new Label { Name = "lblQty", Text = item.Cantidad.ToString(), Font = new Font("Segoe UI", 8.5F, FontStyle.Bold), Size = new Size(22, 18), TextAlign = ContentAlignment.MiddleCenter };
 
+                // Botón Sumar (+)
                 Button btnSumar = new Button { Name = "btnSumar", Text = "+", Size = new Size(22, 22), FlatStyle = FlatStyle.Flat, BackColor = Color.FromArgb(241, 245, 249), Font = new Font("Segoe UI", 8.5F, FontStyle.Bold), Cursor = Cursors.Hand };
                 btnSumar.FlatAppearance.BorderSize = 0;
                 btnSumar.Click += (s, e) =>
@@ -1015,7 +1036,16 @@ namespace SISTEMAACTUALIZADO
                         MessageBox.Show($"No hay más stock disponible de '{item.Nombre}'.", "Límite de Stock", MessageBoxButtons.OK, MessageBoxIcon.Warning);
                         return;
                     }
+                    
                     item.Cantidad++;
+
+                    // Recalcular precio unitario dinámicamente según el tramo de la nueva cantidad
+                    if (prodOriginal != null)
+                    {
+                        decimal precioBase = ObtenerPrecioActivoProducto(prodOriginal);
+                        item.PrecioUnitario = _productoService.ObtenerPrecioSegunCantidad(prodOriginal.ProductoID, item.Cantidad, precioBase);
+                    }
+
                     ActualizarCarritoUI();
                 };
 
