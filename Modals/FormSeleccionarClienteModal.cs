@@ -34,7 +34,7 @@ namespace SISTEMAACTUALIZADO.Modals
         private void InitializeComponent()
         {
             this.Text = "Asignar Cliente a la Venta";
-            this.ClientSize = new Size(410, 520); // ClientSize asegura centrado exacto
+            this.ClientSize = new Size(410, 520);
             this.StartPosition = FormStartPosition.CenterParent;
             this.FormBorderStyle = FormBorderStyle.FixedDialog;
             this.MaximizeBox = false;
@@ -92,7 +92,6 @@ namespace SISTEMAACTUALIZADO.Modals
                 if (e.KeyCode == Keys.Down && lstSugerencias.Visible && lstSugerencias.Items.Count > 0)
                 {
                     lstSugerencias.Focus();
-                    // Si hay más de 1, baja directo al segundo; si hay 1 solo, selecciona el primero
                     lstSugerencias.SelectedIndex = lstSugerencias.Items.Count > 1 ? 1 : 0;
                     e.SuppressKeyPress = true;
                 }
@@ -234,7 +233,7 @@ namespace SISTEMAACTUALIZADO.Modals
             else if (resultados.Count > 0)
             {
                 lstSugerencias.DataSource = resultados;
-                lstSugerencias.DisplayMember = "Nombre";
+                lstSugerencias.DisplayMember = "RazonSocial";
                 lstSugerencias.ValueMember = "Rut";
                 lstSugerencias.Visible = true;
                 lstSugerencias.BringToFront();
@@ -263,7 +262,6 @@ namespace SISTEMAACTUALIZADO.Modals
 
         private void ProcesarSeleccionEnter()
         {
-            // Paso 1: Si hay sugerencias desplegadas, selecciona y muestra la ficha SIN cerrar
             if (lstSugerencias.Visible && lstSugerencias.Items.Count > 0)
             {
                 var seleccionado = lstSugerencias.SelectedItem as Cliente ?? lstSugerencias.Items[0] as Cliente;
@@ -272,18 +270,16 @@ namespace SISTEMAACTUALIZADO.Modals
                     txtRutBuscar.Text = RutHelper.Formatear(seleccionado.Rut);
                     MostrarInformacionCliente(seleccionado);
                     lstSugerencias.Visible = false;
-                    return; // No se cierra: muestra la info y pasa el foco al botón azul
+                    return;
                 }
             }
 
-            // Paso 2: Si ya está la ficha del cliente visible, el Enter confirma la venta
             if (pnlInfoCliente.Visible && !string.IsNullOrEmpty(RutCliente))
             {
                 ConfirmarYSalir();
                 return;
             }
 
-            // Paso 3: Si no estaba seleccionando sugerencias, busca directo
             string rutLimpio = RutHelper.Limpiar(txtRutBuscar.Text);
             var clienteBD = _clienteService.BuscarPorRut(rutLimpio);
 
@@ -307,6 +303,13 @@ namespace SISTEMAACTUALIZADO.Modals
         {
             if (btnConfirmar.Text.Contains("Registrar"))
             {
+                string rutLimpio = RutHelper.Limpiar(txtRutBuscar.Text);
+                if (rutLimpio.Length < 8)
+                {
+                    MessageBox.Show("Para registrar un nuevo cliente, debe ingresar un RUT válido (mínimo 8 dígitos).", "RUT Incompleto", MessageBoxButtons.OK, MessageBoxIcon.Warning);
+                    return;
+                }
+
                 AbrirModalRegistrarNuevoCliente(txtRutBuscar.Text);
                 return;
             }
@@ -317,7 +320,7 @@ namespace SISTEMAACTUALIZADO.Modals
 
         private void MostrarInformacionCliente(Cliente cliente)
         {
-            NombreCliente = cliente.Nombre ?? "Cliente Sin Nombre";
+            NombreCliente = !string.IsNullOrEmpty(cliente.RazonSocial) ? cliente.RazonSocial : "Cliente Sin Nombre";
             RutCliente = RutHelper.Formatear(cliente.Rut ?? txtRutBuscar.Text);
 
             lblNombreCliente.Text = NombreCliente;
@@ -329,7 +332,7 @@ namespace SISTEMAACTUALIZADO.Modals
             pnlInfoCliente.Visible = true;
             btnConfirmar.Text = "✔ Asignar Cliente (Enter)";
             btnConfirmar.Enabled = true;
-            btnConfirmar.Focus(); // Pasa el foco al botón para que el siguiente Enter confirme
+            btnConfirmar.Focus();
         }
 
         private void CargarUltimasDosCompras(string rut)
@@ -399,7 +402,7 @@ namespace SISTEMAACTUALIZADO.Modals
             Form modalNuevo = new Form
             {
                 Text = "Registrar Nuevo Cliente",
-                ClientSize = new Size(370, 470),
+                ClientSize = new Size(420, 630),
                 StartPosition = FormStartPosition.CenterParent,
                 FormBorderStyle = FormBorderStyle.FixedDialog,
                 MaximizeBox = false,
@@ -408,13 +411,16 @@ namespace SISTEMAACTUALIZADO.Modals
             };
 
             const int mX = 20;
-            const int aW = 330;
+            const int aW = 380;
+            int yPos = 12;
 
-            Label lblTitle = new Label { Text = "👤 Nuevo Cliente", Location = new Point(mX, 15), Font = new Font("Segoe UI", 12F, FontStyle.Bold), AutoSize = true, ForeColor = Color.FromArgb(15, 23, 42) };
+            Label lblTitle = new Label { Text = "👤 Registrar Nuevo Cliente", Location = new Point(mX, yPos), Font = new Font("Segoe UI", 12F, FontStyle.Bold), AutoSize = true, ForeColor = Color.FromArgb(15, 23, 42) };
+            yPos += 38;
 
-            Label lblRut = new Label { Text = "RUT / DNI:", Location = new Point(mX, 55), AutoSize = true, Font = new Font("Segoe UI", 8.5F, FontStyle.Bold) };
-            TextBox txtRut = new TextBox { Text = RutHelper.Formatear(rutInicial), Location = new Point(mX, 75), Size = new Size(aW, 26), Font = new Font("Segoe UI", 9.5F), MaxLength = 12 };
-
+            // RUT
+            Label lblRut = new Label { Text = "RUT / DNI Cliente:", Location = new Point(mX, yPos), AutoSize = true, Font = new Font("Segoe UI", 8.5F, FontStyle.Bold), ForeColor = Color.FromArgb(71, 85, 105) };
+            yPos += 18;
+            TextBox txtRut = new TextBox { Text = RutHelper.Formatear(rutInicial), Location = new Point(mX, yPos), Size = new Size(aW, 25), Font = new Font("Segoe UI", 9.5F), MaxLength = 12 };
             txtRut.TextChanged += (s, e) =>
             {
                 string limpio = RutHelper.Limpiar(txtRut.Text);
@@ -426,21 +432,31 @@ namespace SISTEMAACTUALIZADO.Modals
                     txtRut.SelectionStart = txtRut.Text.Length;
                 }
             };
+            yPos += 34;
 
-            Label lblNom = new Label { Text = "Nombre Completo:", Location = new Point(mX, 115), AutoSize = true, Font = new Font("Segoe UI", 8.5F, FontStyle.Bold) };
-            TextBox txtNom = new TextBox { Location = new Point(mX, 135), Size = new Size(aW, 26), Font = new Font("Segoe UI", 9.5F) };
-
+            // Razón Social
+            Label lblNom = new Label { Text = "Razón Social / Nombre Completo:", Location = new Point(mX, yPos), AutoSize = true, Font = new Font("Segoe UI", 8.5F, FontStyle.Bold), ForeColor = Color.FromArgb(71, 85, 105) };
+            yPos += 18;
+            TextBox txtNom = new TextBox { Location = new Point(mX, yPos), Size = new Size(aW, 25), Font = new Font("Segoe UI", 9.5F) };
             txtNom.KeyPress += (s, e) =>
             {
-                if (!char.IsLetter(e.KeyChar) && !char.IsControl(e.KeyChar) && e.KeyChar != ' ')
+                if (!char.IsLetter(e.KeyChar) && !char.IsControl(e.KeyChar) && e.KeyChar != ' ' && e.KeyChar != '.' && e.KeyChar != '&')
                 {
                     e.Handled = true;
                 }
             };
+            yPos += 34;
 
-            Label lblTel = new Label { Text = "Teléfono de Contacto (9 dígitos):", Location = new Point(mX, 175), AutoSize = true, Font = new Font("Segoe UI", 8.5F, FontStyle.Bold) };
-            TextBox txtTel = new TextBox { Text = "9", Location = new Point(mX, 195), Size = new Size(aW, 26), Font = new Font("Segoe UI", 9.5F), MaxLength = 9 };
+            // Giro Comercial
+            Label lblGiro = new Label { Text = "Giro Comercial / Actividad Económica:", Location = new Point(mX, yPos), AutoSize = true, Font = new Font("Segoe UI", 8.5F, FontStyle.Bold), ForeColor = Color.FromArgb(71, 85, 105) };
+            yPos += 18;
+            TextBox txtGiro = new TextBox { Location = new Point(mX, yPos), Size = new Size(aW, 25), Font = new Font("Segoe UI", 9.5F), Text = "PARTICULAR" };
+            yPos += 34;
 
+            // Teléfono (9 dígitos, empezando con 9)
+            Label lblTel = new Label { Text = "Teléfono de Contacto (9 dígitos):", Location = new Point(mX, yPos), AutoSize = true, Font = new Font("Segoe UI", 8.5F, FontStyle.Bold), ForeColor = Color.FromArgb(71, 85, 105) };
+            yPos += 18;
+            TextBox txtTel = new TextBox { Text = "9", Location = new Point(mX, yPos), Size = new Size(aW, 25), Font = new Font("Segoe UI", 9.5F), MaxLength = 9 };
             txtTel.KeyPress += (s, e) =>
             {
                 if (!char.IsDigit(e.KeyChar) && !char.IsControl(e.KeyChar))
@@ -448,17 +464,34 @@ namespace SISTEMAACTUALIZADO.Modals
                     e.Handled = true;
                 }
             };
+            yPos += 34;
 
-            Label lblMail = new Label { Text = "Correo Electrónico:", Location = new Point(mX, 235), AutoSize = true, Font = new Font("Segoe UI", 8.5F, FontStyle.Bold) };
-            TextBox txtMail = new TextBox { Location = new Point(mX, 255), Size = new Size(aW, 26), Font = new Font("Segoe UI", 9.5F) };
+            // Correo Electrónico
+            Label lblMail = new Label { Text = "Correo Electrónico:", Location = new Point(mX, yPos), AutoSize = true, Font = new Font("Segoe UI", 8.5F, FontStyle.Bold), ForeColor = Color.FromArgb(71, 85, 105) };
+            yPos += 18;
+            TextBox txtMail = new TextBox { Location = new Point(mX, yPos), Size = new Size(aW, 25), Font = new Font("Segoe UI", 9.5F) };
+            yPos += 34;
 
-            Label lblDir = new Label { Text = "Dirección:", Location = new Point(mX, 295), AutoSize = true, Font = new Font("Segoe UI", 8.5F, FontStyle.Bold) };
-            TextBox txtDir = new TextBox { Location = new Point(mX, 315), Size = new Size(aW, 26), Font = new Font("Segoe UI", 9.5F) };
+            // Dirección
+            Label lblDir = new Label { Text = "Dirección:", Location = new Point(mX, yPos), AutoSize = true, Font = new Font("Segoe UI", 8.5F, FontStyle.Bold), ForeColor = Color.FromArgb(71, 85, 105) };
+            yPos += 18;
+            TextBox txtDir = new TextBox { Location = new Point(mX, yPos), Size = new Size(aW, 25), Font = new Font("Segoe UI", 9.5F) };
+            yPos += 34;
 
+            // Comuna y Ciudad (Doble columna)
+            int anchoMitad = (aW - 10) / 2;
+            Label lblComuna = new Label { Text = "Comuna:", Location = new Point(mX, yPos), AutoSize = true, Font = new Font("Segoe UI", 8.5F, FontStyle.Bold), ForeColor = Color.FromArgb(71, 85, 105) };
+            Label lblCiudad = new Label { Text = "Ciudad:", Location = new Point(mX + anchoMitad + 10, yPos), AutoSize = true, Font = new Font("Segoe UI", 8.5F, FontStyle.Bold), ForeColor = Color.FromArgb(71, 85, 105) };
+            yPos += 18;
+            TextBox txtComuna = new TextBox { Location = new Point(mX, yPos), Size = new Size(anchoMitad, 25), Font = new Font("Segoe UI", 9.5F), Text = "SANTIAGO" };
+            TextBox txtCiudad = new TextBox { Location = new Point(mX + anchoMitad + 10, yPos), Size = new Size(anchoMitad, 25), Font = new Font("Segoe UI", 9.5F), Text = "SANTIAGO" };
+            yPos += 46;
+
+            // Botón Guardar
             Button btnGuardar = new Button
             {
-                Text = "💾 Guardar Cliente",
-                Location = new Point(mX, 370),
+                Text = "💾 Guardar y Asignar Cliente",
+                Location = new Point(mX, yPos),
                 Size = new Size(aW, 42),
                 BackColor = Color.FromArgb(13, 110, 253),
                 ForeColor = Color.White,
@@ -470,29 +503,35 @@ namespace SISTEMAACTUALIZADO.Modals
 
             btnGuardar.Click += (s, e) =>
             {
+                // Validación de campos obligatorios
                 if (string.IsNullOrWhiteSpace(txtNom.Text) || string.IsNullOrWhiteSpace(txtRut.Text) || 
                     string.IsNullOrWhiteSpace(txtTel.Text) || string.IsNullOrWhiteSpace(txtMail.Text) || 
-                    string.IsNullOrWhiteSpace(txtDir.Text))
+                    string.IsNullOrWhiteSpace(txtDir.Text) || string.IsNullOrWhiteSpace(txtComuna.Text) ||
+                    string.IsNullOrWhiteSpace(txtCiudad.Text))
                 {
                     MessageBox.Show("Todos los campos son obligatorios para registrar al cliente.", "Campos Incompletos", MessageBoxButtons.OK, MessageBoxIcon.Warning);
                     return;
                 }
 
-                if (!RutHelper.EsValidoFormato(txtRut.Text))
+                // Validación RUT mínimo 8 dígitos y formato chileno
+                string rutSinPuntos = RutHelper.Limpiar(txtRut.Text);
+                if (rutSinPuntos.Length < 8 || !RutHelper.EsValidoFormato(txtRut.Text))
                 {
-                    MessageBox.Show("El RUT ingresado no cumple con el formato requerido en Chile.", "RUT Incompleto", MessageBoxButtons.OK, MessageBoxIcon.Warning);
+                    MessageBox.Show("El RUT ingresado no cumple con el formato requerido en Chile (mínimo 8 caracteres).", "RUT Inválido", MessageBoxButtons.OK, MessageBoxIcon.Warning);
                     return;
                 }
 
+                // Validación Teléfono 9 dígitos
                 if (txtTel.Text.Trim().Length != 9)
                 {
-                    MessageBox.Show("El teléfono debe contener exactamente 9 dígitos (ej. 912345678).", "Teléfono Inválido", MessageBoxButtons.OK, MessageBoxIcon.Warning);
+                    MessageBox.Show("El teléfono debe contener exactamente 9 dígitos numéricos (ej. 912345678).", "Teléfono Inválido", MessageBoxButtons.OK, MessageBoxIcon.Warning);
                     return;
                 }
 
+                // Validación Email con '@' y '.'
                 if (!txtMail.Text.Contains("@") || !txtMail.Text.Contains("."))
                 {
-                    MessageBox.Show("Ingrese un correo electrónico válido (debe contener '@' y un dominio).", "Correo Inválido", MessageBoxButtons.OK, MessageBoxIcon.Warning);
+                    MessageBox.Show("Ingrese un correo electrónico válido (debe contener '@' y un dominio válido).", "Correo Inválido", MessageBoxButtons.OK, MessageBoxIcon.Warning);
                     return;
                 }
 
@@ -500,19 +539,25 @@ namespace SISTEMAACTUALIZADO.Modals
                 {
                     Cliente nuevoCliente = new Cliente
                     {
-                        Rut = RutHelper.Limpiar(txtRut.Text),
-                        Nombre = txtNom.Text.Trim(),
+                        Rut = rutSinPuntos,
+                        RazonSocial = txtNom.Text.Trim(),
+                        Giro = txtGiro.Text.Trim(),
                         Telefono = txtTel.Text.Trim(),
                         Email = txtMail.Text.Trim(),
                         Direccion = txtDir.Text.Trim(),
+                        Comuna = txtComuna.Text.Trim(),
+                        Ciudad = txtCiudad.Text.Trim(),
+                        FormaPago = "CONTADO",
+                        ListaPrecioDefecto = 1,
+                        CategoriaCliente = "MINORISTA",
                         Estado = true
                     };
 
                     _clienteService.GuardarCliente(nuevoCliente, esNuevo: true);
 
-                    MessageBox.Show("¡Cliente guardado con éxito!", "Éxito", MessageBoxButtons.OK, MessageBoxIcon.Information);
+                    MessageBox.Show("¡Cliente registrado y guardado con éxito!", "Éxito", MessageBoxButtons.OK, MessageBoxIcon.Information);
 
-                    NombreCliente = nuevoCliente.Nombre;
+                    NombreCliente = nuevoCliente.RazonSocial;
                     RutCliente = RutHelper.Formatear(nuevoCliente.Rut);
 
                     modalNuevo.DialogResult = DialogResult.OK;
@@ -527,7 +572,13 @@ namespace SISTEMAACTUALIZADO.Modals
                 }
             };
 
-            modalNuevo.Controls.AddRange(new Control[] { lblTitle, lblRut, txtRut, lblNom, txtNom, lblTel, txtTel, lblMail, txtMail, lblDir, txtDir, btnGuardar });
+            modalNuevo.Controls.AddRange(new Control[] 
+            { 
+                lblTitle, lblRut, txtRut, lblNom, txtNom, lblGiro, txtGiro, 
+                lblTel, txtTel, lblMail, txtMail, lblDir, txtDir, 
+                lblComuna, lblCiudad, txtComuna, txtCiudad, btnGuardar 
+            });
+            
             modalNuevo.ShowDialog(this);
         }
     }

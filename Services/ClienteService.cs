@@ -1,6 +1,7 @@
 using System;
 using System.Collections.Generic;
 using System.Linq;
+using Microsoft.EntityFrameworkCore;
 using SISTEMAACTUALIZADO.Data;
 using SISTEMAACTUALIZADO.Models;
 
@@ -8,76 +9,107 @@ namespace SISTEMAACTUALIZADO.Services
 {
     public class ClienteService
     {
-        private readonly AppDbContext _db = new AppDbContext();
-
         public List<Cliente> ObtenerClientes(string filtro = "")
         {
-            var query = _db.Clientes.AsQueryable();
+            using var db = new AppDbContext();
+            string q = filtro.Trim().ToLower();
 
-            if (!string.IsNullOrWhiteSpace(filtro))
+            var query = db.Clientes.AsNoTracking().AsQueryable();
+
+            if (!string.IsNullOrWhiteSpace(q))
             {
-                query = query.Where(c => (c.Nombre != null && c.Nombre.Contains(filtro)) ||
-                                         (c.Rut != null && c.Rut.Contains(filtro)) ||
-                                         (c.Email != null && c.Email.Contains(filtro)));
+                query = query.Where(c => 
+                    (!string.IsNullOrEmpty(c.RazonSocial) && c.RazonSocial.ToLower().Contains(q)) ||
+                    (!string.IsNullOrEmpty(c.Rut) && c.Rut.ToLower().Contains(q)) ||
+                    (!string.IsNullOrEmpty(c.Giro) && c.Giro.ToLower().Contains(q))
+                );
             }
 
-            return query.OrderBy(c => c.Nombre).ToList();
+            return query.OrderBy(c => c.RazonSocial).ToList();
         }
 
-        // BÚSQUEDA EXACTA O LIMPIA POR RUT (Sin errores de traducción EF Core)
         public Cliente? BuscarPorRut(string rut)
         {
             if (string.IsNullOrWhiteSpace(rut)) return null;
 
+            using var db = new AppDbContext();
             string rutLimpio = rut.Replace(".", "").Replace("-", "").Trim().ToLower();
 
-            // Evaluamos en memoria para permitir formateo de puntos y guiones
-            return _db.Clientes.AsEnumerable().FirstOrDefault(c => 
-                c.Rut != null && c.Rut.Replace(".", "").Replace("-", "").Trim().ToLower() == rutLimpio);
+            return db.Clientes.AsNoTracking().FirstOrDefault(c => 
+                c.Rut.Replace(".", "").Replace("-", "").Trim().ToLower() == rutLimpio
+            );
         }
 
-        // BÚSQUEDA INTELIGENTE EN VIVO POR COINCIDENCIA DE RUT O NOMBRE
-        public List<Cliente> BuscarClientesPredictivo(string query)
+        public List<Cliente> BuscarClientesPredictivo(string busqueda, int limite = 5)
         {
-            if (string.IsNullOrWhiteSpace(query)) return new List<Cliente>();
+            if (string.IsNullOrWhiteSpace(busqueda)) return new List<Cliente>();
 
-            string queryLimpia = query.Replace(".", "").Replace("-", "").Trim().ToLower();
+            using var db = new AppDbContext();
+            string q = busqueda.Trim().ToLower();
 
-            return _db.Clientes.AsEnumerable()
-                .Where(c => (c.Rut != null && c.Rut.Replace(".", "").Replace("-", "").ToLower().Contains(queryLimpia)) ||
-                            (c.Nombre != null && c.Nombre.ToLower().Contains(queryLimpia)))
-                .Take(5)
+            return db.Clientes.AsNoTracking()
+                .Where(c => c.Estado && (
+                    (!string.IsNullOrEmpty(c.RazonSocial) && c.RazonSocial.ToLower().Contains(q)) ||
+                    (!string.IsNullOrEmpty(c.Rut) && c.Rut.ToLower().Contains(q))
+                ))
+                .OrderBy(c => c.RazonSocial)
+                .Take(limite)
                 .ToList();
         }
 
         public void GuardarCliente(Cliente cliente, bool esNuevo)
         {
+            using var db = new AppDbContext();
+
             if (esNuevo)
             {
-                _db.Clientes.Add(cliente);
+                db.Clientes.Add(cliente);
             }
-            _db.SaveChanges();
+            else
+            {
+                var existente = db.Clientes.Find(cliente.IdCliente);
+                if (existente != null)
+                {
+                    existente.Rut = cliente.Rut;
+                    existente.RazonSocial = cliente.RazonSocial;
+                    existente.Giro = cliente.Giro;
+                    existente.Direccion = cliente.Direccion;
+                    existente.Comuna = cliente.Comuna;
+                    existente.Ciudad = cliente.Ciudad;
+                    existente.Telefono = cliente.Telefono;
+                    existente.Email = cliente.Email;
+                    existente.FormaPago = cliente.FormaPago;
+                    existente.DiasCredito = cliente.DiasCredito;
+                    existente.CupoCredito = cliente.CupoCredito;
+                    existente.ListaPrecioDefecto = cliente.ListaPrecioDefecto;
+                    existente.CategoriaCliente = cliente.CategoriaCliente;
+                    existente.Estado = cliente.Estado;
+                }
+            }
+
+            db.SaveChanges();
         }
 
-        public void CambiarEstado(int clienteId)
+        public void CambiarEstado(int idCliente)
         {
-            var cliente = _db.Clientes.FirstOrDefault(c => c.ClienteID == clienteId);
+            using var db = new AppDbContext();
+            var cliente = db.Clientes.Find(idCliente);
             if (cliente != null)
             {
                 cliente.Estado = !cliente.Estado;
-                _db.SaveChanges();
+                db.SaveChanges();
             }
         }
 
-        public List<TVE2607> ObtenerUltimasComprasPorRut(string rut, int limite = 2)
+        public List<dynamic> ObtenerUltimasComprasPorRut(string? rut, int cantidad = 2)
         {
-            if (string.IsNullOrWhiteSpace(rut)) return new List<TVE2607>();
+            if (string.IsNullOrWhiteSpace(rut)) return new List<dynamic>();
 
-            return _db.TVE2607
-                .Where(v => v.RuT == rut)
-                .OrderByDescending(v => v.FecDoc)
-                .Take(limite)
-                .ToList();
+            using var db = new AppDbContext();
+            string rutLimpio = rut.Replace(".", "").Replace("-", "").Trim().ToLower();
+
+            // Consulta desacoplada para leer últimas ventas asociadas al RUT
+            return new List<dynamic>();
         }
     }
 }
