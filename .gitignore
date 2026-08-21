@@ -70,3 +70,4 @@ Desktop.ini
 # Crash dumps
 *.dmp
 *.stackdump
+Imagenes/*

@@ -27,6 +27,7 @@ namespace SISTEMAACTUALIZADO
         // Botones de Acción (Estilo Productos)
         private Button btnNuevo = null!;
         private Button btnEditar = null!;
+        private Button btnEliminar = null!;
         private Button btnEstado = null!;
 
         // Grilla y Footer
@@ -55,7 +56,7 @@ namespace SISTEMAACTUALIZADO
             };
 
             // ================= 1. HEADER DE TÍTULO Y BOTONERA =================
-            Panel pnlHeader = new Panel { Dock = DockStyle.Top, Height = 50, BackColor = Color.Transparent };
+            Panel pnlHeader = new Panel { Dock = DockStyle.Top, Height = 56, BackColor = Color.Transparent };
 
             Label lblTitulo = new Label
             {
@@ -75,65 +76,94 @@ namespace SISTEMAACTUALIZADO
                 AutoSize = true
             };
 
-            // Panel contenedor de botones a la derecha
-            Panel pnlBotonesAccion = new Panel
+            // Contenedor FlowLayout que organiza automáticamente los botones a la derecha sin superponerlos
+            FlowLayoutPanel pnlBotonesAccion = new FlowLayoutPanel
             {
                 Dock = DockStyle.Right,
-                Width = 430,
+                Width = 560,
                 Height = 44,
-                BackColor = Color.Transparent
+                FlowDirection = FlowDirection.RightToLeft,
+                WrapContents = false,
+                BackColor = Color.Transparent,
+                Padding = new Padding(0, 4, 0, 0)
             };
 
-            // 1. + Nuevo Cliente (Verde Esmeralda #10B981)
+            // 1. + Nuevo Cliente (Verde Esmeralda)
             btnNuevo = new Button
             {
                 Text = "➕ Nuevo Cliente",
-                Size = new Size(135, 34),
-                Location = new Point(295, 4),
+                Height = 34,
+                AutoSize = true,
                 BackColor = Color.FromArgb(16, 185, 129),
                 ForeColor = Color.White,
                 FlatStyle = FlatStyle.Flat,
                 Font = new Font("Segoe UI", 8.5F, FontStyle.Bold),
-                Cursor = Cursors.Hand
+                Cursor = Cursors.Hand,
+                Margin = new Padding(4, 0, 0, 0),
+                Padding = new Padding(8, 0, 8, 0)
             };
             btnNuevo.FlatAppearance.BorderSize = 0;
             btnNuevo.Click += BtnNuevo_Click;
 
-            // 2. Editar (Azul Cielo #0284C7)
+            // 2. Editar (Azul Cielo)
             btnEditar = new Button
             {
                 Text = "✏️ Editar",
-                Size = new Size(90, 34),
-                Location = new Point(200, 4),
+                Height = 34,
+                AutoSize = true,
                 BackColor = Color.FromArgb(2, 132, 199),
                 ForeColor = Color.White,
                 FlatStyle = FlatStyle.Flat,
                 Font = new Font("Segoe UI", 8.5F, FontStyle.Bold),
                 Cursor = Cursors.Hand,
+                Margin = new Padding(4, 0, 0, 0),
+                Padding = new Padding(8, 0, 8, 0),
                 Enabled = false
             };
             btnEditar.FlatAppearance.BorderSize = 0;
             btnEditar.Click += BtnEditar_Click;
 
-            // 3. Activar / Desactivar (Ámbar #F59E0B)
+            // 3. Eliminar (Rojo)
+            btnEliminar = new Button
+            {
+                Text = "🗑️ Eliminar",
+                Height = 34,
+                AutoSize = true,
+                BackColor = Color.FromArgb(239, 68, 68),
+                ForeColor = Color.White,
+                FlatStyle = FlatStyle.Flat,
+                Font = new Font("Segoe UI", 8.5F, FontStyle.Bold),
+                Cursor = Cursors.Hand,
+                Margin = new Padding(4, 0, 0, 0),
+                Padding = new Padding(8, 0, 8, 0),
+                Enabled = false
+            };
+            btnEliminar.FlatAppearance.BorderSize = 0;
+            btnEliminar.Click += BtnEliminar_Click;
+
+            // 4. Activar / Desactivar (Ámbar)
             btnEstado = new Button
             {
                 Text = "🔄 Activar / Desactivar",
-                Size = new Size(160, 34),
-                Location = new Point(35, 4),
+                Height = 34,
+                AutoSize = true,
                 BackColor = Color.FromArgb(245, 158, 11),
                 ForeColor = Color.White,
                 FlatStyle = FlatStyle.Flat,
                 Font = new Font("Segoe UI", 8.5F, FontStyle.Bold),
                 Cursor = Cursors.Hand,
+                Margin = new Padding(4, 0, 0, 0),
+                Padding = new Padding(8, 0, 8, 0),
                 Enabled = false
             };
             btnEstado.FlatAppearance.BorderSize = 0;
             btnEstado.Click += BtnEstado_Click;
 
-            pnlBotonesAccion.Controls.AddRange(new Control[] { btnEstado, btnEditar, btnNuevo });
-            pnlHeader.Controls.AddRange(new Control[] { lblTitulo, lblSubtitulo, pnlBotonesAccion });
+            // Al agregarlos con FlowDirection RightToLeft, el orden visible de derecha a izquierda será:
+            // [Activar / Desactivar] [Eliminar] [Editar] [+ Nuevo Cliente]
+            pnlBotonesAccion.Controls.AddRange(new Control[] {  btnEliminar, btnEstado, btnEditar, btnNuevo, });
 
+            pnlHeader.Controls.AddRange(new Control[] { lblTitulo, lblSubtitulo, pnlBotonesAccion });
             // ================= 2. DASHBOARD KPI CARDS =================
             Panel pnlDashboard = new Panel { Dock = DockStyle.Top, Height = 88, BackColor = Color.Transparent, Margin = new Padding(0, 6, 0, 8) };
 
@@ -257,6 +287,14 @@ namespace SISTEMAACTUALIZADO
 
             ConfigurarEstiloTabla(dgvClientes);
             dgvClientes.SelectionChanged += DgvClientes_SelectionChanged;
+
+            dgvClientes.CellDoubleClick += (s, e) =>
+            {
+                if (e.RowIndex >= 0) // Evita que se dispare si se hace doble clic en el encabezado
+                {
+                    BtnEditar_Click(s, e);
+                }
+            };
 
             // Footer
             Panel pnlFooter = new Panel { Dock = DockStyle.Bottom, Height = 30, BackColor = Color.FromArgb(248, 250, 252) };
@@ -437,12 +475,14 @@ namespace SISTEMAACTUALIZADO
             {
                 _clienteSeleccionado = cliente;
                 btnEditar.Enabled = true;
+                btnEliminar.Enabled = true;
                 btnEstado.Enabled = true;
             }
             else
             {
                 _clienteSeleccionado = null;
                 btnEditar.Enabled = false;
+                btnEliminar.Enabled = false;
                 btnEstado.Enabled = false;
             }
         }
@@ -477,6 +517,41 @@ namespace SISTEMAACTUALIZADO
                 catch (Exception ex)
                 {
                     MessageBox.Show($"Error al actualizar estado: {ex.Message}", "Error DB", MessageBoxButtons.OK, MessageBoxIcon.Error);
+                }
+            }
+        }
+
+        private void BtnEliminar_Click(object? sender, EventArgs e)
+        {
+            if (_clienteSeleccionado == null && dgvClientes.CurrentRow != null)
+            {
+                _clienteSeleccionado = dgvClientes.CurrentRow.DataBoundItem as Cliente;
+            }
+
+            if (_clienteSeleccionado == null)
+            {
+                MessageBox.Show("Seleccione un cliente para eliminar.", "Validación", MessageBoxButtons.OK, MessageBoxIcon.Warning);
+                return;
+            }
+
+            var confirmacion = MessageBox.Show(
+                $"¿Está seguro de eliminar al cliente '{_clienteSeleccionado.RazonSocial}'?\n\nRUT: {_clienteSeleccionado.Rut}\n\nEsta acción lo dará de baja y ya no estará disponible para ventas.",
+                "Confirmar Eliminación de Cliente",
+                MessageBoxButtons.YesNo,
+                MessageBoxIcon.Warning
+            );
+
+            if (confirmacion == DialogResult.Yes)
+            {
+                try
+                {
+                    _clienteService.EliminarCliente(_clienteSeleccionado.IdCliente);
+                    MessageBox.Show("Cliente eliminado correctamente.", "Éxito", MessageBoxButtons.OK, MessageBoxIcon.Information);
+                    CargarDatosCompletos();
+                }
+                catch (Exception ex)
+                {
+                    MessageBox.Show($"Error al eliminar cliente: {ex.Message}", "Error DB", MessageBoxButtons.OK, MessageBoxIcon.Error);
                 }
             }
         }

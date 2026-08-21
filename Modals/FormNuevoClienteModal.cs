@@ -226,8 +226,8 @@ namespace SISTEMAACTUALIZADO.Modals
                 Text = "✕ Cancelar",
                 Location = new Point(mX, yPos),
                 Size = new Size(colW, 42),
-                BackColor = Color.FromArgb(241, 245, 249),
-                ForeColor = Color.FromArgb(71, 85, 105),
+                BackColor = Color.FromArgb(239, 68, 68),
+                ForeColor = Color.White,
                 FlatStyle = FlatStyle.Flat,
                 Font = new Font("Segoe UI", 9.5F, FontStyle.Bold),
                 Cursor = Cursors.Hand

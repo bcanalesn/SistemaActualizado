@@ -111,5 +111,16 @@ namespace SISTEMAACTUALIZADO.Services
             // Consulta desacoplada para leer últimas ventas asociadas al RUT
             return new List<dynamic>();
         }
+
+        public void EliminarCliente(int idCliente)
+        {
+            using var db = new AppDbContext();
+            var cliente = db.Clientes.Find(idCliente);
+            if (cliente != null)
+            {
+                cliente.Estado = false; // Baja lógica (Soft Delete)
+                db.SaveChanges();
+            }
+        }
     }
 }

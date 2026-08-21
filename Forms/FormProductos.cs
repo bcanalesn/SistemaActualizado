@@ -293,6 +293,20 @@ namespace SISTEMAACTUALIZADO
 
             // SKU / Código Barra al final
             ConfigurarCol("CodigoBarra", "SKU / Código Barra", orden++, 130);
+
+            if (dgvProductos.Rows.Count > 0)
+            {
+                var primeraColumnaVisible = dgvProductos.Columns.Cast<DataGridViewColumn>()
+                    .OrderBy(c => c.DisplayIndex)
+                    .FirstOrDefault(c => c.Visible);
+
+                if (primeraColumnaVisible != null)
+                {
+                    dgvProductos.ClearSelection();
+                    dgvProductos.CurrentCell = dgvProductos.Rows[0].Cells[primeraColumnaVisible.Index];
+                    dgvProductos.Rows[0].Selected = true;
+                }
+            }
         }
 
         private void FiltrarProductosInteligente()
@@ -354,7 +368,18 @@ namespace SISTEMAACTUALIZADO
 
         private void BtnEditar_Click(object? sender, EventArgs e)
         {
-            if (dgvProductos.CurrentRow?.DataBoundItem is not Producto prod)
+            Producto? prod = null;
+
+            if (dgvProductos.CurrentRow?.DataBoundItem is Producto pCurrent)
+            {
+                prod = pCurrent;
+            }
+            else if (dgvProductos.SelectedRows.Count > 0 && dgvProductos.SelectedRows[0].DataBoundItem is Producto pSelected)
+            {
+                prod = pSelected;
+            }
+
+            if (prod == null)
             {
                 MessageBox.Show("Seleccione un producto para editar.", "Validación", MessageBoxButtons.OK, MessageBoxIcon.Warning);
                 return;
