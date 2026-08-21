@@ -74,6 +74,58 @@ namespace SISTEMAACTUALIZADO.Services
 
             return escala != null && escala.NPrecio > 0 ? escala.NPrecio : precioBase;
         }
+        public decimal ObtenerPrecioProductoConCliente(Producto prod, int listaCliente, int cantidad)
+        {
+            // 1. Obtener precio según la lista preferencial del cliente
+            decimal precioCliente = ObtenerPrecioPorNumeroLista(prod, listaCliente);
+
+            // 2. Si el producto tiene escala por cantidad (PreciosQ), verificar si califica a un mejor tramo
+            using var db = new AppDbContext();
+            var reglaTramo = db.PreciosQ
+                .Where(pq => pq.IdProducto == prod.ProductoID && pq.Bloqueo == 0 && cantidad >= pq.Qini && cantidad <= pq.Qfin)
+                .FirstOrDefault();
+
+            if (reglaTramo != null)
+            {
+                int nroListaTramo = ObtenerIndiceDesdeIdPrecio(reglaTramo.IdPrecio);
+                decimal precioTramo = ObtenerPrecioPorNumeroLista(prod, nroListaTramo);
+
+                // Si el precio por tramo de cantidad es más conveniente que el del cliente, se aplica
+                if (precioTramo > 0 && precioTramo < precioCliente)
+                {
+                    return precioTramo;
+                }
+            }
+
+            return precioCliente;
+        }
+
+        public decimal ObtenerPrecioPorNumeroLista(Producto prod, int nroLista)
+        {
+            return nroLista switch
+            {
+                1 => prod.PrecioUnitario,
+                2 => prod.Precio2 > 0 ? prod.Precio2 : prod.PrecioUnitario,
+                3 => prod.Precio3 > 0 ? prod.Precio3 : prod.PrecioUnitario,
+                4 => prod.Precio4 > 0 ? prod.Precio4 : prod.PrecioUnitario,
+                5 => prod.Precio5 > 0 ? prod.Precio5 : prod.PrecioUnitario,
+                6 => prod.Precio6 > 0 ? prod.Precio6 : prod.PrecioUnitario,
+                7 => prod.Precio7 > 0 ? prod.Precio7 : prod.PrecioUnitario,
+                8 => prod.Precio8 > 0 ? prod.Precio8 : prod.PrecioUnitario,
+                9 => prod.Precio9 > 0 ? prod.Precio9 : prod.PrecioUnitario,
+                10 => prod.Precio10 > 0 ? prod.Precio10 : prod.PrecioUnitario,
+                _ => prod.PrecioUnitario
+            };
+        }
+
+        private int ObtenerIndiceDesdeIdPrecio(string? idPrecio)
+        {
+            if (string.IsNullOrEmpty(idPrecio)) return 1;
+            string clean = idPrecio.Trim().ToLower().Replace("precio", "").Replace("d", "1");
+            if (int.TryParse(clean, out int idx) && idx >= 1 && idx <= 10)
+                return idx;
+            return 1;
+        }
 
     }
 }

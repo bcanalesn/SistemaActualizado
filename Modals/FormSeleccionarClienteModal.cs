@@ -10,6 +10,7 @@ namespace SISTEMAACTUALIZADO.Modals
     public class FormSeleccionarClienteModal : Form
     {
         private readonly ClienteService _clienteService = new ClienteService();
+        public Cliente? ClienteSeleccionado { get; private set; }
 
         public string NombreCliente { get; private set; } = "Consumidor Final";
         public string RutCliente { get; private set; } = "";
@@ -194,6 +195,7 @@ namespace SISTEMAACTUALIZADO.Modals
             btnAnonimo.FlatAppearance.BorderSize = 0;
             btnAnonimo.Click += (s, e) =>
             {
+                ClienteSeleccionado = null;
                 NombreCliente = "Consumidor Final";
                 RutCliente = "";
                 this.DialogResult = DialogResult.OK;
@@ -320,6 +322,7 @@ namespace SISTEMAACTUALIZADO.Modals
 
         private void MostrarInformacionCliente(Cliente cliente)
         {
+            ClienteSeleccionado = cliente;
             NombreCliente = !string.IsNullOrEmpty(cliente.RazonSocial) ? cliente.RazonSocial : "Cliente Sin Nombre";
             RutCliente = RutHelper.Formatear(cliente.Rut ?? txtRutBuscar.Text);
 
