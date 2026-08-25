@@ -13,6 +13,7 @@ namespace SISTEMAACTUALIZADO
     {
         private readonly ClienteService _clienteService = new ClienteService();
         private List<Cliente> _listaCompletaClientes = new List<Cliente>();
+        private Button btnPreciosEspeciales = null!;
 
         // KPIs Dashboard
         private Label lblTotalClientesVal = null!;
@@ -80,13 +81,41 @@ namespace SISTEMAACTUALIZADO
             FlowLayoutPanel pnlBotonesAccion = new FlowLayoutPanel
             {
                 Dock = DockStyle.Right,
-                Width = 560,
+                Width = 710,
                 Height = 44,
                 FlowDirection = FlowDirection.RightToLeft,
                 WrapContents = false,
                 BackColor = Color.Transparent,
                 Padding = new Padding(0, 4, 0, 0)
             };
+
+            // Botón Precios Especiales (Morado #7C3AED)
+            btnPreciosEspeciales = new Button
+            {
+                Text = "💲 Precios Especiales",
+                Height = 34,
+                AutoSize = true,
+                BackColor = Color.FromArgb(124, 58, 237),
+                ForeColor = Color.White,
+                FlatStyle = FlatStyle.Flat,
+                Font = new Font("Segoe UI", 8.5F, FontStyle.Bold),
+                Cursor = Cursors.Hand,
+                Margin = new Padding(4, 0, 0, 0),
+                Padding = new Padding(8, 0, 8, 0),
+                Enabled = false
+            };
+            btnPreciosEspeciales.FlatAppearance.BorderSize = 0;
+            btnPreciosEspeciales.Click += (s, e) =>
+            {
+                if (_clienteSeleccionado != null)
+                {
+                    using var modal = new FormPreciosEspecialesClienteModal(_clienteSeleccionado);
+                    modal.ShowDialog(this);
+                }
+            };
+
+            // Agregar todos los botones al panel
+            pnlBotonesAccion.Controls.AddRange(new Control[] { btnNuevo, btnEditar, btnEliminar, btnPreciosEspeciales, btnEstado });
 
             // 1. + Nuevo Cliente (Verde Esmeralda)
             btnNuevo = new Button
@@ -476,6 +505,7 @@ namespace SISTEMAACTUALIZADO
                 _clienteSeleccionado = cliente;
                 btnEditar.Enabled = true;
                 btnEliminar.Enabled = true;
+                btnPreciosEspeciales.Enabled = true; // <-- Habilitar
                 btnEstado.Enabled = true;
             }
             else
@@ -483,10 +513,10 @@ namespace SISTEMAACTUALIZADO
                 _clienteSeleccionado = null;
                 btnEditar.Enabled = false;
                 btnEliminar.Enabled = false;
+                btnPreciosEspeciales.Enabled = false; // <-- Deshabilitar
                 btnEstado.Enabled = false;
             }
         }
-
         private void BtnNuevo_Click(object? sender, EventArgs e)
         {
             MostrarFormularioModal(null);

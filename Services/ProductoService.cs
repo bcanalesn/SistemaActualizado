@@ -74,13 +74,35 @@ namespace SISTEMAACTUALIZADO.Services
 
             return escala != null && escala.NPrecio > 0 ? escala.NPrecio : precioBase;
         }
-        public decimal ObtenerPrecioProductoConCliente(Producto prod, int listaCliente, int cantidad)
+
+        public decimal ObtenerPrecioProductoConCliente(Producto prod, int listaCliente, int cantidad, int clienteId = 0)
         {
-            // 1. Obtener precio según la lista preferencial del cliente
+            DateTime hoy = DateTime.Today;
+
+            using var db = new AppDbContext();
+
+            // 1. EVALUAR PRECIO ESPECIAL TEMPORAL VIGENTE PARA EL CLIENTE
+            if (clienteId > 0)
+            {
+                var especial = db.PreciosEspecialesClientes
+                    .Where(p => p.ClienteId == clienteId && 
+                                p.ProductoId == prod.ProductoID && 
+                                p.Estado && 
+                                p.FechaInicio <= hoy && 
+                                p.FechaFin >= hoy)
+                    .OrderByDescending(p => p.IdEspecial)
+                    .FirstOrDefault();
+
+                if (especial != null && especial.PrecioEspecial > 0)
+                {
+                    return especial.PrecioEspecial;
+                }
+            }
+
+            // 2. OBTENER PRECIO SEGÚN LA LISTA PREFERENCIAL DEL CLIENTE
             decimal precioCliente = ObtenerPrecioPorNumeroLista(prod, listaCliente);
 
-            // 2. Si el producto tiene escala por cantidad (PreciosQ), verificar si califica a un mejor tramo
-            using var db = new AppDbContext();
+            // 3. EVALUAR SI CALIFICA A MEJOR TRAMO POR VOLUMEN (PreciosQ)
             var reglaTramo = db.PreciosQ
                 .Where(pq => pq.IdProducto == prod.ProductoID && pq.Bloqueo == 0 && cantidad >= pq.Qini && cantidad <= pq.Qfin)
                 .FirstOrDefault();
@@ -90,7 +112,6 @@ namespace SISTEMAACTUALIZADO.Services
                 int nroListaTramo = ObtenerIndiceDesdeIdPrecio(reglaTramo.IdPrecio);
                 decimal precioTramo = ObtenerPrecioPorNumeroLista(prod, nroListaTramo);
 
-                // Si el precio por tramo de cantidad es más conveniente que el del cliente, se aplica
                 if (precioTramo > 0 && precioTramo < precioCliente)
                 {
                     return precioTramo;
@@ -98,6 +119,27 @@ namespace SISTEMAACTUALIZADO.Services
             }
 
             return precioCliente;
+        }
+
+        public List<(string NombreProducto, decimal PrecioPactado, DateTime Inicio, DateTime Fin)> ObtenerPromocionesVigentesCliente(int clienteId)
+        {
+            if (clienteId <= 0) return new List<(string, decimal, DateTime, DateTime)>();
+
+            DateTime hoy = DateTime.Today;
+            using var db = new AppDbContext();
+
+            var query = from pe in db.PreciosEspecialesClientes
+                        join pr in db.Productos on pe.ProductoId equals pr.ProductoID
+                        where pe.ClienteId == clienteId && pe.Estado && pe.FechaInicio <= hoy && pe.FechaFin >= hoy
+                        select new
+                        {
+                            pr.Nombre,
+                            pe.PrecioEspecial,
+                            pe.FechaInicio,
+                            pe.FechaFin
+                        };
+
+            return query.ToList().Select(x => (x.Nombre, x.PrecioEspecial, x.FechaInicio, x.FechaFin)).ToList();
         }
 
         public decimal ObtenerPrecioPorNumeroLista(Producto prod, int nroLista)
@@ -126,6 +168,5 @@ namespace SISTEMAACTUALIZADO.Services
                 return idx;
             return 1;
         }
-
     }
 }

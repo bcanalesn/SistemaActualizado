@@ -18,6 +18,7 @@ namespace SISTEMAACTUALIZADO
 
         private static Dictionary<string, List<DetalleCarrito>> _carritosPorVendedor = new Dictionary<string, List<DetalleCarrito>>();
         private static Dictionary<string, Cliente?> _clientesPorVendedor = new Dictionary<string, Cliente?>();
+        private Cliente? _clienteActual = null;
         private int _listaClienteActivo = 1; // 1 = Consumidor Final
 
         private List<Producto> _productosCache = new List<Producto>();
@@ -493,16 +494,11 @@ namespace SISTEMAACTUALIZADO
 
             AjustarAnchoYAlturaCategorias();
         }
+
         private decimal ObtenerPrecioActivoProducto(Producto prod)
         {
-            // Si hay un cliente seleccionado con lista especial (ej: Lista 2, 3), se muestra esa lista
-            if (_listaClienteActivo > 1)
-            {
-                return _productoService.ObtenerPrecioPorNumeroLista(prod, _listaClienteActivo);
-            }
-
-            // Si es Consumidor Final, muestra la lista configurada por defecto en el producto
-            return _productoService.ObtenerPrecioPorNumeroLista(prod, prod.ListaDefectoPOS);
+            int clienteId = _clienteActual?.IdCliente ?? 0;
+            return _productoService.ObtenerPrecioProductoConCliente(prod, _listaClienteActivo, 1, clienteId);
         }
 
         private Button CrearBotonSubFamilia(string nombreFamilia, bool seleccionada)
@@ -637,7 +633,9 @@ namespace SISTEMAACTUALIZADO
             // 1. Recargar el catálogo fresco desde la base de datos
             _productosCache = _productoService.ObtenerProductosActivos();
 
-            // 2. Recalcular los precios unitarios de los ítems en los carritos según los nuevos tramos o listas
+            int clienteId = _clienteActual?.IdCliente ?? 0;
+
+            // 2. Recalcular los precios unitarios de los ítems en los carritos según los nuevos tramos, listas o precios especiales
             foreach (var carritoVendedor in _carritosPorVendedor.Values)
             {
                 foreach (var item in carritoVendedor)
@@ -645,9 +643,7 @@ namespace SISTEMAACTUALIZADO
                     var prod = _productosCache.FirstOrDefault(p => p.ProductoID == item.ProductoID);
                     if (prod != null)
                     {
-                        // Obtener el precio base activo y reevaluar la escala de tramos para la cantidad actual
-                        decimal precioBase = ObtenerPrecioActivoProducto(prod);
-                        item.PrecioUnitario = _productoService.ObtenerPrecioProductoConCliente(prod, _listaClienteActivo, item.Cantidad);
+                        item.PrecioUnitario = _productoService.ObtenerPrecioProductoConCliente(prod, _listaClienteActivo, item.Cantidad, clienteId);
 
                         // Descontar del stock visible en las tarjetas
                         prod.Stock -= item.Cantidad;
@@ -729,7 +725,7 @@ namespace SISTEMAACTUALIZADO
                 TextAlign = ContentAlignment.TopCenter
             };
 
-            // Obtener el precio dinámico según la lista configurada
+            // Obtener el precio dinámico según precios especiales, lista preferencial o tramos
             decimal precioVenta = ObtenerPrecioActivoProducto(prod);
             Color colorPrecio = prod.ListaDefectoPOS > 1 ? Color.FromArgb(2, 132, 199) : Color.FromArgb(0, 102, 255);
 
@@ -909,7 +905,7 @@ namespace SISTEMAACTUALIZADO
             var itemExistente = cart.FirstOrDefault(c => c.ProductoID == prod.ProductoID);
             int cantidadInicial = itemExistente != null ? itemExistente.Cantidad : 1;
 
-            // Tomar el precio de la lista asignada al producto (Lista 2, 3, etc.)
+            // Tomar el precio base activo evaluando cliente y escala
             decimal precioBaseVenta = ObtenerPrecioActivoProducto(prod);
 
             using (FormCantidadModal modal = new FormCantidadModal(prod.Nombre, precioBaseVenta, cantidadInicial, prod.Stock, prod.ImagenPath))
@@ -930,10 +926,8 @@ namespace SISTEMAACTUALIZADO
                     }
                     else
                     {
-                        // Si existe escala de tramos (tabla PreciosQ), se evalúa; si no, mantiene el precio base de la lista
-                        
-                        decimal precioFinal = _productoService.ObtenerPrecioProductoConCliente(prod, _listaClienteActivo, nuevaCantidad);
-                        
+                        int clienteId = _clienteActual?.IdCliente ?? 0;
+                        decimal precioFinal = _productoService.ObtenerPrecioProductoConCliente(prod, _listaClienteActivo, nuevaCantidad, clienteId);
 
                         if (itemExistente != null)
                         {
@@ -976,6 +970,7 @@ namespace SISTEMAACTUALIZADO
             }
 
             int totalItemsCount = 0;
+            int clienteId = _clienteActual?.IdCliente ?? 0;
 
             foreach (var item in cart)
             {
@@ -1006,11 +1001,9 @@ namespace SISTEMAACTUALIZADO
                     }
                     else
                     {
-                        // Recalcular precio unitario dinámicamente según el tramo de la nueva cantidad
                         if (prodOriginal != null)
                         {
-                            decimal precioBase = ObtenerPrecioActivoProducto(prodOriginal);
-                            item.PrecioUnitario = _productoService.ObtenerPrecioProductoConCliente(prodOriginal, _listaClienteActivo, item.Cantidad);
+                            item.PrecioUnitario = _productoService.ObtenerPrecioProductoConCliente(prodOriginal, _listaClienteActivo, item.Cantidad, clienteId);
                         }
                     }
                     ActualizarCarritoUI();
@@ -1031,11 +1024,9 @@ namespace SISTEMAACTUALIZADO
                     
                     item.Cantidad++;
 
-                    // Recalcular precio unitario dinámicamente según el tramo de la nueva cantidad
                     if (prodOriginal != null)
                     {
-                        decimal precioBase = ObtenerPrecioActivoProducto(prodOriginal);
-                        item.PrecioUnitario = _productoService.ObtenerPrecioProductoConCliente(prodOriginal, _listaClienteActivo, item.Cantidad);
+                        item.PrecioUnitario = _productoService.ObtenerPrecioProductoConCliente(prodOriginal, _listaClienteActivo, item.Cantidad, clienteId);
                     }
 
                     ActualizarCarritoUI();
@@ -1115,7 +1106,6 @@ namespace SISTEMAACTUALIZADO
             {
                 if (modalCliente.ShowDialog(this) == DialogResult.OK)
                 {
-                    // Pasa el cliente seleccionado a la lógica de precios
                     AsignarClienteActivo(modalCliente.ClienteSeleccionado);
                 }
             }
@@ -1148,9 +1138,9 @@ namespace SISTEMAACTUALIZADO
             }
         }
 
-
         private void AsignarClienteActivo(Cliente? cliente)
         {
+            _clienteActual = cliente;
             _clientesPorVendedor[_vendedorActualNombre] = cliente;
 
             if (cliente != null)
@@ -1158,6 +1148,14 @@ namespace SISTEMAACTUALIZADO
                 _clienteSeleccionadoNombre = cliente.RazonSocial;
                 _clienteSeleccionadoRut = cliente.Rut;
                 _listaClienteActivo = cliente.ListaPrecioDefecto > 0 ? cliente.ListaPrecioDefecto : 1;
+
+                // Notificar si el cliente posee acuerdos de precios especiales vigentes
+                var promociones = _productoService.ObtenerPromocionesVigentesCliente(cliente.IdCliente);
+                if (promociones.Count > 0)
+                {
+                    string detalle = string.Join("\n", promociones.Select(p => $"• {p.NombreProducto}: ${p.PrecioPactado:N0} (Válido hasta {p.Fin:dd/MM/yyyy})"));
+                    MessageBox.Show($"¡El cliente cuenta con Precios Especiales Vigentes!\n\n{detalle}", "Precios Especiales del Cliente", MessageBoxButtons.OK, MessageBoxIcon.Information);
+                }
             }
             else
             {
@@ -1167,12 +1165,10 @@ namespace SISTEMAACTUALIZADO
             }
 
             btnCliente.Text = $"👤 {_clienteSeleccionadoNombre.Split(' ')[0]}";
-            
+
             // Al cambiar cliente, refresca los precios del catálogo y recalcula el carro
             CargarProductosDesdeBD();
             ActualizarCarritoUI();
         }
-
-        
     }
 }
