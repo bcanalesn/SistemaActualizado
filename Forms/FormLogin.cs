@@ -12,9 +12,10 @@ namespace SISTEMAACTUALIZADO
     {
         private TextBox txtUsuario = null!;
         private TextBox txtClave = null!;
+        private Button btnMostrarClave = null!;
+        private CheckBox chkRecordarme = null!;
         private Button btnIngresar = null!;
         private Label lblError = null!;
-
         public Usuario? UsuarioAutenticado { get; private set; }
 
         // Variables para permitir el arrastre de la ventana sin bordes
@@ -30,21 +31,27 @@ namespace SISTEMAACTUALIZADO
         private void InitializeComponent()
         {
             this.SuspendLayout();
-
             this.Text = "POS System - Acceso al Sistema";
-            this.Size = new Size(840, 520);
+            this.Size = new Size(860, 530);
             this.StartPosition = FormStartPosition.CenterScreen;
             this.FormBorderStyle = FormBorderStyle.None;
             this.BackColor = Color.White;
 
+            // Tipografías con fallback
+            Font fontTituloBrand = new Font("Segoe UI", 23F, FontStyle.Bold, GraphicsUnit.Point);
+            Font fontHeader = new Font("Segoe UI", 20F, FontStyle.Bold, GraphicsUnit.Point);
+            Font fontMonoInput = new Font("Consolas", 10.5F, FontStyle.Regular, GraphicsUnit.Point);
+
+            // =========================================================================
+            // PANEL IZQUIERDO (BRANDING & LOGO)
+            // =========================================================================
             Panel pnlLeft = new Panel
             {
                 Dock = DockStyle.Left,
-                Width = 340,
+                Width = 350,
                 BackColor = Color.FromArgb(8, 18, 38)
             };
 
-            // Evento para pintar todo el panel izquierdo (Logo 3D, POS SYSTEM, Linea y Subtítulo) centrado e idéntico
             pnlLeft.Paint += (s, e) =>
             {
                 Graphics g = e.Graphics;
@@ -61,38 +68,37 @@ namespace SISTEMAACTUALIZADO
                     g.FillRectangle(bgBrush, pnlLeft.ClientRectangle);
                 }
 
-                // 2. Ondas Decorativas e Isotipo de Marca en Marcas de Agua (Fondo Inferior)
+                // 2. Ondas Decorativas
                 using (Pen wavePen = new Pen(Color.FromArgb(20, 0, 150, 255), 1.5f))
                 {
                     for (int i = 0; i < 7; i++)
                     {
                         GraphicsPath path = new GraphicsPath();
                         path.AddBezier(
-                            new Point(-30, 370 + i * 18),
-                            new Point(80, 330 + i * 14),
-                            new Point(190, 450 + i * 14),
-                            new Point(350, 390 + i * 18));
+                            new Point(-30, 390 + i * 18),
+                            new Point(80, 350 + i * 14),
+                            new Point(190, 470 + i * 14),
+                            new Point(360, 410 + i * 18));
                         g.DrawPath(wavePen, path);
                     }
                 }
 
-                // Marca de Agua Cúbica Transparente en la Esquina Inferior
+                // Marca de Agua Cúbica Transparente
                 using (Pen watermarkPen = new Pen(Color.FromArgb(12, 0, 122, 255), 2f))
                 {
                     PointF[] bgCube = {
-                        new PointF(220, 380), new PointF(290, 420), new PointF(220, 460), new PointF(150, 420),
-                        new PointF(150, 500), new PointF(220, 540), new PointF(290, 500), new PointF(290, 420)
+                        new PointF(230, 380), new PointF(300, 420), new PointF(230, 460), new PointF(160, 420),
+                        new PointF(160, 500), new PointF(230, 540), new PointF(300, 500), new PointF(300, 420)
                     };
                     g.DrawPolygon(watermarkPen, bgCube);
-                    g.DrawLine(watermarkPen, new PointF(220, 460), new PointF(220, 540));
+                    g.DrawLine(watermarkPen, new PointF(230, 460), new PointF(230, 540));
                 }
 
-                // 3. Dibujar Logo 3D Isométrico Cubo Centrado Perfectamente
-                float centerX = pnlLeft.Width / 2f; // 170px
-                float logoY = 65f;
+                // 3. Logo 3D Isométrico Cubo
+                float centerX = pnlLeft.Width / 2f;
+                float logoY = 95f;
                 float size = 55f;
 
-                // Vertices Principales del Cubo 3D
                 PointF topPt = new PointF(centerX, logoY);
                 PointF rightPt = new PointF(centerX + size, logoY + size * 0.55f);
                 PointF leftPt = new PointF(centerX - size, logoY + size * 0.55f);
@@ -101,7 +107,7 @@ namespace SISTEMAACTUALIZADO
                 PointF btmRightPt = new PointF(centerX + size, logoY + size * 1.65f);
                 PointF btmPt = new PointF(centerX, logoY + size * 2.2f);
 
-                // Cara Superior (Azul Claro Degradado)
+                // Cara Superior
                 PointF[] topFace = { topPt, rightPt, centerPt, leftPt };
                 using (LinearGradientBrush topBrush = new LinearGradientBrush(
                     topPt, centerPt,
@@ -110,7 +116,7 @@ namespace SISTEMAACTUALIZADO
                     g.FillPolygon(topBrush, topFace);
                 }
 
-                // Cara Izquierda (Azul Medio / Oscuro Degradado)
+                // Cara Izquierda
                 PointF[] leftFace = { leftPt, centerPt, btmPt, btmLeftPt };
                 using (LinearGradientBrush leftBrush = new LinearGradientBrush(
                     leftPt, btmPt,
@@ -119,7 +125,7 @@ namespace SISTEMAACTUALIZADO
                     g.FillPolygon(leftBrush, leftFace);
                 }
 
-                // Cara Derecha (Azul Vibrante Degradado)
+                // Cara Derecha
                 PointF[] rightFace = { centerPt, rightPt, btmRightPt, btmPt };
                 using (LinearGradientBrush rightBrush = new LinearGradientBrush(
                     centerPt, btmRightPt,
@@ -128,59 +134,41 @@ namespace SISTEMAACTUALIZADO
                     g.FillPolygon(rightBrush, rightFace);
                 }
 
-                // Detalles Internos Estilizados del Logo (Forma "P")
-                PointF innerTop = new PointF(centerX, logoY + size * 0.4f);
-                PointF innerRight = new PointF(centerX + size * 0.5f, logoY + size * 0.68f);
-                PointF innerCenter = new PointF(centerX, logoY + size * 0.95f);
-                PointF innerLeft = new PointF(centerX - size * 0.5f, logoY + size * 0.68f);
+                // 4. Texto "POS SYSTEM"
+                SizeF sizePOS = g.MeasureString("POS", fontTituloBrand);
+                SizeF sizeSYS = g.MeasureString("SYSTEM", fontTituloBrand);
+                float totalTitleWidth = sizePOS.Width + sizeSYS.Width - 12f;
+                float startTitleX = (pnlLeft.Width - totalTitleWidth) / 2f;
+                float titleY = logoY + size * 2.2f + 25f;
 
-                using (SolidBrush innerBrush = new SolidBrush(Color.FromArgb(40, 255, 255, 255)))
+                using (SolidBrush whiteBrush = new SolidBrush(Color.White))
                 {
-                    g.FillPolygon(innerBrush, new PointF[] { innerTop, innerRight, innerCenter, innerLeft });
+                    g.DrawString("POS", fontTituloBrand, whiteBrush, startTitleX, titleY);
                 }
 
-                // 4. Dibujar Texto "POS SYSTEM" Alineado y Centrado sin Espacios Extra
-                using (Font fontTitle = new Font("Segoe UI", 22F, FontStyle.Bold, GraphicsUnit.Point))
+                using (SolidBrush blueBrush = new SolidBrush(Color.FromArgb(0, 122, 255)))
                 {
-                    SizeF sizePOS = g.MeasureString("POS", fontTitle);
-                    SizeF sizeSYS = g.MeasureString("SYSTEM", fontTitle);
-                    float totalTitleWidth = sizePOS.Width + sizeSYS.Width - 12f; // Ajuste de kerning
-                    float startTitleX = (pnlLeft.Width - totalTitleWidth) / 2f;
-                    float titleY = logoY + size * 2.2f + 25f;
+                    g.DrawString("SYSTEM", fontTituloBrand, blueBrush, startTitleX + sizePOS.Width - 12f, titleY);
+                }
 
-                    // Dibujar "POS" en Blanco
-                    using (SolidBrush whiteBrush = new SolidBrush(Color.White))
-                    {
-                        g.DrawString("POS", fontTitle, whiteBrush, startTitleX, titleY);
-                    }
+                // 5. Línea Divisora
+                float lineY = titleY + sizePOS.Height + 6f;
+                float lineLineWidth = totalTitleWidth + 10f;
+                float lineStartX = (pnlLeft.Width - lineLineWidth) / 2f;
+                using (Pen linePen = new Pen(Color.FromArgb(0, 102, 255), 2f))
+                {
+                    g.DrawLine(linePen, lineStartX, lineY, lineStartX + lineLineWidth, lineY);
+                }
 
-                    // Dibujar "SYSTEM" en Azul Vibrante (#007AFF)
-                    using (SolidBrush blueBrush = new SolidBrush(Color.FromArgb(0, 122, 255)))
-                    {
-                        g.DrawString("SYSTEM", fontTitle, blueBrush, startTitleX + sizePOS.Width - 12f, titleY);
-                    }
-
-                    // 5. Línea Divisora Centrada Perfectamente con el Texto
-                    float lineY = titleY + sizePOS.Height + 6f;
-                    float lineLineWidth = totalTitleWidth + 10f;
-                    float lineStartX = (pnlLeft.Width - lineLineWidth) / 2f;
-
-                    using (Pen linePen = new Pen(Color.FromArgb(0, 102, 255), 2f))
-                    {
-                        g.DrawLine(linePen, lineStartX, lineY, lineStartX + lineLineWidth, lineY);
-                    }
-
-                    // 6. Subtítulo Centrado
-                    using (Font fontSub = new Font("Segoe UI", 9.5F, FontStyle.Regular, GraphicsUnit.Point))
-                    using (SolidBrush subBrush = new SolidBrush(Color.FromArgb(203, 213, 225)))
-                    {
-                        string subText = "Gestión inteligente de ventas e inventario";
-                        SizeF sizeSub = g.MeasureString(subText, fontSub);
-                        float subX = (pnlLeft.Width - sizeSub.Width) / 2f;
-                        float subY = lineY + 14f;
-
-                        g.DrawString(subText, fontSub, subBrush, subX, subY);
-                    }
+                // 6. Subtítulo
+                using (Font fontSub = new Font("Segoe UI", 9.5F, FontStyle.Regular, GraphicsUnit.Point))
+                using (SolidBrush subBrush = new SolidBrush(Color.FromArgb(203, 213, 225)))
+                {
+                    string subText = "Gestión inteligente de ventas e inventario";
+                    SizeF sizeSub = g.MeasureString(subText, fontSub);
+                    float subX = (pnlLeft.Width - sizeSub.Width) / 2f;
+                    float subY = lineY + 14f;
+                    g.DrawString(subText, fontSub, subBrush, subX, subY);
                 }
             };
 
@@ -188,24 +176,15 @@ namespace SISTEMAACTUALIZADO
             pnlLeft.MouseMove += FormLogin_MouseMove;
             pnlLeft.MouseUp += FormLogin_MouseUp;
 
-            Label lblFooterLeft = new Label
-            {
-                Text = "v2.0  •  Corporación Santo Tomás",
-                Font = new Font("Segoe UI", 8.5F, FontStyle.Regular),
-                ForeColor = Color.FromArgb(100, 116, 139),
-                Location = new Point(30, 470),
-                AutoSize = true
-            };
-
-            pnlLeft.Controls.Add(lblFooterLeft);
-
+            // =========================================================================
+            // PANEL DERECHO (FORMULARIO)
+            // =========================================================================
             Panel pnlRight = new Panel
             {
                 Dock = DockStyle.Fill,
                 BackColor = Color.White,
                 Padding = new Padding(45, 20, 45, 20)
             };
-
             pnlRight.MouseDown += FormLogin_MouseDown;
             pnlRight.MouseMove += FormLogin_MouseMove;
             pnlRight.MouseUp += FormLogin_MouseUp;
@@ -214,51 +193,32 @@ namespace SISTEMAACTUALIZADO
             Button btnCerrar = new Button
             {
                 Text = "✕",
-                Font = new Font("Segoe UI", 11F, FontStyle.Bold),
+                Font = new Font("Segoe UI", 12F, FontStyle.Bold),
                 ForeColor = Color.FromArgb(148, 163, 184),
                 BackColor = Color.Transparent,
                 FlatStyle = FlatStyle.Flat,
-                Size = new Size(32, 32),
-                Location = new Point(455, 12),
-                Cursor = Cursors.Hand
+                Size = new Size(36, 36),
+                Location = new Point(460, 10),
+                Cursor = Cursors.Hand,
+                DialogResult = DialogResult.Cancel
             };
             btnCerrar.FlatAppearance.BorderSize = 0;
             btnCerrar.FlatAppearance.MouseOverBackColor = Color.FromArgb(254, 226, 226);
             btnCerrar.MouseEnter += (s, e) => btnCerrar.ForeColor = Color.FromArgb(220, 38, 38);
             btnCerrar.MouseLeave += (s, e) => btnCerrar.ForeColor = Color.FromArgb(148, 163, 184);
-            btnCerrar.Click += (s, e) => Application.Exit();
-
-            // Selector de Idioma "🌐 ES ⌄" y "❓ ¿Necesitas ayuda?"
-            Button btnLang = new Button
+            btnCerrar.Click += (s, e) =>
             {
-                Text = "🌐  ES  ⌄",
-                Font = new Font("Segoe UI", 8.5F, FontStyle.Bold),
-                ForeColor = Color.FromArgb(71, 85, 105),
-                BackColor = Color.FromArgb(248, 250, 252),
-                FlatStyle = FlatStyle.Flat,
-                Size = new Size(80, 30),
-                Location = new Point(365, 12),
-                Cursor = Cursors.Hand
-            };
-            btnLang.FlatAppearance.BorderColor = Color.FromArgb(226, 232, 240);
-            btnLang.FlatAppearance.BorderSize = 1;
-
-            Label lblHelp = new Label
-            {
-                Text = "❓ ¿Necesitas ayuda?",
-                Font = new Font("Segoe UI", 8.5F, FontStyle.Regular),
-                ForeColor = Color.FromArgb(100, 116, 139),
-                Location = new Point(220, 18),
-                AutoSize = true,
-                Cursor = Cursors.Hand
+                this.DialogResult = DialogResult.Cancel;
+                this.Close();
+                Environment.Exit(0);
             };
 
             Label lblWelcome = new Label
             {
                 Text = "Bienvenido de nuevo",
-                Font = new Font("Segoe UI", 20F, FontStyle.Bold),
+                Font = fontHeader,
                 ForeColor = Color.FromArgb(15, 23, 42),
-                Location = new Point(42, 55),
+                Location = new Point(42, 40),
                 AutoSize = true
             };
 
@@ -267,71 +227,72 @@ namespace SISTEMAACTUALIZADO
                 Text = "Ingresa tus credenciales para acceder al panel",
                 Font = new Font("Segoe UI", 9.5F, FontStyle.Regular),
                 ForeColor = Color.FromArgb(100, 116, 139),
-                Location = new Point(42, 93),
+                Location = new Point(42, 80),
                 AutoSize = true
             };
 
+            // Campo Usuario
             Label lblUser = new Label
             {
                 Text = "👤  USUARIO",
                 Font = new Font("Segoe UI", 8.5F, FontStyle.Bold),
                 ForeColor = Color.FromArgb(51, 65, 85),
-                Location = new Point(42, 135),
+                Location = new Point(42, 122),
                 AutoSize = true
             };
 
             Panel pnlInputUser = CrearContenedorInput();
-            pnlInputUser.Location = new Point(42, 158);
-            pnlInputUser.Size = new Size(410, 40);
+            pnlInputUser.Location = new Point(42, 145);
+            pnlInputUser.Size = new Size(410, 42);
 
             Label lblIconUserInside = new Label
             {
                 Text = "👤",
                 Font = new Font("Segoe UI", 9.5F),
                 ForeColor = Color.FromArgb(148, 163, 184),
-                Location = new Point(12, 9),
+                Location = new Point(12, 11),
                 AutoSize = true
             };
 
             txtUsuario = new TextBox
             {
-                Location = new Point(42, 8),
-                Size = new Size(355, 26),
-                Font = new Font("Segoe UI", 10.5F),
+                Location = new Point(40, 10),
+                Size = new Size(355, 24),
+                Font = fontMonoInput,
                 BorderStyle = BorderStyle.None,
                 BackColor = Color.FromArgb(248, 250, 252),
-                Text = "barbara"
+                Text = "Barbara"
             };
-            pnlInputUser.Controls.Add(lblIconUserInside);
-            pnlInputUser.Controls.Add(txtUsuario);
+            pnlInputUser.Controls.AddRange(new Control[] { lblIconUserInside, txtUsuario });
 
+            // Campo Contraseña
             Label lblPass = new Label
             {
                 Text = "🔒  CONTRASEÑA",
                 Font = new Font("Segoe UI", 8.5F, FontStyle.Bold),
                 ForeColor = Color.FromArgb(51, 65, 85),
-                Location = new Point(42, 210),
+                Location = new Point(42, 200),
                 AutoSize = true
             };
 
             Panel pnlInputPass = CrearContenedorInput();
-            pnlInputPass.Location = new Point(42, 233);
-            pnlInputPass.Size = new Size(410, 40);
+            pnlInputPass.Location = new Point(42, 223);
+            pnlInputPass.Size = new Size(410, 42);
 
             Label lblIconPassInside = new Label
             {
                 Text = "🔒",
                 Font = new Font("Segoe UI", 9.5F),
                 ForeColor = Color.FromArgb(148, 163, 184),
-                Location = new Point(12, 9),
+                Location = new Point(12, 11),
                 AutoSize = true
             };
 
             txtClave = new TextBox
             {
-                Location = new Point(42, 8),
-                Size = new Size(355, 26),
-                Font = new Font("Segoe UI", 10.5F),
+                Location = new Point(40, 10),
+                Size = new Size(325, 24),
+                Font = fontMonoInput,
                 BorderStyle = BorderStyle.None,
                 BackColor = Color.FromArgb(248, 250, 252),
                 UseSystemPasswordChar = true,
@@ -339,134 +300,109 @@ namespace SISTEMAACTUALIZADO
             };
             txtClave.KeyDown += (s, e) => { if (e.KeyCode == Keys.Enter) { btnIngresar_Click(s, e); e.SuppressKeyPress = true; } };
 
-            pnlInputPass.Controls.Add(lblIconPassInside);
-            pnlInputPass.Controls.Add(txtClave);
-
-            Label lblQuickAccess = new Label
+            // Botón Mostrar/Ocultar Clave (Ojito)
+            btnMostrarClave = new Button
             {
-                Text = "Acceso Rápido de Pruebas",
-                Font = new Font("Segoe UI", 8.5F, FontStyle.Regular),
+                Text = "👁️",
+                Location = new Point(370, 6),
+                Size = new Size(32, 28),
+                FlatStyle = FlatStyle.Flat,
+                BackColor = Color.Transparent,
                 ForeColor = Color.FromArgb(100, 116, 139),
-                Location = new Point(42, 285),
-                AutoSize = true
+                Cursor = Cursors.Hand,
+                Font = new Font("Segoe UI", 9.5F)
+            };
+            btnMostrarClave.FlatAppearance.BorderSize = 0;
+            btnMostrarClave.Click += (s, e) =>
+            {
+                txtClave.UseSystemPasswordChar = !txtClave.UseSystemPasswordChar;
+                btnMostrarClave.Text = txtClave.UseSystemPasswordChar ? "👁️" : "🙈";
             };
 
-            // Tarjeta Bárbara (Admin)
-            Panel pnlCardBarbara = new Panel
+            pnlInputPass.Controls.AddRange(new Control[] { lblIconPassInside, txtClave, btnMostrarClave });
+
+            // Fila Auxiliar: Checkbox Recordarme + Link Olvidaste Contraseña
+            chkRecordarme = new CheckBox
             {
-                Location = new Point(42, 308),
-                Size = new Size(200, 52),
-                BackColor = Color.FromArgb(240, 249, 255),
+                Text = "Recordarme",
+                Font = new Font("Segoe UI", 8.5F),
+                ForeColor = Color.FromArgb(71, 85, 105),
+                Location = new Point(44, 275),
+                Size = new Size(130, 22),
+                Cursor = Cursors.Hand,
+                Checked = true
+            };
+
+            LinkLabel linkOlvidaste = new LinkLabel
+            {
+                Text = "¿Olvidaste tu contraseña?",
+                Font = new Font("Segoe UI", 8.5F),
+                LinkColor = Color.FromArgb(37, 99, 235),
+                ActiveLinkColor = Color.FromArgb(29, 78, 216),
+                Location = new Point(285, 277),
+                AutoSize = true,
                 Cursor = Cursors.Hand
             };
-            pnlCardBarbara.Paint += (s, e) => { ControlPaint.DrawBorder(e.Graphics, pnlCardBarbara.ClientRectangle, Color.FromArgb(186, 230, 253), ButtonBorderStyle.Solid); };
-
-            Label lblIconBarbara = new Label { Text = "👤", Font = new Font("Segoe UI", 10F), ForeColor = Color.FromArgb(3, 105, 161), Location = new Point(12, 14), AutoSize = true, Cursor = Cursors.Hand };
-            Label lblNameBarbara = new Label { Text = "Bárbara (Admin)", Font = new Font("Segoe UI", 9F, FontStyle.Bold), ForeColor = Color.FromArgb(3, 105, 161), Location = new Point(42, 8), AutoSize = true, Cursor = Cursors.Hand };
-            Label lblRoleBarbara = new Label { Text = "Administrador", Font = new Font("Segoe UI", 8F), ForeColor = Color.FromArgb(2, 132, 199), Location = new Point(42, 28), AutoSize = true, Cursor = Cursors.Hand };
-
-            pnlCardBarbara.Controls.Add(lblIconBarbara);
-            pnlCardBarbara.Controls.Add(lblNameBarbara);
-            pnlCardBarbara.Controls.Add(lblRoleBarbara);
-
-            Action selectBarbara = () =>
+            linkOlvidaste.LinkClicked += (s, e) =>
             {
-                txtUsuario.Text = "barbara";
-                txtClave.Text = "admin123";
-                lblError.Text = "";
-                btnIngresar.Focus();
+                MessageBox.Show("Para restablecer tu contraseña o desbloquear el acceso, contacta al Administrador del sistema.", "Recuperación de Acceso", MessageBoxButtons.OK, MessageBoxIcon.Information);
             };
-
-            pnlCardBarbara.Click += (s, e) => selectBarbara();
-            lblIconBarbara.Click += (s, e) => selectBarbara();
-            lblNameBarbara.Click += (s, e) => selectBarbara();
-            lblRoleBarbara.Click += (s, e) => selectBarbara();
-
-            // Tarjeta Víctor (Cajero)
-            Panel pnlCardVictor = new Panel
-            {
-                Location = new Point(252, 308),
-                Size = new Size(200, 52),
-                BackColor = Color.FromArgb(240, 253, 244),
-                Cursor = Cursors.Hand
-            };
-            pnlCardVictor.Paint += (s, e) => { ControlPaint.DrawBorder(e.Graphics, pnlCardVictor.ClientRectangle, Color.FromArgb(187, 247, 208), ButtonBorderStyle.Solid); };
-
-            Label lblIconVictor = new Label { Text = "👤", Font = new Font("Segoe UI", 10F), ForeColor = Color.FromArgb(21, 128, 61), Location = new Point(12, 14), AutoSize = true, Cursor = Cursors.Hand };
-            Label lblNameVictor = new Label { Text = "Víctor (Cajero)", Font = new Font("Segoe UI", 9F, FontStyle.Bold), ForeColor = Color.FromArgb(21, 128, 61), Location = new Point(42, 8), AutoSize = true, Cursor = Cursors.Hand };
-            Label lblRoleVictor = new Label { Text = "Cajero", Font = new Font("Segoe UI", 8F), ForeColor = Color.FromArgb(22, 163, 74), Location = new Point(42, 28), AutoSize = true, Cursor = Cursors.Hand };
-
-            pnlCardVictor.Controls.Add(lblIconVictor);
-            pnlCardVictor.Controls.Add(lblNameVictor);
-            pnlCardVictor.Controls.Add(lblRoleVictor);
-
-            Action selectVictor = () =>
-            {
-                txtUsuario.Text = "victor";
-                txtClave.Text = "123456";
-                lblError.Text = "";
-                btnIngresar.Focus();
-            };
-
-            pnlCardVictor.Click += (s, e) => selectVictor();
-            lblIconVictor.Click += (s, e) => selectVictor();
-            lblNameVictor.Click += (s, e) => selectVictor();
-            lblRoleVictor.Click += (s, e) => selectVictor();
 
             lblError = new Label
             {
                 Text = "",
                 Font = new Font("Segoe UI", 8.5F, FontStyle.Bold),
                 ForeColor = Color.FromArgb(220, 38, 38),
-                Location = new Point(42, 365),
-                Size = new Size(410, 18),
+                Location = new Point(42, 308),
+                Size = new Size(410, 20),
                 TextAlign = ContentAlignment.MiddleLeft
             };
 
             btnIngresar = new Button
             {
                 Text = "INICIAR SESIÓN  ➔",
-                Location = new Point(42, 388),
+                Location = new Point(42, 336),
                 Size = new Size(410, 48),
                 BackColor = Color.FromArgb(0, 102, 255),
                 ForeColor = Color.White,
                 FlatStyle = FlatStyle.Flat,
-                Font = new Font("Segoe UI", 11F, FontStyle.Bold),
+                Font = new Font("Segoe UI", 10.5F, FontStyle.Bold),
                 Cursor = Cursors.Hand
             };
             btnIngresar.FlatAppearance.BorderSize = 0;
             btnIngresar.Click += btnIngresar_Click;
 
+            // Footer con Candado
             Label lblSecurityFooter = new Label
             {
-                Text = "✔  Acceso seguro y protegido",
+                Text = "🔒  Acceso seguro y protegido SSL",
                 Font = new Font("Segoe UI", 8.5F, FontStyle.Regular),
                 ForeColor = Color.FromArgb(100, 116, 139),
-                Location = new Point(42, 452),
+                Location = new Point(42, 398),
                 Size = new Size(410, 20),
                 TextAlign = ContentAlignment.MiddleCenter
             };
 
-            pnlRight.Controls.Add(btnCerrar);
-            pnlRight.Controls.Add(btnLang);
-            pnlRight.Controls.Add(lblHelp);
-            pnlRight.Controls.Add(lblWelcome);
-            pnlRight.Controls.Add(lblSubWelcome);
-            pnlRight.Controls.Add(lblUser);
-            pnlRight.Controls.Add(pnlInputUser);
-            pnlRight.Controls.Add(lblPass);
-            pnlRight.Controls.Add(pnlInputPass);
-            pnlRight.Controls.Add(lblQuickAccess);
-            pnlRight.Controls.Add(pnlCardBarbara);
-            pnlRight.Controls.Add(pnlCardVictor);
-            pnlRight.Controls.Add(lblError);
-            pnlRight.Controls.Add(btnIngresar);
-            pnlRight.Controls.Add(lblSecurityFooter);
+            pnlRight.Controls.AddRange(new Control[] {
+                btnCerrar,
+                lblWelcome,
+                lblSubWelcome,
+                lblUser,
+                pnlInputUser,
+                lblPass,
+                pnlInputPass,
+                chkRecordarme,
+                linkOlvidaste,
+                lblError,
+                btnIngresar,
+                lblSecurityFooter
+            });
 
             this.Controls.Add(pnlRight);
             this.Controls.Add(pnlLeft);
-
             this.ResumeLayout(false);
+
+            btnCerrar.BringToFront();
         }
 
         private Panel CrearContenedorInput()
@@ -522,7 +458,6 @@ namespace SISTEMAACTUALIZADO
                 using (var db = new AppDbContext())
                 {
                     var u = db.Usuarios.FirstOrDefault(x => x.NombreUsuario.ToLower() == user && x.Clave == pass && x.Estado);
-
                     if (u != null)
                     {
                         UsuarioAutenticado = u;
@@ -534,32 +469,30 @@ namespace SISTEMAACTUALIZADO
             }
             catch { }
 
-            // Credenciales asignadas directamente (Fallback de seguridad)
-            if ((user == "barbara" || user == "admin") && pass == "admin123")
+            // Credenciales de contingencia
+            if ((user == "Barbara" || user == "admin") && pass == "admin123")
             {
                 UsuarioAutenticado = new Usuario
                 {
                     UsuarioID = 1,
-                    NombreUsuario = "barbara",
+                    NombreUsuario = "Barbara",
                     NombreCompleto = "Barbara",
                     Rol = "Administrador",
                     Estado = true
                 };
-
                 this.DialogResult = DialogResult.OK;
                 this.Close();
             }
-            else if ((user == "victor" || user == "cajero") && pass == "123456")
+            else if ((user == "Victor" || user == "cajero") && pass == "123456")
             {
                 UsuarioAutenticado = new Usuario
                 {
                     UsuarioID = 2,
-                    NombreUsuario = "victor",
+                    NombreUsuario = "Victor",
                     NombreCompleto = "Victor",
                     Rol = "Cajero",
                     Estado = true
                 };
-
                 this.DialogResult = DialogResult.OK;
                 this.Close();
             }
