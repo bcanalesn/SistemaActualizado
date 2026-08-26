@@ -4,21 +4,27 @@ using System.ComponentModel.DataAnnotations.Schema;
 
 namespace SISTEMAACTUALIZADO.Models
 {
+    [Table("detallecompras")]
     public class DetalleCompra
     {
         [Key]
+        [Column("IdDetalleCompra")]
         public int IdDetalleCompra { get; set; }
+
         public int CompraID { get; set; }
-        public int ProductoID { get; set; }
+        public string TipoItem { get; set; } = "MERCADERIA"; // MERCADERIA o GASTO
+        public int? ProductoID { get; set; }
         public string NombreProducto { get; set; } = string.Empty;
-        public int Cantidad { get; set; }
+        public string? DescripcionGasto { get; set; }
+        public string? CategoriaGasto { get; set; }
+        public string? ActivoFijoRef { get; set; }
+        public bool AfectaStock { get; set; } = true;
+        public int Cantidad { get; set; } = 1;
         public decimal PrecioCostoUnitario { get; set; }
+        public decimal PvpSugerido { get; set; }
         public decimal Subtotal { get; set; }
 
-        [ForeignKey("CompraID")]
         public Compra? Compra { get; set; }
-
-        [ForeignKey("ProductoID")]
         public Producto? Producto { get; set; }
     }
 }

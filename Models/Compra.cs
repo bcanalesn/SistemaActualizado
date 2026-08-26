@@ -1,21 +1,29 @@
 using System;
 using System.Collections.Generic;
 using System.ComponentModel.DataAnnotations;
+using System.ComponentModel.DataAnnotations.Schema;
 
 namespace SISTEMAACTUALIZADO.Models
 {
+    [Table("compras")]
     public class Compra
     {
         [Key]
+        [Column("CompraID")]
         public int CompraID { get; set; }
+
+        public string TipoCompra { get; set; } = "MERCADERIA"; // MERCADERIA o GASTO_INTERNO
+        public string TipoDocumento { get; set; } = "Factura de Compra";
         public string RutProveedor { get; set; } = string.Empty;
         public string RazonSocialProveedor { get; set; } = string.Empty;
         public int NroFacturaProveedor { get; set; }
         public DateTime FechaEmision { get; set; } = DateTime.Now;
         public DateTime FechaRecepcion { get; set; } = DateTime.Now;
         public decimal MontoNeto { get; set; }
+        public decimal MontoExento { get; set; } = 0;
         public decimal MontoIva { get; set; }
         public decimal MontoTotal { get; set; }
+        public string? Observaciones { get; set; }
         public string UsuarioReceptor { get; set; } = "Bárbara";
         public string Estado { get; set; } = "Recibida";
 
