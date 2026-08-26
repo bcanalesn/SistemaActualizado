@@ -1,6 +1,7 @@
 using System;
 using System.Drawing;
 using System.Drawing.Drawing2D;
+using System.IO;
 using System.Linq;
 using System.Windows.Forms;
 using SISTEMAACTUALIZADO.Data;
@@ -18,6 +19,9 @@ namespace SISTEMAACTUALIZADO
         private Label lblError = null!;
         public Usuario? UsuarioAutenticado { get; private set; }
 
+        // Ruta local para recordar el usuario
+        private static readonly string _configPath = Path.Combine(AppDomain.CurrentDomain.BaseDirectory, "last_user.cfg");
+
         // Variables para permitir el arrastre de la ventana sin bordes
         private bool _dragging = false;
         private Point _dragCursorPoint;
@@ -26,6 +30,7 @@ namespace SISTEMAACTUALIZADO
         public FormLogin()
         {
             InitializeComponent();
+            CargarUsuarioRecordado();
         }
 
         private void InitializeComponent()
@@ -37,7 +42,6 @@ namespace SISTEMAACTUALIZADO
             this.FormBorderStyle = FormBorderStyle.None;
             this.BackColor = Color.White;
 
-            // Tipografías con fallback
             Font fontTituloBrand = new Font("Segoe UI", 23F, FontStyle.Bold, GraphicsUnit.Point);
             Font fontHeader = new Font("Segoe UI", 20F, FontStyle.Bold, GraphicsUnit.Point);
             Font fontMonoInput = new Font("Consolas", 10.5F, FontStyle.Regular, GraphicsUnit.Point);
@@ -260,8 +264,7 @@ namespace SISTEMAACTUALIZADO
                 Size = new Size(355, 24),
                 Font = fontMonoInput,
                 BorderStyle = BorderStyle.None,
-                BackColor = Color.FromArgb(248, 250, 252),
-                Text = "Barbara"
+                BackColor = Color.FromArgb(248, 250, 252)
             };
             pnlInputUser.Controls.AddRange(new Control[] { lblIconUserInside, txtUsuario });
 
@@ -295,12 +298,11 @@ namespace SISTEMAACTUALIZADO
                 Font = fontMonoInput,
                 BorderStyle = BorderStyle.None,
                 BackColor = Color.FromArgb(248, 250, 252),
-                UseSystemPasswordChar = true,
-                Text = "admin123"
+                UseSystemPasswordChar = true
             };
             txtClave.KeyDown += (s, e) => { if (e.KeyCode == Keys.Enter) { btnIngresar_Click(s, e); e.SuppressKeyPress = true; } };
 
-            // Botón Mostrar/Ocultar Clave (Ojito)
+            // Botón Mostrar/Ocultar Clave
             btnMostrarClave = new Button
             {
                 Text = "👁️",
@@ -321,7 +323,7 @@ namespace SISTEMAACTUALIZADO
 
             pnlInputPass.Controls.AddRange(new Control[] { lblIconPassInside, txtClave, btnMostrarClave });
 
-            // Fila Auxiliar: Checkbox Recordarme + Link Olvidaste Contraseña
+            // Checkbox Recordarme + Link Olvidaste Contraseña
             chkRecordarme = new CheckBox
             {
                 Text = "Recordarme",
@@ -372,7 +374,7 @@ namespace SISTEMAACTUALIZADO
             btnIngresar.FlatAppearance.BorderSize = 0;
             btnIngresar.Click += btnIngresar_Click;
 
-            // Footer con Candado
+            // Footer de Seguridad
             Label lblSecurityFooter = new Label
             {
                 Text = "🔒  Acceso seguro y protegido SSL",
@@ -403,6 +405,48 @@ namespace SISTEMAACTUALIZADO
             this.ResumeLayout(false);
 
             btnCerrar.BringToFront();
+        }
+
+        private void CargarUsuarioRecordado()
+        {
+            try
+            {
+                if (File.Exists(_configPath))
+                {
+                    string savedUser = File.ReadAllText(_configPath).Trim();
+                    if (!string.IsNullOrEmpty(savedUser))
+                    {
+                        txtUsuario.Text = savedUser;
+                        chkRecordarme.Checked = true;
+
+                        // Si el usuario ya está recordado, situar el cursor directamente en la contraseña
+                        this.Shown += (s, e) =>
+                        {
+                            txtClave.Focus();
+                        };
+                    }
+                }
+            }
+            catch { }
+        }
+
+        private void GuardarOlimpiarUsuarioRecordado(string user)
+        {
+            try
+            {
+                if (chkRecordarme.Checked && !string.IsNullOrWhiteSpace(user))
+                {
+                    File.WriteAllText(_configPath, user);
+                }
+                else
+                {
+                    if (File.Exists(_configPath))
+                    {
+                        File.Delete(_configPath);
+                    }
+                }
+            }
+            catch { }
         }
 
         private Panel CrearContenedorInput()
@@ -444,7 +488,7 @@ namespace SISTEMAACTUALIZADO
 
         private void btnIngresar_Click(object? sender, EventArgs e)
         {
-            string user = txtUsuario.Text.Trim().ToLower();
+            string user = txtUsuario.Text.Trim();
             string pass = txtClave.Text.Trim();
 
             if (string.IsNullOrEmpty(user) || string.IsNullOrEmpty(pass))
@@ -455,52 +499,40 @@ namespace SISTEMAACTUALIZADO
 
             try
             {
-                using (var db = new AppDbContext())
+                using var db = new AppDbContext();
+
+                // Validación directa contra la base de datos (Usuario, Clave y Estado Activo)
+                var usuarioEncontrado = db.Usuarios
+                    .FirstOrDefault(u => u.NombreUsuario.ToLower() == user.ToLower() && 
+                                         u.Clave == pass && 
+                                         u.Estado);
+
+                if (usuarioEncontrado != null)
                 {
-                    var u = db.Usuarios.FirstOrDefault(x => x.NombreUsuario.ToLower() == user && x.Clave == pass && x.Estado);
-                    if (u != null)
+                    if (string.IsNullOrWhiteSpace(usuarioEncontrado.Rol))
                     {
-                        UsuarioAutenticado = u;
-                        this.DialogResult = DialogResult.OK;
-                        this.Close();
+                        lblError.Text = "❌ El usuario no tiene un rol válido asignado.";
                         return;
                     }
+
+                    // Guardar o limpiar el usuario según el checkbox "Recordarme"
+                    GuardarOlimpiarUsuarioRecordado(user);
+
+                    UsuarioAutenticado = usuarioEncontrado;
+                    this.DialogResult = DialogResult.OK;
+                    this.Close();
+                }
+                else
+                {
+                    lblError.Text = "❌ Credenciales incorrectas o usuario inactivo";
+                    txtClave.Clear();
+                    txtClave.Focus();
                 }
             }
-            catch { }
-
-            // Credenciales de contingencia
-            if ((user == "Barbara" || user == "admin") && pass == "admin123")
+            catch (Exception ex)
             {
-                UsuarioAutenticado = new Usuario
-                {
-                    UsuarioID = 1,
-                    NombreUsuario = "Barbara",
-                    NombreCompleto = "Barbara",
-                    Rol = "Administrador",
-                    Estado = true
-                };
-                this.DialogResult = DialogResult.OK;
-                this.Close();
-            }
-            else if ((user == "Victor" || user == "cajero") && pass == "123456")
-            {
-                UsuarioAutenticado = new Usuario
-                {
-                    UsuarioID = 2,
-                    NombreUsuario = "Victor",
-                    NombreCompleto = "Victor",
-                    Rol = "Cajero",
-                    Estado = true
-                };
-                this.DialogResult = DialogResult.OK;
-                this.Close();
-            }
-            else
-            {
-                lblError.Text = "❌ Credenciales incorrectas o usuario inactivo";
-                txtClave.Clear();
-                txtClave.Focus();
+                lblError.Text = "❌ Error de conexión con la base de datos";
+                MessageBox.Show($"No se pudo verificar la sesión:\n{ex.Message}", "Error de Conexión", MessageBoxButtons.OK, MessageBoxIcon.Error);
             }
         }
     }
