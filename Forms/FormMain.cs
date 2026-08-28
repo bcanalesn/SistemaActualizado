@@ -1,6 +1,7 @@
 using System;
 using System.Drawing;
 using System.Windows.Forms;
+using SISTEMAACTUALIZADO.Forms;
 using SISTEMAACTUALIZADO.Models;
 
 namespace SISTEMAACTUALIZADO
@@ -14,10 +15,11 @@ namespace SISTEMAACTUALIZADO
         private Label lblTituloVista = null!;
         private Label lblUsuarioInfo = null!;
 
-        // Botones del Menú Lateral (Orden Operativo sin Proveedores en el menú principal)
+        // Botones del Menú Lateral
         private Button btnCaja = new Button();
         private Button btnVentas = new Button();
         private Button btnLibroVentas = new Button();
+        private Button btnLibroCompras = new Button(); // <-- Botón Libro de Compras agregado
         private Button btnFolios = new Button();
         private Button btnCompras = new Button();
         private Button btnClientes = new Button();
@@ -78,13 +80,14 @@ namespace SISTEMAACTUALIZADO
                 AutoScroll = true
             };
 
-            // Posicionamiento de botones sin botón de proveedores
+            // Posicionamiento de botones
             int yPos = 10;
             int espaciado = 48;
 
             ConfigurarBotonSidebar(this.btnCaja, "💵  Control de Caja", yPos); yPos += espaciado;
             ConfigurarBotonSidebar(this.btnVentas, "🛒  Punto de Venta", yPos); yPos += espaciado;
             ConfigurarBotonSidebar(this.btnLibroVentas, "📚  Libro Ventas LVE", yPos); yPos += espaciado;
+            ConfigurarBotonSidebar(this.btnLibroCompras, "📕  Libro de Compras", yPos); yPos += espaciado;
             ConfigurarBotonSidebar(this.btnFolios, "📄  Control de Folios", yPos); yPos += espaciado;
             ConfigurarBotonSidebar(this.btnCompras, "📥  Recepción Compras", yPos); yPos += espaciado;
             ConfigurarBotonSidebar(this.btnClientes, "👥  Clientes", yPos); yPos += espaciado;
@@ -98,6 +101,7 @@ namespace SISTEMAACTUALIZADO
             pnlNav.Controls.Add(this.btnClientes);
             pnlNav.Controls.Add(this.btnCompras);
             pnlNav.Controls.Add(this.btnFolios);
+            pnlNav.Controls.Add(this.btnLibroCompras);
             pnlNav.Controls.Add(this.btnLibroVentas);
             pnlNav.Controls.Add(this.btnVentas);
             pnlNav.Controls.Add(this.btnCaja);
@@ -112,9 +116,11 @@ namespace SISTEMAACTUALIZADO
             ConfigurarBotonSidebar(this.btnCerrarSesion, "🔒  Cerrar Sesión", 10);
             ConfigurarBotonSidebar(this.btnSalir, "🚪  Salir", 60);
 
+            // Eventos de Navegación
             this.btnCaja.Click += (s, e) => AbrirFormEnContent(new FormCaja(_usuarioActual), "Apertura y Cierre de Caja", btnCaja);
             this.btnVentas.Click += (s, e) => AbrirFormEnContent(new FormVenta(_usuarioActual), "Punto de Venta DTE", btnVentas);
             this.btnLibroVentas.Click += (s, e) => AbrirFormEnContent(new FormLibroVentas(), "Libro de Ventas Electrónico (LVE) y Formulario F29", btnLibroVentas);
+            this.btnLibroCompras.Click += (s, e) => AbrirFormEnContent(new FormLibroCompras(), "Libro de Compras y Control de Facturas Recibidas", btnLibroCompras);
             this.btnFolios.Click += (s, e) => AbrirFormEnContent(new FormFolios(), "Control de Folios Autorizados (SII)", btnFolios);
             this.btnCompras.Click += (s, e) => AbrirFormEnContent(new FormCompras(), "Recepción de Compras e Incremento de Stock", btnCompras);
             this.btnClientes.Click += (s, e) => AbrirFormEnContent(new FormClientes(), "Gestión de Clientes (CRM)", btnClientes);
@@ -154,7 +160,7 @@ namespace SISTEMAACTUALIZADO
             this.lblTituloVista.TextAlign = ContentAlignment.MiddleLeft;
             this.lblTituloVista.AutoSize = true;
 
-            string nombreUser = _usuarioActual?.NombreCompleto ?? "Barbara";
+            string nombreUser = _usuarioActual?.NombreCompleto ?? "Bárbara";
             string rolUser = _usuarioActual?.Rol ?? "Administrador";
 
             this.lblUsuarioInfo = new Label
@@ -190,6 +196,7 @@ namespace SISTEMAACTUALIZADO
                 btnReportes.Visible = false;
                 btnFolios.Visible = false;
                 btnLibroVentas.Visible = false;
+                btnLibroCompras.Visible = false;
                 btnCompras.Visible = false;
             }
         }
@@ -230,7 +237,7 @@ namespace SISTEMAACTUALIZADO
         private void ResaltarBotonActivo(Button btn)
         {
             Button[] botones = new[] { 
-                btnCaja, btnVentas, btnLibroVentas, btnFolios, 
+                btnCaja, btnVentas, btnLibroVentas, btnLibroCompras, btnFolios, 
                 btnCompras, btnClientes, btnProductos, 
                 btnUsuarios, btnReportes, btnCerrarSesion 
             };
