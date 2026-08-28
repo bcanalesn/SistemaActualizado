@@ -168,5 +168,65 @@ namespace SISTEMAACTUALIZADO.Services
                 return idx;
             return 1;
         }
+
+        // Obtiene los márgenes globales vigentes configurados en el sistema
+        public static decimal[] ObtenerMargenesConfigurados()
+        {
+            try
+            {
+                using var db = new AppDbContext();
+                var prod = db.Productos.FirstOrDefault(p => p.Estado && p.PrecioCosto > 0 && p.PrecioUnitario > 0);
+                if (prod != null)
+                {
+                    decimal costo = prod.PrecioCosto;
+                    decimal[] precios = new decimal[] { prod.PrecioUnitario, prod.Precio2, prod.Precio3, prod.Precio4, prod.Precio5, prod.Precio6, prod.Precio7, prod.Precio8, prod.Precio9, prod.Precio10 };
+                    decimal[] margenes = new decimal[10];
+
+                    for (int i = 0; i < 10; i++)
+                    {
+                        if (precios[i] > 0)
+                        {
+                            decimal neto = precios[i] / 1.19m;
+                            decimal margenCalc = ((neto / costo) - 1m) * 100m;
+                            margenes[i] = Math.Round(margenCalc, 1);
+                        }
+                    }
+                    return margenes;
+                }
+            }
+            catch { }
+
+            return new decimal[] { 60m, 50m, 18m, 12m, 5m, 0m, 0m, 0m, 0m, 0m };
+        }
+
+        // Calcula el precio bruto final con IVA y redondeo a la decena
+        public static decimal CalcularPrecioVenta(decimal costoNeto, decimal margenPorcentaje, bool redondear = true)
+        {
+            if (costoNeto <= 0 || margenPorcentaje <= 0) return 0m;
+            decimal neto = costoNeto * (1m + (margenPorcentaje / 100m));
+            decimal bruto = neto * 1.19m;
+            return redondear ? Math.Round(bruto / 10m, MidpointRounding.AwayFromZero) * 10m : Math.Round(bruto, 0);
+        }
+
+        // Aplica el nuevo costo y recalcula todas las listas activas (> 0%)
+        public static void AplicarNuevoCostoYRecalcularListas(Producto prod, decimal nuevoCostoNeto, decimal[]? margenes = null)
+        {
+            if (nuevoCostoNeto <= 0) return;
+            margenes ??= ObtenerMargenesConfigurados();
+
+            prod.PrecioCosto = nuevoCostoNeto;
+            if (margenes[0] > 0) prod.PrecioUnitario = CalcularPrecioVenta(nuevoCostoNeto, margenes[0]);
+            prod.Precio2 = margenes[1] > 0 ? CalcularPrecioVenta(nuevoCostoNeto, margenes[1]) : 0m;
+            prod.Precio3 = margenes[2] > 0 ? CalcularPrecioVenta(nuevoCostoNeto, margenes[2]) : 0m;
+            prod.Precio4 = margenes[3] > 0 ? CalcularPrecioVenta(nuevoCostoNeto, margenes[3]) : 0m;
+            prod.Precio5 = margenes[4] > 0 ? CalcularPrecioVenta(nuevoCostoNeto, margenes[4]) : 0m;
+            prod.Precio6 = margenes[5] > 0 ? CalcularPrecioVenta(nuevoCostoNeto, margenes[5]) : 0m;
+            prod.Precio7 = margenes[6] > 0 ? CalcularPrecioVenta(nuevoCostoNeto, margenes[6]) : 0m;
+            prod.Precio8 = margenes[7] > 0 ? CalcularPrecioVenta(nuevoCostoNeto, margenes[7]) : 0m;
+            prod.Precio9 = margenes[8] > 0 ? CalcularPrecioVenta(nuevoCostoNeto, margenes[8]) : 0m;
+            prod.Precio10 = margenes[9] > 0 ? CalcularPrecioVenta(nuevoCostoNeto, margenes[9]) : 0m;
+            prod.FchUpd = DateTime.Now;
+            prod.Sincro = 0;
+        }
     }
 }

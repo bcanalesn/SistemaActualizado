@@ -35,11 +35,15 @@ namespace SISTEMAACTUALIZADO.Services
                         if (producto != null)
                         {
                             producto.Stock += item.Cantidad;
-                            producto.PrecioCosto = item.PrecioCostoUnitario;
 
-                            if (actualizarPreciosVenta && item.PvpSugerido > 0)
+                            if (actualizarPreciosVenta && item.PrecioCostoUnitario > 0)
                             {
-                                producto.PrecioUnitario = item.PvpSugerido;
+                                // Actualiza costo base y recalcula todas las listas (1 a 10) con margen activo
+                                ProductoService.AplicarNuevoCostoYRecalcularListas(producto, item.PrecioCostoUnitario);
+                            }
+                            else
+                            {
+                                producto.PrecioCosto = item.PrecioCostoUnitario;
                             }
                         }
                     }

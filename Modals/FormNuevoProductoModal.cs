@@ -8,6 +8,7 @@ using System.Runtime.InteropServices;
 using System.Windows.Forms;
 using SISTEMAACTUALIZADO.Data;
 using SISTEMAACTUALIZADO.Models;
+using SISTEMAACTUALIZADO.Services;
 
 namespace SISTEMAACTUALIZADO.Modals
 {
@@ -449,20 +450,9 @@ namespace SISTEMAACTUALIZADO.Modals
         {
             if (!decimal.TryParse(txtPrecioCosto.Text.Trim(), out decimal costo) || costo <= 0) return;
 
-            int nroLista = rbModoEscala.Checked && _filasTramos.Count > 0
-                ? (_filasTramos[0].CbLista.SelectedIndex + 1)
-                : (cbListaPrecioPOS.SelectedIndex + 1);
-
-            if (_productoAEditar != null)
-            {
-                decimal precio = ObtenerPrecioPorListaNumero(_productoAEditar, nroLista);
-                txtPrecioUnitario.Text = precio.ToString("0");
-            }
-            else
-            {
-                decimal neto = costo * 1.35m;
-                txtPrecioUnitario.Text = (Math.Round(neto * 1.19m / 10m, 0, MidpointRounding.AwayFromZero) * 10m).ToString("0");
-            }
+            var margenes = ProductoService.ObtenerMargenesConfigurados();
+            decimal precioL1 = ProductoService.CalcularPrecioVenta(costo, margenes[0]);
+            txtPrecioUnitario.Text = precioL1.ToString("0");
         }
 
         private decimal ObtenerPrecioPorListaNumero(Producto p, int nroLista)

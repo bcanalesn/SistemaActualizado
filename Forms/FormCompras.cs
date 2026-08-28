@@ -49,7 +49,7 @@ namespace SISTEMAACTUALIZADO
         private TextBox txtCantidadRecibida = null!;
         private TextBox txtPrecioCosto = null!;
         private TextBox txtPvpSugerido = null!;
-        private Label lblPreviewPVP = null!;
+        private Label lblCostoAnterior = null!;
         private const string PLACEHOLDER_PROD = "🔍 Buscar por Código o Nombre...";
 
         // Paso 2 (Modo Gasto Interno)
@@ -364,13 +364,13 @@ namespace SISTEMAACTUALIZADO
             Label lcost = new Label { Text = "COSTO NETO ($)", Dock = DockStyle.Top, AutoSize = true, Font = new Font("Segoe UI", 7.5F, FontStyle.Bold), ForeColor = Color.FromArgb(100, 116, 139) };
             txtPrecioCosto = new TextBox { Text = "0", Font = new Font("Segoe UI", 9F, FontStyle.Bold), Dock = DockStyle.Top, Height = 24 };
             txtPrecioCosto.TextChanged += (s, e) => CalcularPreviewPrecioVenta();
-            lblPreviewPVP = new Label { Text = "PVP Sug: $0", Dock = DockStyle.Top, AutoSize = true, Font = new Font("Segoe UI", 7.5F, FontStyle.Bold), ForeColor = Color.FromArgb(16, 185, 129) };
-            pnlCosto.Controls.Add(lblPreviewPVP);
+            lblCostoAnterior = new Label { Text = "Costo Ant: $0", Dock = DockStyle.Top, AutoSize = true, Font = new Font("Segoe UI", 7F, FontStyle.Bold), ForeColor = Color.FromArgb(100, 116, 139) };
+            pnlCosto.Controls.Add(lblCostoAnterior);
             pnlCosto.Controls.Add(txtPrecioCosto);
             pnlCosto.Controls.Add(lcost);
 
-            txtPvpSugerido = new TextBox { Font = new Font("Segoe UI", 9F), PlaceholderText = "Auto-sugerido" };
-            Panel pnlPvp = EnvolverConLabel("PRECIO VENTA (IVA INC.)", txtPvpSugerido);
+            txtPvpSugerido = new TextBox { Font = new Font("Segoe UI", 9F, FontStyle.Bold), ReadOnly = true, BackColor = Color.FromArgb(248, 250, 252), ForeColor = Color.FromArgb(16, 185, 129) };
+            Panel pnlPvp = EnvolverConLabel("PRECIO VENTA (L1)", txtPvpSugerido);
 
             Panel pnlBtnAdd = new Panel { Dock = DockStyle.Fill, Padding = new Padding(6, 0, 0, 0) };
             Label lblEspacioBtnAdd = new Label { Text = " ", Dock = DockStyle.Top, AutoSize = true, Font = new Font("Segoe UI", 7.5F) };
@@ -910,8 +910,8 @@ namespace SISTEMAACTUALIZADO
             txtBuscarProducto.ForeColor = Color.FromArgb(148, 163, 184);
             lstSugerenciasProductos.Visible = false;
             txtPrecioCosto.Text = "0";
-            lblPreviewPVP.Text = "PVP Sug: $0";
-            txtPvpSugerido.Clear();
+            lblCostoAnterior.Text = "Costo Ant: $0";
+            txtPvpSugerido.Text = "0";
         }
 
         private void LstSugerenciasProductos_Click(object? sender, EventArgs e)
@@ -924,20 +924,9 @@ namespace SISTEMAACTUALIZADO
                 txtBuscarProducto.ForeColor = Color.FromArgb(37, 99, 235);
                 lstSugerenciasProductos.Visible = false;
 
-                // 1. Cargar costo actual registrado
-                decimal costo = p.PrecioCosto > 0 ? p.PrecioCosto : (p.PrecioUnitario > 0 ? Math.Round(p.PrecioUnitario / 1.19m / (1 + (p.MargenGanancia / 100m)), 0) : 0);
-                txtPrecioCosto.Text = costo.ToString("0");
-
-                // 2. Si el costo no cambia, mantener exactamente el PrecioUnitario (Lista 1) actual; si cambia, recalcular con su margen
-                if (p.PrecioUnitario > 0 && costo == p.PrecioCosto)
-                {
-                    lblPreviewPVP.Text = $"PVP Sug: ${p.PrecioUnitario:N0}";
-                    txtPvpSugerido.Text = p.PrecioUnitario.ToString("0");
-                }
-                else
-                {
-                    CalcularPreviewPrecioVenta();
-                }
+                lblCostoAnterior.Text = $"Costo Ant: ${p.PrecioCosto:N0}";
+                txtPrecioCosto.Text = p.PrecioCosto.ToString("0");
+                CalcularPreviewPrecioVenta();
 
                 txtCantidadRecibida.Focus();
                 txtCantidadRecibida.SelectAll();
@@ -950,16 +939,14 @@ namespace SISTEMAACTUALIZADO
 
             if (decimal.TryParse(txtPrecioCosto.Text.Trim(), out decimal costo) && costo > 0)
             {
-                // Usa el margen real guardado en el producto (ej: 59.7%)
-                decimal margen = _productoSeleccionado.MargenGanancia > 0 ? _productoSeleccionado.MargenGanancia : 30m;
-
-                // Misma fórmula oficial de FormConfigurarMargenesModal
-                decimal neto = costo * (1 + (margen / 100m));
-                decimal bruto = neto * 1.19m;
-                decimal pvpSugerido = Math.Round(bruto / 10m, MidpointRounding.AwayFromZero) * 10m;
-
-                lblPreviewPVP.Text = $"PVP Sug: ${pvpSugerido:N0}";
-                txtPvpSugerido.Text = pvpSugerido.ToString("0");
+                var margenes = ProductoService.ObtenerMargenesConfigurados();
+                decimal margenL1 = _productoSeleccionado.MargenGanancia > 0 ? _productoSeleccionado.MargenGanancia : margenes[0];
+                decimal precioVentaL1 = ProductoService.CalcularPrecioVenta(costo, margenL1);
+                txtPvpSugerido.Text = precioVentaL1.ToString("0");
+            }
+            else
+            {
+                txtPvpSugerido.Text = "0";
             }
         }
 
