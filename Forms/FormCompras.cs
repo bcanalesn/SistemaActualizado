@@ -64,6 +64,7 @@ namespace SISTEMAACTUALIZADO
         private Label lblTituloGrilla = null!;
         private Label lblContadorLineas = null!;
         private DataGridView dgvDetalle = null!;
+        private Button btnQuitarItem = null!;
         private Label lblTotalNeto = null!;
         private Label lblIvaCredito = null!;
         private Label lblTotalBruto = null!;
@@ -85,6 +86,9 @@ namespace SISTEMAACTUALIZADO
             this.Font = new Font("Segoe UI", 9F, FontStyle.Regular, GraphicsUnit.Point);
             this.Dock = DockStyle.Fill;
             this.FormBorderStyle = FormBorderStyle.None;
+            // Recomendado en el shell principal (Program.cs / Form contenedor):
+            // Application.SetHighDpiMode(HighDpiMode.PerMonitorV2) + this.AutoScaleMode = AutoScaleMode.Dpi;
+            // para que el escalado de Windows (125%/150%) no desalinee los controles.
 
             Panel pnlMain = new Panel { Dock = DockStyle.Fill, Padding = new Padding(20, 10, 20, 16), AutoScroll = true };
 
@@ -108,11 +112,14 @@ namespace SISTEMAACTUALIZADO
             pnlMain.Controls.Add(pnlIzquierda);
             pnlMain.Controls.Add(pnlDerecha);
 
-            // Listas Predictivas Flotantes
-            lstSugerenciasProveedores = new ListBox { Size = new Size(320, 130), Location = new Point(36, 175), Font = new Font("Segoe UI", 9F), Visible = false, BorderStyle = BorderStyle.FixedSingle };
+            // Listas Predictivas Flotantes.
+            // Ya NO se posicionan con Point fijo: ahora se ubican dinámicamente
+            // justo debajo del cuadro de búsqueda real (ver PosicionarListaSugerencias),
+            // porque con layout responsivo el cuadro puede estar en cualquier X/Y.
+            lstSugerenciasProveedores = new ListBox { Size = new Size(320, 130), Font = new Font("Segoe UI", 9F), Visible = false, BorderStyle = BorderStyle.FixedSingle };
             lstSugerenciasProveedores.Click += LstSugerenciasProveedores_Click;
 
-            lstSugerenciasProductos = new ListBox { Size = new Size(320, 130), Location = new Point(36, 280), Font = new Font("Segoe UI", 9F), Visible = false, BorderStyle = BorderStyle.FixedSingle };
+            lstSugerenciasProductos = new ListBox { Size = new Size(320, 130), Font = new Font("Segoe UI", 9F), Visible = false, BorderStyle = BorderStyle.FixedSingle };
             lstSugerenciasProductos.Click += LstSugerenciasProductos_Click;
 
             pnlMain.Controls.Add(lstSugerenciasProductos);
@@ -122,148 +129,361 @@ namespace SISTEMAACTUALIZADO
             this.ResumeLayout(false);
         }
 
+        // ==========================================
+        // BARRA DE SELECTORES DE MODO (RESPONSIVA)
+        // ==========================================
         private Panel CrearBarraSelectoresModo()
         {
-            Panel pnl = new Panel { Dock = DockStyle.Top, Height = 78, Margin = new Padding(0, 0, 0, 10) };
+            Panel pnl = new Panel 
+            { 
+                Dock = DockStyle.Top, 
+                Height = 78, 
+                Margin = new Padding(0, 0, 0, 14), 
+                Padding = new Padding(0, 0, 0, 8) 
+            };
 
-            pnlCardMercaderia = new Panel { Location = new Point(0, 4), Size = new Size(390, 68), BackColor = Color.FromArgb(239, 246, 255), Cursor = Cursors.Hand };
-            pnlCardMercaderia.Paint += (s, e) => {
+            TableLayoutPanel tabla = new TableLayoutPanel { Dock = DockStyle.Fill, ColumnCount = 2, RowCount = 1 };
+            tabla.ColumnStyles.Add(new ColumnStyle(SizeType.Percent, 48F));
+            tabla.ColumnStyles.Add(new ColumnStyle(SizeType.Percent, 52F));
+            tabla.RowStyles.Add(new RowStyle(SizeType.Percent, 100F));
+
+            pnlCardMercaderia = CrearTarjetaModo("📦", "Mercadería para venta", "Aumenta stock de productos", out lblBadgeMercaderiaCheck, esActivoInicial: true);
+            pnlCardMercaderia.Margin = new Padding(0, 2, 6, 2);
+            pnlCardMercaderia.Paint += (s, e) =>
+            {
                 Color border = _esModoMercaderia ? Color.FromArgb(37, 99, 235) : Color.FromArgb(226, 232, 240);
-                ControlPaint.DrawBorder(e.Graphics, pnlCardMercaderia.ClientRectangle, border, _esModoMercaderia ? 2 : 1, ButtonBorderStyle.Solid, border, _esModoMercaderia ? 2 : 1, ButtonBorderStyle.Solid, border, _esModoMercaderia ? 2 : 1, ButtonBorderStyle.Solid, border, _esModoMercaderia ? 2 : 1, ButtonBorderStyle.Solid);
+                int w = _esModoMercaderia ? 2 : 1;
+                ControlPaint.DrawBorder(e.Graphics, pnlCardMercaderia.ClientRectangle, border, w, ButtonBorderStyle.Solid, border, w, ButtonBorderStyle.Solid, border, w, ButtonBorderStyle.Solid, border, w, ButtonBorderStyle.Solid);
             };
+            AsignarClickRecursivo(pnlCardMercaderia, (s, e) => AplicarModoVisual(true));
 
-            Label lblIconM = new Label { Text = "📦", Font = new Font("Segoe UI", 16F), Location = new Point(12, 16), AutoSize = true };
-            Label lblTitM = new Label { Text = "Mercadería para venta", Font = new Font("Segoe UI", 10F, FontStyle.Bold), ForeColor = Color.FromArgb(15, 23, 42), Location = new Point(52, 14), AutoSize = true };
-            Label lblSubM = new Label { Text = "Aumenta stock de productos", Font = new Font("Segoe UI", 8.5F), ForeColor = Color.FromArgb(100, 116, 139), Location = new Point(52, 36), AutoSize = true };
-            lblBadgeMercaderiaCheck = new Label { Text = "✔", Font = new Font("Segoe UI", 10F, FontStyle.Bold), ForeColor = Color.White, BackColor = Color.FromArgb(37, 99, 235), Size = new Size(22, 22), Location = new Point(350, 22), TextAlign = ContentAlignment.MiddleCenter };
-            pnlCardMercaderia.Controls.AddRange(new Control[] { lblIconM, lblTitM, lblSubM, lblBadgeMercaderiaCheck });
-            pnlCardMercaderia.Click += (s, e) => AplicarModoVisual(true);
-            foreach (Control c in pnlCardMercaderia.Controls) c.Click += (s, e) => AplicarModoVisual(true);
-
-            pnlCardGasto = new Panel { Location = new Point(410, 4), Size = new Size(420, 68), BackColor = Color.White, Cursor = Cursors.Hand };
-            pnlCardGasto.Paint += (s, e) => {
+            pnlCardGasto = CrearTarjetaModo("📄", "Gasto / insumo interno", "No afecta stock — solo Libro de Compras", out lblBadgeGastoCheck, esActivoInicial: false);
+            pnlCardGasto.Margin = new Padding(6, 2, 0, 2);
+            pnlCardGasto.Paint += (s, e) =>
+            {
                 Color border = !_esModoMercaderia ? Color.FromArgb(124, 58, 237) : Color.FromArgb(226, 232, 240);
-                ControlPaint.DrawBorder(e.Graphics, pnlCardGasto.ClientRectangle, border, !_esModoMercaderia ? 2 : 1, ButtonBorderStyle.Solid, border, !_esModoMercaderia ? 2 : 1, ButtonBorderStyle.Solid, border, !_esModoMercaderia ? 2 : 1, ButtonBorderStyle.Solid, border, !_esModoMercaderia ? 2 : 1, ButtonBorderStyle.Solid);
+                int w = !_esModoMercaderia ? 2 : 1;
+                ControlPaint.DrawBorder(e.Graphics, pnlCardGasto.ClientRectangle, border, w, ButtonBorderStyle.Solid, border, w, ButtonBorderStyle.Solid, border, w, ButtonBorderStyle.Solid, border, w, ButtonBorderStyle.Solid);
             };
+            AsignarClickRecursivo(pnlCardGasto, (s, e) => AplicarModoVisual(false));
 
-            Label lblIconG = new Label { Text = "📄", Font = new Font("Segoe UI", 16F), Location = new Point(12, 16), AutoSize = true };
-            Label lblTitG = new Label { Text = "Gasto / insumo interno", Font = new Font("Segoe UI", 10F, FontStyle.Bold), ForeColor = Color.FromArgb(15, 23, 42), Location = new Point(52, 14), AutoSize = true };
-            Label lblSubG = new Label { Text = "No afecta stock — solo Libro de Compras", Font = new Font("Segoe UI", 8.5F), ForeColor = Color.FromArgb(100, 116, 139), Location = new Point(52, 36), AutoSize = true };
-            lblBadgeGastoCheck = new Label { Text = "", Font = new Font("Segoe UI", 10F, FontStyle.Bold), ForeColor = Color.White, BackColor = Color.FromArgb(226, 232, 240), Size = new Size(22, 22), Location = new Point(380, 22), TextAlign = ContentAlignment.MiddleCenter };
-            pnlCardGasto.Controls.AddRange(new Control[] { lblIconG, lblTitG, lblSubG, lblBadgeGastoCheck });
-            pnlCardGasto.Click += (s, e) => AplicarModoVisual(false);
-            foreach (Control c in pnlCardGasto.Controls) c.Click += (s, e) => AplicarModoVisual(false);
+            tabla.Controls.Add(pnlCardMercaderia, 0, 0);
+            tabla.Controls.Add(pnlCardGasto, 1, 0);
 
-            pnl.Controls.AddRange(new Control[] { pnlCardMercaderia, pnlCardGasto });
+            pnl.Controls.Add(tabla);
             return pnl;
         }
 
+        private Panel CrearTarjetaModo(string icono, string titulo, string subtitulo, out Label badge, bool esActivoInicial)
+        {
+            Panel card = new Panel { Dock = DockStyle.Fill, BackColor = esActivoInicial ? Color.FromArgb(239, 246, 255) : Color.White, Cursor = Cursors.Hand };
+
+            Label lblIcon = new Label { Text = icono, Font = new Font("Segoe UI", 16F), Dock = DockStyle.Left, Width = 46, TextAlign = ContentAlignment.MiddleCenter };
+
+            Label badgeLocal = new Label
+            {
+                Text = esActivoInicial ? "✔" : "",
+                Font = new Font("Segoe UI", 10F, FontStyle.Bold),
+                ForeColor = Color.White,
+                BackColor = esActivoInicial ? Color.FromArgb(37, 99, 235) : Color.FromArgb(226, 232, 240),
+                Size = new Size(22, 22),
+                Dock = DockStyle.Right,
+                Margin = new Padding(0, 22, 12, 0),
+                TextAlign = ContentAlignment.MiddleCenter
+            };
+            badge = badgeLocal;
+
+            Panel pnlTextos = new Panel { Dock = DockStyle.Fill, Padding = new Padding(0, 14, 0, 0) };
+            Label lblTit = new Label { Text = titulo, Font = new Font("Segoe UI", 10F, FontStyle.Bold), ForeColor = Color.FromArgb(15, 23, 42), Dock = DockStyle.Top, AutoSize = true };
+            Label lblSub = new Label { Text = subtitulo, Font = new Font("Segoe UI", 8.5F), ForeColor = Color.FromArgb(100, 116, 139), Dock = DockStyle.Top, AutoSize = true };
+            pnlTextos.Controls.Add(lblSub);
+            pnlTextos.Controls.Add(lblTit);
+
+            card.Controls.Add(pnlTextos);
+            card.Controls.Add(badgeLocal);
+            card.Controls.Add(lblIcon);
+            return card;
+        }
+
+        private void AsignarClickRecursivo(Control contenedor, EventHandler handler)
+        {
+            contenedor.Click += handler;
+            foreach (Control hijo in contenedor.Controls)
+            {
+                hijo.Click += handler;
+                if (hijo.HasChildren) AsignarClickRecursivo(hijo, handler);
+            }
+        }
+
+        // ==========================================
+        // PASO 1: DOCUMENTO (RESPONSIVO)
+        // ==========================================
         private Panel CrearPaso1Documento()
         {
-            Panel pnl = new Panel { Dock = DockStyle.Top, Height = 100, BackColor = Color.White, Padding = new Padding(16, 8, 16, 8), Margin = new Padding(0, 0, 0, 10) };
+            Panel pnl = new Panel 
+            { 
+                Dock = DockStyle.Top, 
+                Height = 92, 
+                BackColor = Color.White, 
+                Padding = new Padding(16, 30, 16, 8), 
+                Margin = new Padding(0, 0, 0, 14) 
+            };
             pnl.Paint += (s, e) => ControlPaint.DrawBorder(e.Graphics, pnl.ClientRectangle, Color.FromArgb(226, 232, 240), ButtonBorderStyle.Solid);
 
-            lblTagDocumento = new Label { Text = "📦 DOCUMENTO DE MERCADERÍA", Font = new Font("Segoe UI", 7.5F, FontStyle.Bold), ForeColor = Color.FromArgb(37, 99, 235), BackColor = Color.FromArgb(239, 246, 255), Location = new Point(16, 8), AutoSize = true, Padding = new Padding(4, 2, 4, 2) };
+            lblTagDocumento = new Label
+            {
+                Text = "📦 DOCUMENTO DE MERCADERÍA",
+                Font = new Font("Segoe UI", 7.5F, FontStyle.Bold),
+                ForeColor = Color.FromArgb(37, 99, 235),
+                BackColor = Color.FromArgb(239, 246, 255),
+                AutoSize = true,
+                Padding = new Padding(4, 2, 4, 2),
+                Location = new Point(16, 8)
+            };
 
-            Panel pnlProv = new Panel { Location = new Point(16, 32), Size = new Size(280, 52) };
-            Label lp = new Label { Text = "1. PROVEEDOR (RUT O NOMBRE)", Font = new Font("Segoe UI", 7.5F, FontStyle.Bold), ForeColor = Color.FromArgb(100, 116, 139), Location = new Point(0, 0), AutoSize = true };
-            txtBuscarProveedor = new TextBox { Text = PLACEHOLDER_PROV, ForeColor = Color.FromArgb(148, 163, 184), Font = new Font("Segoe UI", 8.5F, FontStyle.Italic), Location = new Point(0, 18), Size = new Size(185, 24) };
+            TableLayoutPanel tabla = new TableLayoutPanel { Dock = DockStyle.Fill, ColumnCount = 5, RowCount = 1 };
+            tabla.ColumnStyles.Add(new ColumnStyle(SizeType.Percent, 38F)); // Proveedor
+            tabla.ColumnStyles.Add(new ColumnStyle(SizeType.Percent, 16F)); // Tipo Doc
+            tabla.ColumnStyles.Add(new ColumnStyle(SizeType.Percent, 14F)); // N° Documento
+            tabla.ColumnStyles.Add(new ColumnStyle(SizeType.Percent, 15F)); // Fecha
+            tabla.ColumnStyles.Add(new ColumnStyle(SizeType.Percent, 17F)); // Botón Lista Proveedores
+            tabla.RowStyles.Add(new RowStyle(SizeType.Percent, 100F));
+
+            // Columna 1: Proveedor
+            Panel pnlProv = new Panel { Dock = DockStyle.Fill, Padding = new Padding(0, 0, 6, 0) };
+            Label lp = new Label { Text = "1. PROVEEDOR (RUT O NOMBRE)", Dock = DockStyle.Top, AutoSize = true, Font = new Font("Segoe UI", 7.5F, FontStyle.Bold), ForeColor = Color.FromArgb(100, 116, 139) };
+            
+            Panel pnlProvFila = new Panel { Dock = DockStyle.Top, Height = 28, Padding = new Padding(0, 2, 0, 0) };
+            txtBuscarProveedor = new TextBox { Text = PLACEHOLDER_PROV, ForeColor = Color.FromArgb(148, 163, 184), Font = new Font("Segoe UI", 8.5F, FontStyle.Italic), Dock = DockStyle.Fill };
             ConfigurarEventosBuscadorProveedor();
-            btnLimpiarBuscadorProv = CrearBotonIcono("🗑️", 188, 18, (s, e) => ResetearBuscadorProveedor());
-            btnNuevoProveedor = CrearBotonAccionRapida("➕", Color.FromArgb(2, 132, 199), 218, 18, BtnNuevoProveedor_Click);
-            btnEditarProveedor = CrearBotonAccionRapida("✏️", Color.FromArgb(245, 158, 11), 248, 18, BtnEditarProveedor_Click);
-            pnlProv.Controls.AddRange(new Control[] { lp, txtBuscarProveedor, btnLimpiarBuscadorProv, btnNuevoProveedor, btnEditarProveedor });
+            
+            FlowLayoutPanel pnlBotonesProv = new FlowLayoutPanel { Dock = DockStyle.Right, AutoSize = true, FlowDirection = FlowDirection.LeftToRight, WrapContents = false, Margin = new Padding(0), Padding = new Padding(0) };
+            btnLimpiarBuscadorProv = CrearBotonIcono("🗑️", 0, 0, (s, e) => ResetearBuscadorProveedor());
+            btnNuevoProveedor = CrearBotonAccionRapida("➕", Color.FromArgb(2, 132, 199), 0, 0, BtnNuevoProveedor_Click);
+            btnEditarProveedor = CrearBotonAccionRapida("✏️", Color.FromArgb(245, 158, 11), 0, 0, BtnEditarProveedor_Click);
+            pnlBotonesProv.Controls.AddRange(new Control[] { btnLimpiarBuscadorProv, btnNuevoProveedor, btnEditarProveedor });
+            
+            pnlProvFila.Controls.Add(txtBuscarProveedor);
+            pnlProvFila.Controls.Add(pnlBotonesProv);
+            pnlProv.Controls.Add(pnlProvFila);
+            pnlProv.Controls.Add(lp);
 
-            Label lt = new Label { Text = "2. TIPO DOC.", Location = new Point(310, 32), AutoSize = true, Font = new Font("Segoe UI", 7.5F, FontStyle.Bold), ForeColor = Color.FromArgb(100, 116, 139) };
-            cbTipoDocumento = new ComboBox { Location = new Point(310, 50), Size = new Size(150, 26), DropDownStyle = ComboBoxStyle.DropDownList };
+            // Columnas 2 a 4
+            cbTipoDocumento = new ComboBox { DropDownStyle = ComboBoxStyle.DropDownList };
             cbTipoDocumento.Items.AddRange(new string[] { "Factura de Compra", "Factura Exenta", "Boleta de Compra", "Guía de Recepción" });
             cbTipoDocumento.SelectedIndex = 0;
+            Panel pnlTipo = EnvolverConLabel("2. TIPO DOC.", cbTipoDocumento);
 
-            Label ln = new Label { Text = "3. N° DE DOCUMENTO", Location = new Point(475, 32), AutoSize = true, Font = new Font("Segoe UI", 7.5F, FontStyle.Bold), ForeColor = Color.FromArgb(100, 116, 139) };
-            txtNroDocumento = new TextBox { Location = new Point(475, 50), Size = new Size(110, 26), Font = new Font("Segoe UI", 9F, FontStyle.Bold) };
+            txtNroDocumento = new TextBox { Font = new Font("Segoe UI", 9F, FontStyle.Bold) };
             txtNroDocumento.KeyPress += (s, e) => { if (!char.IsControl(e.KeyChar) && !char.IsDigit(e.KeyChar)) e.Handled = true; };
+            Panel pnlFolio = EnvolverConLabel("3. N° DE DOCUMENTO", txtNroDocumento);
 
-            Label lf = new Label { Text = "4. FECHA EMISIÓN", Location = new Point(600, 32), AutoSize = true, Font = new Font("Segoe UI", 7.5F, FontStyle.Bold), ForeColor = Color.FromArgb(100, 116, 139) };
-            dtpFechaEmision = new DateTimePicker { Location = new Point(600, 50), Size = new Size(115, 26), Format = DateTimePickerFormat.Short, Value = DateTime.Today };
+            dtpFechaEmision = new DateTimePicker { Format = DateTimePickerFormat.Short, Value = DateTime.Today };
+            Panel pnlFecha = EnvolverConLabel("4. FECHA EMISIÓN", dtpFechaEmision);
 
-            Button btnListaProv = new Button { Text = "📖 Lista Proveedores", Location = new Point(730, 48), Size = new Size(130, 28), BackColor = Color.FromArgb(15, 23, 42), ForeColor = Color.White, FlatStyle = FlatStyle.Flat, Font = new Font("Segoe UI", 8F, FontStyle.Bold), Cursor = Cursors.Hand };
+            // Columna 5: Botón Lista Proveedores
+            Panel pnlBtnLista = new Panel { Dock = DockStyle.Fill, Padding = new Padding(6, 0, 0, 0) };
+            Label lblEspacioBtn = new Label { Text = " ", Dock = DockStyle.Top, AutoSize = true, Font = new Font("Segoe UI", 7.5F) };
+            Button btnListaProv = new Button { Text = "📖 Lista Proveedores", Dock = DockStyle.Top, Height = 26, BackColor = Color.FromArgb(15, 23, 42), ForeColor = Color.White, FlatStyle = FlatStyle.Flat, Font = new Font("Segoe UI", 8F, FontStyle.Bold), Cursor = Cursors.Hand };
             btnListaProv.FlatAppearance.BorderSize = 0;
             btnListaProv.Click += BtnListaProveedores_Click;
+            pnlBtnLista.Controls.Add(btnListaProv);
+            pnlBtnLista.Controls.Add(lblEspacioBtn);
 
-            pnl.Controls.AddRange(new Control[] { lblTagDocumento, pnlProv, lt, cbTipoDocumento, ln, txtNroDocumento, lf, dtpFechaEmision, btnListaProv });
+            tabla.Controls.Add(pnlProv, 0, 0);
+            tabla.Controls.Add(pnlTipo, 1, 0);
+            tabla.Controls.Add(pnlFolio, 2, 0);
+            tabla.Controls.Add(pnlFecha, 3, 0);
+            tabla.Controls.Add(pnlBtnLista, 4, 0);
+
+            pnl.Controls.Add(tabla);
+            pnl.Controls.Add(lblTagDocumento);
             return pnl;
         }
 
-        private void CrearPaso2Detalle()
+        /// <summary>Envuelve un control con su label superior, ambos dockeados (patrón reutilizado en todo el formulario).</summary>
+        private Panel EnvolverConLabel(string texto, Control control)
         {
-            // Mercadería
-            pnlPaso2Mercaderia = new Panel { Dock = DockStyle.Top, Height = 80, BackColor = Color.White, Padding = new Padding(16, 8, 16, 8), Margin = new Padding(0, 0, 0, 10) };
-            pnlPaso2Mercaderia.Paint += (s, e) => ControlPaint.DrawBorder(e.Graphics, pnlPaso2Mercaderia.ClientRectangle, Color.FromArgb(226, 232, 240), ButtonBorderStyle.Solid);
-
-            Panel pnlProd = new Panel { Location = new Point(16, 10), Size = new Size(280, 52) };
-            Label lpr = new Label { Text = "SELECCIONAR PRODUCTO (CÓDIGO O NOMBRE)", Font = new Font("Segoe UI", 7.5F, FontStyle.Bold), ForeColor = Color.FromArgb(100, 116, 139), Location = new Point(0, 0), AutoSize = true };
-            txtBuscarProducto = new TextBox { Text = PLACEHOLDER_PROD, ForeColor = Color.FromArgb(148, 163, 184), Font = new Font("Segoe UI", 8.5F, FontStyle.Italic), Location = new Point(0, 18), Size = new Size(185, 24) };
-            ConfigurarEventosBuscadorProducto();
-            btnLimpiarBuscadorProd = CrearBotonIcono("🗑️", 188, 18, (s, e) => ResetearBuscadorProducto());
-            btnNuevoProducto = CrearBotonAccionRapida("➕", Color.FromArgb(2, 132, 199), 218, 18, BtnNuevoProducto_Click);
-            btnEditarProducto = CrearBotonAccionRapida("✏️", Color.FromArgb(245, 158, 11), 248, 18, BtnEditarProducto_Click);
-            pnlProd.Controls.AddRange(new Control[] { lpr, txtBuscarProducto, btnLimpiarBuscadorProd, btnNuevoProducto, btnEditarProducto });
-
-            Label lc = new Label { Text = "CANT. RECIBIDA", Location = new Point(310, 10), AutoSize = true, Font = new Font("Segoe UI", 7.5F, FontStyle.Bold), ForeColor = Color.FromArgb(100, 116, 139) };
-            txtCantidadRecibida = new TextBox { Location = new Point(310, 28), Size = new Size(70, 24), Text = "1", Font = new Font("Segoe UI", 9F, FontStyle.Bold), TextAlign = HorizontalAlignment.Center };
-            txtCantidadRecibida.KeyPress += (s, e) => { if (!char.IsControl(e.KeyChar) && !char.IsDigit(e.KeyChar)) e.Handled = true; };
-
-            Label lcost = new Label { Text = "COSTO NETO ($)", Location = new Point(395, 10), AutoSize = true, Font = new Font("Segoe UI", 7.5F, FontStyle.Bold), ForeColor = Color.FromArgb(100, 116, 139) };
-            txtPrecioCosto = new TextBox { Location = new Point(395, 28), Size = new Size(95, 24), Text = "0", Font = new Font("Segoe UI", 9F, FontStyle.Bold) };
-            txtPrecioCosto.TextChanged += (s, e) => CalcularPreviewPrecioVenta();
-
-            lblPreviewPVP = new Label { Text = "PVP Sug: $0", Location = new Point(395, 54), AutoSize = true, Font = new Font("Segoe UI", 7.5F, FontStyle.Bold), ForeColor = Color.FromArgb(16, 185, 129) };
-
-            Label lpvp = new Label { Text = "PRECIO VENTA (IVA INC.)", Location = new Point(505, 10), AutoSize = true, Font = new Font("Segoe UI", 7.5F, FontStyle.Bold), ForeColor = Color.FromArgb(100, 116, 139) };
-            txtPvpSugerido = new TextBox { Location = new Point(505, 28), Size = new Size(110, 24), Font = new Font("Segoe UI", 9F), PlaceholderText = "Auto-sugerido" };
-
-            Button btnAddM = new Button { Text = "+ Agregar", Location = new Point(630, 24), Size = new Size(95, 30), BackColor = Color.FromArgb(37, 99, 235), ForeColor = Color.White, FlatStyle = FlatStyle.Flat, Font = new Font("Segoe UI", 8.5F, FontStyle.Bold), Cursor = Cursors.Hand };
-            btnAddM.FlatAppearance.BorderSize = 0;
-            btnAddM.Click += BtnAgregarMercaderia_Click;
-
-            pnlPaso2Mercaderia.Controls.AddRange(new Control[] { pnlProd, lc, txtCantidadRecibida, lcost, txtPrecioCosto, lblPreviewPVP, lpvp, txtPvpSugerido, btnAddM });
-
-            // Gasto Interno
-            pnlPaso2Gasto = new Panel { Dock = DockStyle.Top, Height = 95, BackColor = Color.White, Padding = new Padding(16, 8, 16, 8), Margin = new Padding(0, 0, 0, 10), Visible = false };
-            pnlPaso2Gasto.Paint += (s, e) => ControlPaint.DrawBorder(e.Graphics, pnlPaso2Gasto.ClientRectangle, Color.FromArgb(226, 232, 240), ButtonBorderStyle.Solid);
-
-            Label ldesc = new Label { Text = "DESCRIPCIÓN DEL GASTO", Location = new Point(16, 8), AutoSize = true, Font = new Font("Segoe UI", 7.5F, FontStyle.Bold), ForeColor = Color.FromArgb(100, 116, 139) };
-            txtDescripcionGasto = new TextBox { Location = new Point(16, 26), Size = new Size(280, 24), Font = new Font("Segoe UI", 9F), PlaceholderText = "Ej: Materiales reparación escritorio recepción" };
-
-            Label lcat = new Label { Text = "CATEGORÍA / CUENTA CONTABLE", Location = new Point(310, 8), AutoSize = true, Font = new Font("Segoe UI", 7.5F, FontStyle.Bold), ForeColor = Color.FromArgb(100, 116, 139) };
-            cbCategoriaGasto = new ComboBox { Location = new Point(310, 26), Size = new Size(180, 26), DropDownStyle = ComboBoxStyle.DropDownList };
-            cbCategoriaGasto.Items.AddRange(new string[] { "Mantención de activos", "Materiales de oficina", "Insumos y Aseo", "Servicios Básicos", "Mobiliario y Equipamiento", "Gastos Operacionales Varios" });
-            cbCategoriaGasto.SelectedIndex = 0;
-
-            Label lm = new Label { Text = "MONTO NETO ($)", Location = new Point(505, 8), AutoSize = true, Font = new Font("Segoe UI", 7.5F, FontStyle.Bold), ForeColor = Color.FromArgb(100, 116, 139) };
-            txtMontoNetoGasto = new TextBox { Location = new Point(505, 26), Size = new Size(110, 24), Text = "0", Font = new Font("Segoe UI", 9F, FontStyle.Bold) };
-
-            chkCapitalizaActivo = new CheckBox { Text = "¿Se capitaliza a un activo fijo existente?", Location = new Point(16, 60), AutoSize = true, Font = new Font("Segoe UI", 8F, FontStyle.Bold), ForeColor = Color.FromArgb(124, 58, 237) };
-            txtNombreActivoFijo = new TextBox { Location = new Point(280, 58), Size = new Size(180, 22), Font = new Font("Segoe UI", 8.5F), Visible = false, PlaceholderText = "Seleccionar activo..." };
-            chkCapitalizaActivo.CheckedChanged += (s, e) => txtNombreActivoFijo.Visible = chkCapitalizaActivo.Checked;
-
-            Button btnAddG = new Button { Text = "+ Agregar", Location = new Point(630, 24), Size = new Size(95, 30), BackColor = Color.FromArgb(124, 58, 237), ForeColor = Color.White, FlatStyle = FlatStyle.Flat, Font = new Font("Segoe UI", 8.5F, FontStyle.Bold), Cursor = Cursors.Hand };
-            btnAddG.FlatAppearance.BorderSize = 0;
-            btnAddG.Click += BtnAgregarGasto_Click;
-
-            pnlPaso2Gasto.Controls.AddRange(new Control[] { ldesc, txtDescripcionGasto, lcat, cbCategoriaGasto, lm, txtMontoNetoGasto, chkCapitalizaActivo, txtNombreActivoFijo, btnAddG });
+            Panel p = new Panel { Dock = DockStyle.Fill, Padding = new Padding(6, 0, 6, 0) };
+            Label l = new Label { Text = texto, Dock = DockStyle.Top, AutoSize = true, Font = new Font("Segoe UI", 7.5F, FontStyle.Bold), ForeColor = Color.FromArgb(100, 116, 139) };
+            control.Height = 26;
+            control.Dock = DockStyle.Top;
+            p.Controls.Add(control);
+            p.Controls.Add(l);
+            return p;
         }
 
+        // ==========================================
+        // PASO 2: DETALLE (RESPONSIVO)
+        // ==========================================
+        private void CrearPaso2Detalle()
+        {
+            // ---------- Mercadería ----------
+            pnlPaso2Mercaderia = new Panel 
+            { 
+                Dock = DockStyle.Top, 
+                Height = 92, 
+                BackColor = Color.White, 
+                Padding = new Padding(16, 12, 16, 8), 
+                Margin = new Padding(0, 0, 0, 14) 
+            };
+            pnlPaso2Mercaderia.Paint += (s, e) => ControlPaint.DrawBorder(e.Graphics, pnlPaso2Mercaderia.ClientRectangle, Color.FromArgb(226, 232, 240), ButtonBorderStyle.Solid);
+
+            TableLayoutPanel tablaM = new TableLayoutPanel { Dock = DockStyle.Fill, ColumnCount = 5, RowCount = 1 };
+            tablaM.ColumnStyles.Add(new ColumnStyle(SizeType.Percent, 34F)); // Producto
+            tablaM.ColumnStyles.Add(new ColumnStyle(SizeType.Percent, 13F)); // Cantidad
+            tablaM.ColumnStyles.Add(new ColumnStyle(SizeType.Percent, 18F)); // Costo Neto
+            tablaM.ColumnStyles.Add(new ColumnStyle(SizeType.Percent, 20F)); // Precio Venta
+            tablaM.ColumnStyles.Add(new ColumnStyle(SizeType.Percent, 15F)); // Botón
+            tablaM.RowStyles.Add(new RowStyle(SizeType.Percent, 100F));
+
+            // Columna Producto
+            Panel pnlProd = new Panel { Dock = DockStyle.Fill, Padding = new Padding(0, 0, 6, 0) };
+            Label lpr = new Label { Text = "SELECCIONAR PRODUCTO (CÓDIGO O NOMBRE)", Dock = DockStyle.Top, AutoSize = true, Font = new Font("Segoe UI", 7.5F, FontStyle.Bold), ForeColor = Color.FromArgb(100, 116, 139) };
+            
+            Panel pnlProdFila = new Panel { Dock = DockStyle.Top, Height = 28, Padding = new Padding(0, 2, 0, 0) };
+            txtBuscarProducto = new TextBox { Text = PLACEHOLDER_PROD, ForeColor = Color.FromArgb(148, 163, 184), Font = new Font("Segoe UI", 8.5F, FontStyle.Italic), Dock = DockStyle.Fill };
+            ConfigurarEventosBuscadorProducto();
+            
+            FlowLayoutPanel pnlBotonesProd = new FlowLayoutPanel { Dock = DockStyle.Right, AutoSize = true, FlowDirection = FlowDirection.LeftToRight, WrapContents = false, Margin = new Padding(0), Padding = new Padding(0) };
+            btnLimpiarBuscadorProd = CrearBotonIcono("🗑️", 0, 0, (s, e) => ResetearBuscadorProducto());
+            btnNuevoProducto = CrearBotonAccionRapida("➕", Color.FromArgb(2, 132, 199), 0, 0, BtnNuevoProducto_Click);
+            btnEditarProducto = CrearBotonAccionRapida("✏️", Color.FromArgb(245, 158, 11), 0, 0, BtnEditarProducto_Click);
+            pnlBotonesProd.Controls.AddRange(new Control[] { btnLimpiarBuscadorProd, btnNuevoProducto, btnEditarProducto });
+            
+            pnlProdFila.Controls.Add(txtBuscarProducto);
+            pnlProdFila.Controls.Add(pnlBotonesProd);
+            pnlProd.Controls.Add(pnlProdFila);
+            pnlProd.Controls.Add(lpr);
+
+            txtCantidadRecibida = new TextBox { Text = "1", Font = new Font("Segoe UI", 9F, FontStyle.Bold), TextAlign = HorizontalAlignment.Center };
+            txtCantidadRecibida.KeyPress += (s, e) => { if (!char.IsControl(e.KeyChar) && !char.IsDigit(e.KeyChar)) e.Handled = true; };
+            Panel pnlCant = EnvolverConLabel("CANT. RECIBIDA", txtCantidadRecibida);
+
+            Panel pnlCosto = new Panel { Dock = DockStyle.Fill, Padding = new Padding(6, 0, 6, 0) };
+            Label lcost = new Label { Text = "COSTO NETO ($)", Dock = DockStyle.Top, AutoSize = true, Font = new Font("Segoe UI", 7.5F, FontStyle.Bold), ForeColor = Color.FromArgb(100, 116, 139) };
+            txtPrecioCosto = new TextBox { Text = "0", Font = new Font("Segoe UI", 9F, FontStyle.Bold), Dock = DockStyle.Top, Height = 24 };
+            txtPrecioCosto.TextChanged += (s, e) => CalcularPreviewPrecioVenta();
+            lblPreviewPVP = new Label { Text = "PVP Sug: $0", Dock = DockStyle.Top, AutoSize = true, Font = new Font("Segoe UI", 7.5F, FontStyle.Bold), ForeColor = Color.FromArgb(16, 185, 129) };
+            pnlCosto.Controls.Add(lblPreviewPVP);
+            pnlCosto.Controls.Add(txtPrecioCosto);
+            pnlCosto.Controls.Add(lcost);
+
+            txtPvpSugerido = new TextBox { Font = new Font("Segoe UI", 9F), PlaceholderText = "Auto-sugerido" };
+            Panel pnlPvp = EnvolverConLabel("PRECIO VENTA (IVA INC.)", txtPvpSugerido);
+
+            Panel pnlBtnAdd = new Panel { Dock = DockStyle.Fill, Padding = new Padding(6, 0, 0, 0) };
+            Label lblEspacioBtnAdd = new Label { Text = " ", Dock = DockStyle.Top, AutoSize = true, Font = new Font("Segoe UI", 7.5F) };
+            Button btnAddM = new Button { Text = "+ Agregar", Dock = DockStyle.Top, Height = 26, BackColor = Color.FromArgb(37, 99, 235), ForeColor = Color.White, FlatStyle = FlatStyle.Flat, Font = new Font("Segoe UI", 8.5F, FontStyle.Bold), Cursor = Cursors.Hand };
+            btnAddM.FlatAppearance.BorderSize = 0;
+            btnAddM.Click += BtnAgregarMercaderia_Click;
+            pnlBtnAdd.Controls.Add(btnAddM);
+            pnlBtnAdd.Controls.Add(lblEspacioBtnAdd);
+
+            tablaM.Controls.Add(pnlProd, 0, 0);
+            tablaM.Controls.Add(pnlCant, 1, 0);
+            tablaM.Controls.Add(pnlCosto, 2, 0);
+            tablaM.Controls.Add(pnlPvp, 3, 0);
+            tablaM.Controls.Add(pnlBtnAdd, 4, 0);
+
+            pnlPaso2Mercaderia.Controls.Add(tablaM);
+
+            // ---------- Gasto Interno ----------
+            pnlPaso2Gasto = new Panel 
+            { 
+                Dock = DockStyle.Top, 
+                Height = 105, 
+                BackColor = Color.White, 
+                Padding = new Padding(16, 12, 16, 8), 
+                Margin = new Padding(0, 0, 0, 14), 
+                Visible = false 
+            };
+            pnlPaso2Gasto.Paint += (s, e) => ControlPaint.DrawBorder(e.Graphics, pnlPaso2Gasto.ClientRectangle, Color.FromArgb(226, 232, 240), ButtonBorderStyle.Solid);
+
+            TableLayoutPanel tablaG = new TableLayoutPanel { Dock = DockStyle.Fill, ColumnCount = 4, RowCount = 2 };
+            tablaG.ColumnStyles.Add(new ColumnStyle(SizeType.Percent, 38F)); // Descripción
+            tablaG.ColumnStyles.Add(new ColumnStyle(SizeType.Percent, 27F)); // Categoría
+            tablaG.ColumnStyles.Add(new ColumnStyle(SizeType.Percent, 17F)); // Monto
+            tablaG.ColumnStyles.Add(new ColumnStyle(SizeType.Percent, 18F)); // Botón
+            tablaG.RowStyles.Add(new RowStyle(SizeType.Absolute, 52F));
+            tablaG.RowStyles.Add(new RowStyle(SizeType.Absolute, 34F));
+
+            txtDescripcionGasto = new TextBox { Font = new Font("Segoe UI", 9F), PlaceholderText = "Ej: Materiales reparación escritorio recepción" };
+            Panel pnlDesc = EnvolverConLabel("DESCRIPCIÓN DEL GASTO", txtDescripcionGasto);
+
+            cbCategoriaGasto = new ComboBox { DropDownStyle = ComboBoxStyle.DropDownList };
+            cbCategoriaGasto.Items.AddRange(new string[] { "Mantención de activos", "Materiales de oficina", "Insumos y Aseo", "Servicios Básicos", "Mobiliario y Equipamiento", "Gastos Operacionales Varios" });
+            cbCategoriaGasto.SelectedIndex = 0;
+            Panel pnlCat = EnvolverConLabel("CATEGORÍA / CUENTA CONTABLE", cbCategoriaGasto);
+
+            txtMontoNetoGasto = new TextBox { Text = "0", Font = new Font("Segoe UI", 9F, FontStyle.Bold) };
+            Panel pnlMonto = EnvolverConLabel("MONTO NETO ($)", txtMontoNetoGasto);
+
+            Panel pnlBtnAddG = new Panel { Dock = DockStyle.Fill, Padding = new Padding(6, 0, 0, 0) };
+            Label lblEspacioBtnAddG = new Label { Text = " ", Dock = DockStyle.Top, AutoSize = true, Font = new Font("Segoe UI", 7.5F) };
+            Button btnAddG = new Button { Text = "+ Agregar", Dock = DockStyle.Top, Height = 26, BackColor = Color.FromArgb(124, 58, 237), ForeColor = Color.White, FlatStyle = FlatStyle.Flat, Font = new Font("Segoe UI", 8.5F, FontStyle.Bold), Cursor = Cursors.Hand };
+            btnAddG.FlatAppearance.BorderSize = 0;
+            btnAddG.Click += BtnAgregarGasto_Click;
+            pnlBtnAddG.Controls.Add(btnAddG);
+            pnlBtnAddG.Controls.Add(lblEspacioBtnAddG);
+
+            FlowLayoutPanel pnlCapitaliza = new FlowLayoutPanel { Dock = DockStyle.Fill, FlowDirection = FlowDirection.LeftToRight, WrapContents = false, AutoSize = true, Margin = new Padding(0, 6, 0, 0) };
+            chkCapitalizaActivo = new CheckBox { Text = "¿Se capitaliza a un activo fijo existente?", AutoSize = true, Font = new Font("Segoe UI", 8F, FontStyle.Bold), ForeColor = Color.FromArgb(124, 58, 237) };
+            txtNombreActivoFijo = new TextBox { Width = 200, Font = new Font("Segoe UI", 8.5F), Visible = false, PlaceholderText = "Seleccionar activo...", Margin = new Padding(10, 2, 0, 0) };
+            chkCapitalizaActivo.CheckedChanged += (s, e) => txtNombreActivoFijo.Visible = chkCapitalizaActivo.Checked;
+            pnlCapitaliza.Controls.Add(chkCapitalizaActivo);
+            pnlCapitaliza.Controls.Add(txtNombreActivoFijo);
+
+            tablaG.Controls.Add(pnlDesc, 0, 0);
+            tablaG.Controls.Add(pnlCat, 1, 0);
+            tablaG.Controls.Add(pnlMonto, 2, 0);
+            tablaG.Controls.Add(pnlBtnAddG, 3, 0);
+            tablaG.SetColumnSpan(pnlCapitaliza, 4);
+            tablaG.Controls.Add(pnlCapitaliza, 0, 1);
+
+            pnlPaso2Gasto.Controls.Add(tablaG);
+        }
         private Panel CrearBloqueGrilla()
         {
-            Panel pnl = new Panel { Dock = DockStyle.Fill, BackColor = Color.White, Padding = new Padding(14) };
+            Panel pnl = new Panel 
+            { 
+                Dock = DockStyle.Fill, 
+                BackColor = Color.White, 
+                Padding = new Padding(14, 10, 14, 10), 
+                Margin = new Padding(0) 
+            };
             pnl.Paint += (s, e) => ControlPaint.DrawBorder(e.Graphics, pnl.ClientRectangle, Color.FromArgb(226, 232, 240), ButtonBorderStyle.Solid);
 
-            Panel pnlHead = new Panel { Dock = DockStyle.Top, Height = 28 };
-            lblTituloGrilla = new Label { Text = "Productos en esta recepción", Font = new Font("Segoe UI", 9.5F, FontStyle.Bold), ForeColor = Color.FromArgb(15, 23, 42), Location = new Point(0, 2), AutoSize = true };
-            lblContadorLineas = new Label { Text = "0 líneas", Font = new Font("Segoe UI", 8F), ForeColor = Color.FromArgb(100, 116, 139), BackColor = Color.FromArgb(241, 245, 249), Location = new Point(230, 2), AutoSize = true, Padding = new Padding(4, 2, 4, 2) };
-            pnlHead.Controls.AddRange(new Control[] { lblTituloGrilla, lblContadorLineas });
+            // Barra Superior de la Grilla (Título + Contador + Botón Quitar)
+            Panel pnlHead = new Panel { Dock = DockStyle.Top, Height = 32, Padding = new Padding(0, 0, 0, 4) };
+            lblTituloGrilla = new Label { Text = "Productos en esta recepción", Font = new Font("Segoe UI", 9.5F, FontStyle.Bold), ForeColor = Color.FromArgb(15, 23, 42), Location = new Point(0, 4), AutoSize = true };
+            lblContadorLineas = new Label { Text = "0 líneas", Font = new Font("Segoe UI", 8F), ForeColor = Color.FromArgb(100, 116, 139), BackColor = Color.FromArgb(241, 245, 249), Location = new Point(220, 5), AutoSize = true, Padding = new Padding(4, 2, 4, 2) };
 
+            btnQuitarItem = new Button
+            {
+                Text = "🗑️ Quitar Seleccionado",
+                Dock = DockStyle.Right,
+                Width = 160,
+                BackColor = Color.FromArgb(239, 68, 68),
+                ForeColor = Color.White,
+                FlatStyle = FlatStyle.Flat,
+                Font = new Font("Segoe UI", 8F, FontStyle.Bold),
+                Cursor = Cursors.Hand
+            };
+            btnQuitarItem.FlatAppearance.BorderSize = 0;
+            btnQuitarItem.Click += (s, e) =>
+            {
+                var filtrados = _detalleFactura.Where(d => _esModoMercaderia ? d.TipoItem == "MERCADERIA" : d.TipoItem == "GASTO").ToList();
+                if (dgvDetalle.CurrentRow != null && dgvDetalle.CurrentRow.Index >= 0 && dgvDetalle.CurrentRow.Index < filtrados.Count)
+                {
+                    _detalleFactura.Remove(filtrados[dgvDetalle.CurrentRow.Index]);
+                    RefrescarGrilla();
+                }
+            };
+
+            pnlHead.Controls.AddRange(new Control[] { lblTituloGrilla, lblContadorLineas, btnQuitarItem });
+
+            // DataGridView Estilo Catálogo Oficial
             dgvDetalle = new DataGridView
             {
                 Dock = DockStyle.Fill,
@@ -272,14 +492,26 @@ namespace SISTEMAACTUALIZADO
                 AllowUserToAddRows = false,
                 RowHeadersVisible = false,
                 SelectionMode = DataGridViewSelectionMode.FullRowSelect,
+                MultiSelect = false,
+                ReadOnly = true,
                 AutoSizeColumnsMode = DataGridViewAutoSizeColumnsMode.Fill,
-                RowTemplate = { Height = 34 }
+                RowTemplate = { Height = 32 },
+                GridColor = Color.FromArgb(241, 245, 249)
             };
+
+            // Estilo de Encabezados (Oscuro #0F172A fijo que no cambia al hacer clic)
             dgvDetalle.EnableHeadersVisualStyles = false;
-            dgvDetalle.ColumnHeadersDefaultCellStyle.BackColor = Color.FromArgb(248, 250, 252);
-            dgvDetalle.ColumnHeadersDefaultCellStyle.ForeColor = Color.FromArgb(100, 116, 139);
-            dgvDetalle.ColumnHeadersDefaultCellStyle.Font = new Font("Segoe UI", 8F, FontStyle.Bold);
-            dgvDetalle.CellClick += DgvDetalle_CellClick;
+            dgvDetalle.ColumnHeadersHeight = 34;
+            dgvDetalle.ColumnHeadersDefaultCellStyle.BackColor = Color.FromArgb(15, 23, 42);
+            dgvDetalle.ColumnHeadersDefaultCellStyle.ForeColor = Color.White;
+            dgvDetalle.ColumnHeadersDefaultCellStyle.SelectionBackColor = Color.FromArgb(15, 23, 42); // Evita el fondo azul al seleccionar
+            dgvDetalle.ColumnHeadersDefaultCellStyle.SelectionForeColor = Color.White;
+            dgvDetalle.ColumnHeadersDefaultCellStyle.Font = new Font("Segoe UI", 8.5F, FontStyle.Bold);
+
+            // Estilo de Filas Seleccionadas (Celeste Suave #E0F2FE con texto visible #0F172A)
+            dgvDetalle.DefaultCellStyle.SelectionBackColor = Color.FromArgb(224, 242, 254);
+            dgvDetalle.DefaultCellStyle.SelectionForeColor = Color.FromArgb(15, 23, 42);
+            dgvDetalle.DefaultCellStyle.Font = new Font("Segoe UI", 8.5F);
 
             pnl.Controls.Add(dgvDetalle);
             pnl.Controls.Add(pnlHead);
@@ -387,34 +619,45 @@ namespace SISTEMAACTUALIZADO
         private void ConfigurarColumnasGrillaMercaderia()
         {
             dgvDetalle.Columns.Clear();
-            dgvDetalle.Columns.Add("Producto", "PRODUCTO");
-            dgvDetalle.Columns.Add("Cant", "CANT.");
-            dgvDetalle.Columns.Add("CostoNeto", "COSTO NETO");
-            dgvDetalle.Columns.Add("PvpSugerido", "PVP SUGERIDO");
-            dgvDetalle.Columns.Add("Subtotal", "SUBTOTAL");
+            dgvDetalle.Columns.Add("Producto", "Descripción Producto");
+            dgvDetalle.Columns.Add("Cant", "Cantidad");
+            dgvDetalle.Columns.Add("CostoNeto", "Costo Neto");
+            dgvDetalle.Columns.Add("PvpSugerido", "Precio Venta (PVP)");
+            dgvDetalle.Columns.Add("Subtotal", "Subtotal Neto");
 
-            var btnEliminar = new DataGridViewButtonColumn { Name = "Eliminar", HeaderText = "", Text = "✕", UseColumnTextForButtonValue = true, Width = 35 };
-            btnEliminar.FlatStyle = FlatStyle.Flat;
-            dgvDetalle.Columns.Add(btnEliminar);
+            // Alineaciones y anchos
+            dgvDetalle.Columns["Cant"].Width = 80;
+            dgvDetalle.Columns["Cant"].DefaultCellStyle.Alignment = DataGridViewContentAlignment.MiddleCenter;
+            dgvDetalle.Columns["Cant"].DefaultCellStyle.Font = new Font("Segoe UI", 8.5F, FontStyle.Bold);
 
-            dgvDetalle.Columns["Cant"].Width = 60;
+            dgvDetalle.Columns["CostoNeto"].Width = 110;
+            dgvDetalle.Columns["CostoNeto"].DefaultCellStyle.Alignment = DataGridViewContentAlignment.MiddleRight;
             dgvDetalle.Columns["CostoNeto"].DefaultCellStyle.Format = "$#,##0";
+
+            // Precio de venta destacado en verde (como en el catálogo)
+            dgvDetalle.Columns["PvpSugerido"].Width = 130;
+            dgvDetalle.Columns["PvpSugerido"].DefaultCellStyle.Alignment = DataGridViewContentAlignment.MiddleRight;
             dgvDetalle.Columns["PvpSugerido"].DefaultCellStyle.Format = "$#,##0";
+            dgvDetalle.Columns["PvpSugerido"].DefaultCellStyle.ForeColor = Color.FromArgb(22, 163, 74);
+            dgvDetalle.Columns["PvpSugerido"].DefaultCellStyle.Font = new Font("Segoe UI", 8.5F, FontStyle.Bold);
+
+            dgvDetalle.Columns["Subtotal"].Width = 110;
+            dgvDetalle.Columns["Subtotal"].DefaultCellStyle.Alignment = DataGridViewContentAlignment.MiddleRight;
             dgvDetalle.Columns["Subtotal"].DefaultCellStyle.Format = "$#,##0";
         }
 
         private void ConfigurarColumnasGrillaGasto()
         {
             dgvDetalle.Columns.Clear();
-            dgvDetalle.Columns.Add("Descripcion", "DESCRIPCIÓN");
-            dgvDetalle.Columns.Add("Categoria", "CATEGORÍA");
-            dgvDetalle.Columns.Add("MontoNeto", "MONTO NETO");
+            dgvDetalle.Columns.Add("Descripcion", "Descripción del Gasto");
+            dgvDetalle.Columns.Add("Categoria", "Categoría / Cuenta");
+            dgvDetalle.Columns.Add("MontoNeto", "Monto Neto");
 
-            var btnEliminar = new DataGridViewButtonColumn { Name = "Eliminar", HeaderText = "", Text = "✕", UseColumnTextForButtonValue = true, Width = 35 };
-            btnEliminar.FlatStyle = FlatStyle.Flat;
-            dgvDetalle.Columns.Add(btnEliminar);
-
+            dgvDetalle.Columns["Categoria"].Width = 180;
+            dgvDetalle.Columns["MontoNeto"].Width = 130;
+            dgvDetalle.Columns["MontoNeto"].DefaultCellStyle.Alignment = DataGridViewContentAlignment.MiddleRight;
             dgvDetalle.Columns["MontoNeto"].DefaultCellStyle.Format = "$#,##0";
+            dgvDetalle.Columns["MontoNeto"].DefaultCellStyle.Font = new Font("Segoe UI", 8.5F, FontStyle.Bold);
         }
 
         private void RefrescarGrilla()
@@ -445,18 +688,6 @@ namespace SISTEMAACTUALIZADO
             lblTotalBruto.Text = $"$ {total:N0}";
         }
 
-        private void DgvDetalle_CellClick(object? sender, DataGridViewCellEventArgs e)
-        {
-            if (e.RowIndex >= 0 && dgvDetalle.Columns[e.ColumnIndex].Name == "Eliminar")
-            {
-                var filtrados = _detalleFactura.Where(d => _esModoMercaderia ? d.TipoItem == "MERCADERIA" : d.TipoItem == "GASTO").ToList();
-                if (e.RowIndex < filtrados.Count)
-                {
-                    _detalleFactura.Remove(filtrados[e.RowIndex]);
-                    RefrescarGrilla();
-                }
-            }
-        }
 
         private void BtnAgregarMercaderia_Click(object? sender, EventArgs e)
         {
@@ -568,7 +799,7 @@ namespace SISTEMAACTUALIZADO
             {
                 _compraService.RegistrarFacturaCompra(compra, itemsProcesar, actualizarPreciosVenta: true);
 
-                string mensaje = _esModoMercaderia 
+                string mensaje = _esModoMercaderia
                     ? $"Documento N° {folio} procesado.\n• Stock incrementado en {itemsProcesar.Sum(i => i.Cantidad)} unidades."
                     : $"Gasto Operacional N° {folio} registrado en el Libro de Compras.\n• No se alteró el inventario de venta.";
 
@@ -595,6 +826,20 @@ namespace SISTEMAACTUALIZADO
             _productosCache = db.Productos.Where(p => p.Estado).OrderBy(p => p.Nombre).ToList();
         }
 
+        /// <summary>
+        /// Ubica una lista de sugerencias flotante justo debajo del cuadro de búsqueda real,
+        /// convirtiendo coordenadas de pantalla a coordenadas del contenedor de la lista.
+        /// Reemplaza el Point fijo original, que dejaba de coincidir apenas el layout se volvió responsivo.
+        /// </summary>
+        private void PosicionarListaSugerencias(ListBox lista, Control referenciaCampo)
+        {
+            if (lista.Parent == null || referenciaCampo.Parent == null) return;
+            Point puntoPantalla = referenciaCampo.Parent.PointToScreen(new Point(referenciaCampo.Left, referenciaCampo.Bottom));
+            Point puntoLocal = lista.Parent.PointToClient(puntoPantalla);
+            lista.Location = puntoLocal;
+            lista.Width = Math.Max(referenciaCampo.Width, 260);
+        }
+
         private void ConfigurarEventosBuscadorProveedor()
         {
             txtBuscarProveedor.GotFocus += (s, e) => { if (txtBuscarProveedor.Text == PLACEHOLDER_PROV) { txtBuscarProveedor.Text = ""; txtBuscarProveedor.ForeColor = Color.FromArgb(15, 23, 42); txtBuscarProveedor.Font = new Font("Segoe UI", 9F); } };
@@ -607,6 +852,7 @@ namespace SISTEMAACTUALIZADO
                     var f = _proveedoresCache.Where(p => p.RazonSocial.ToLower().Contains(q) || p.Rut.ToLower().Contains(q)).Take(6).ToList();
                     lstSugerenciasProveedores.DataSource = f.Count > 0 ? f : null;
                     lstSugerenciasProveedores.DisplayMember = "RazonSocial";
+                    if (f.Count > 0) PosicionarListaSugerencias(lstSugerenciasProveedores, txtBuscarProveedor);
                     lstSugerenciasProveedores.Visible = f.Count > 0;
                     lstSugerenciasProveedores.BringToFront();
                 }
@@ -648,6 +894,7 @@ namespace SISTEMAACTUALIZADO
                     var f = _productosCache.Where(p => p.Nombre.ToLower().Contains(q) || p.CodigoBarra.ToLower().Contains(q)).Take(6).ToList();
                     lstSugerenciasProductos.DataSource = f.Count > 0 ? f : null;
                     lstSugerenciasProductos.DisplayMember = "Nombre";
+                    if (f.Count > 0) PosicionarListaSugerencias(lstSugerenciasProductos, txtBuscarProducto);
                     lstSugerenciasProductos.Visible = f.Count > 0;
                     lstSugerenciasProductos.BringToFront();
                 }
@@ -677,9 +924,20 @@ namespace SISTEMAACTUALIZADO
                 txtBuscarProducto.ForeColor = Color.FromArgb(37, 99, 235);
                 lstSugerenciasProductos.Visible = false;
 
-                decimal costo = p.PrecioCosto > 0 ? p.PrecioCosto : Math.Round(p.PrecioUnitario / 1.19m / 1.30m, 0);
+                // 1. Cargar costo actual registrado
+                decimal costo = p.PrecioCosto > 0 ? p.PrecioCosto : (p.PrecioUnitario > 0 ? Math.Round(p.PrecioUnitario / 1.19m / (1 + (p.MargenGanancia / 100m)), 0) : 0);
                 txtPrecioCosto.Text = costo.ToString("0");
-                CalcularPreviewPrecioVenta();
+
+                // 2. Si el costo no cambia, mantener exactamente el PrecioUnitario (Lista 1) actual; si cambia, recalcular con su margen
+                if (p.PrecioUnitario > 0 && costo == p.PrecioCosto)
+                {
+                    lblPreviewPVP.Text = $"PVP Sug: ${p.PrecioUnitario:N0}";
+                    txtPvpSugerido.Text = p.PrecioUnitario.ToString("0");
+                }
+                else
+                {
+                    CalcularPreviewPrecioVenta();
+                }
 
                 txtCantidadRecibida.Focus();
                 txtCantidadRecibida.SelectAll();
@@ -688,11 +946,20 @@ namespace SISTEMAACTUALIZADO
 
         private void CalcularPreviewPrecioVenta()
         {
+            if (_productoSeleccionado == null) return;
+
             if (decimal.TryParse(txtPrecioCosto.Text.Trim(), out decimal costo) && costo > 0)
             {
-                decimal pvp = Math.Round(costo * 1.30m * 1.19m / 10m, 0, MidpointRounding.AwayFromZero) * 10m;
-                lblPreviewPVP.Text = $"PVP Sug: ${pvp:N0}";
-                txtPvpSugerido.Text = pvp.ToString("0");
+                // Usa el margen real guardado en el producto (ej: 59.7%)
+                decimal margen = _productoSeleccionado.MargenGanancia > 0 ? _productoSeleccionado.MargenGanancia : 30m;
+
+                // Misma fórmula oficial de FormConfigurarMargenesModal
+                decimal neto = costo * (1 + (margen / 100m));
+                decimal bruto = neto * 1.19m;
+                decimal pvpSugerido = Math.Round(bruto / 10m, MidpointRounding.AwayFromZero) * 10m;
+
+                lblPreviewPVP.Text = $"PVP Sug: ${pvpSugerido:N0}";
+                txtPvpSugerido.Text = pvpSugerido.ToString("0");
             }
         }
 
@@ -761,7 +1028,15 @@ namespace SISTEMAACTUALIZADO
 
         private Button CrearBotonIcono(string t, int x, int y, EventHandler h)
         {
-            Button b = new Button { Text = t, Size = new Size(26, 26), Location = new Point(x, y), BackColor = Color.FromArgb(241, 245, 249), FlatStyle = FlatStyle.Flat, Cursor = Cursors.Hand };
+            Button b = new Button 
+            { 
+                Text = t, 
+                Size = new Size(26, 26), 
+                Margin = new Padding(2, 0, 0, 0),
+                BackColor = Color.FromArgb(241, 245, 249), 
+                FlatStyle = FlatStyle.Flat, 
+                Cursor = Cursors.Hand 
+            };
             b.FlatAppearance.BorderColor = Color.FromArgb(203, 213, 225);
             b.Click += h;
             return b;
@@ -769,7 +1044,17 @@ namespace SISTEMAACTUALIZADO
 
         private Button CrearBotonAccionRapida(string t, Color bg, int x, int y, EventHandler h)
         {
-            Button b = new Button { Text = t, Size = new Size(26, 26), Location = new Point(x, y), BackColor = bg, ForeColor = Color.White, FlatStyle = FlatStyle.Flat, Font = new Font("Segoe UI", 8F, FontStyle.Bold), Cursor = Cursors.Hand };
+            Button b = new Button 
+            { 
+                Text = t, 
+                Size = new Size(26, 26), 
+                Margin = new Padding(2, 0, 0, 0),
+                BackColor = bg, 
+                ForeColor = Color.White, 
+                FlatStyle = FlatStyle.Flat, 
+                Font = new Font("Segoe UI", 8F, FontStyle.Bold), 
+                Cursor = Cursors.Hand 
+            };
             b.FlatAppearance.BorderSize = 0;
             b.Click += h;
             return b;
