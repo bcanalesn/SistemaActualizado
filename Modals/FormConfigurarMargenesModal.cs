@@ -10,80 +10,41 @@ namespace SISTEMAACTUALIZADO.Modals
 {
     public class FormConfigurarMargenesModal : Form
     {
-        // Memoria estática que persiste durante toda la ejecución
-        private static decimal[] _ultimosMargenes = new decimal[] { 35m, 25m, 18m, 12m, 5m, 0m, 0m, 0m, 0m, 0m };
-        private static bool _margenesInicializadosDesdeBD = false;
-
         private RadioButton rbTodo = null!;
         private RadioButton rbCategoria = null!;
         private ComboBox cbCategorias = null!;
         private CheckBox chkRedondear = null!;
         private NumericUpDown[] numMargenes = new NumericUpDown[10];
         private List<string> _categoriasDisponibles = new List<string>();
+        private decimal[] _margenesOriginales = new decimal[10];
 
         public FormConfigurarMargenesModal(List<string>? categorias = null)
         {
             _categoriasDisponibles = categorias ?? new List<string>();
-            
-            // Cargar los márgenes reales que existen en la BD si es la primera apertura
-            if (!_margenesInicializadosDesdeBD)
-            {
-                CargarMargenesRealesDesdeBD();
-                _margenesInicializadosDesdeBD = true;
-            }
-
             InitializeComponent();
-            CargarValoresEnControles();
+            CargarMargenesDesdeBD();
         }
 
-        private void CargarMargenesRealesDesdeBD()
+        private void CargarMargenesDesdeBD()
         {
             try
             {
                 using var db = new AppDbContext();
-                // Tomar el primer producto activo que tenga costo y precio calculados
-                var prod = db.Productos.FirstOrDefault(p => p.Estado && p.PrecioCosto > 0 && p.PrecioUnitario > 0);
-                if (prod != null)
-                {
-                    decimal costo = prod.PrecioCosto;
-                    decimal[] precios = new decimal[]
-                    {
-                        prod.PrecioUnitario,
-                        prod.Precio2,
-                        prod.Precio3,
-                        prod.Precio4,
-                        prod.Precio5,
-                        prod.Precio6,
-                        prod.Precio7,
-                        prod.Precio8,
-                        prod.Precio9,
-                        prod.Precio10
-                    };
+                var margenesBD = db.ConfiguracionMargenes.OrderBy(m => m.NumeroLista).ToList();
 
-                    for (int i = 0; i < 10; i++)
-                    {
-                        if (precios[i] > 0)
-                        {
-                            // Fórmula Inversa: Margen % = (((PrecioBruto / 1.19) / CostoNeto) - 1) * 100
-                            decimal neto = precios[i] / 1.19m;
-                            decimal margenCalc = ((neto / costo) - 1m) * 100m;
-                            _ultimosMargenes[i] = Math.Round(margenCalc, 1);
-                        }
-                    }
+                for (int i = 0; i < 10; i++)
+                {
+                    int nro = i + 1;
+                    var item = margenesBD.FirstOrDefault(m => m.NumeroLista == nro);
+                    decimal porcentaje = item != null ? item.PorcentajeMargen : 0m;
+                    
+                    _margenesOriginales[i] = porcentaje; // Guarda el valor previo en memoria
+                    if (numMargenes[i] != null) numMargenes[i].Value = porcentaje;
                 }
             }
-            catch { }
-        }
-
-        private void CargarValoresEnControles()
-        {
-            for (int i = 0; i < 10; i++)
+            catch (Exception ex)
             {
-                if (numMargenes[i] != null)
-                {
-                    decimal val = Math.Max(numMargenes[i].Minimum, Math.Min(numMargenes[i].Maximum, _ultimosMargenes[i]));
-                    numMargenes[i].Value = val;
-                }
+                MessageBox.Show($"Error al cargar configuración de márgenes: {ex.Message}", "Error DB", MessageBoxButtons.OK, MessageBoxIcon.Warning);
             }
         }
 
@@ -190,7 +151,7 @@ namespace SISTEMAACTUALIZADO.Modals
                     DecimalPlaces = 1,
                     Minimum = -50,
                     Maximum = 500,
-                    Value = _ultimosMargenes[i], // Toma el valor guardado
+                    Value = 0m,
                     Font = new Font("Segoe UI", 9F, FontStyle.Bold),
                     TextAlign = HorizontalAlignment.Right
                 };
@@ -245,18 +206,33 @@ namespace SISTEMAACTUALIZADO.Modals
 
         private void BtnGuardar_Click(object? sender, EventArgs e)
         {
-            var confirm = MessageBox.Show("¿Está seguro de recalcular las listas de precios con los porcentajes definidos?", "Confirmar", MessageBoxButtons.YesNo, MessageBoxIcon.Question);
+            var confirm = MessageBox.Show("¿Está seguro de guardar estos márgenes y recalcular los precios?", "Confirmar", MessageBoxButtons.YesNo, MessageBoxIcon.Question);
             if (confirm != DialogResult.Yes) return;
 
             try
             {
-                // Guardar los nuevos valores en la memoria estática
+                using var db = new AppDbContext();
+
+                // 1. Guardar los porcentajes reales exactos en la tabla configuracion_margenes
                 for (int i = 0; i < 10; i++)
                 {
-                    _ultimosMargenes[i] = numMargenes[i].Value;
-                }
+                    int nroLista = i + 1;
+                    decimal nuevoPorcentaje = numMargenes[i].Value;
 
-                using var db = new AppDbContext();
+                    // Solo si el usuario cambió el número de ESTA lista específica
+                    if (nuevoPorcentaje != _margenesOriginales[i])
+                    {
+                        var config = db.ConfiguracionMargenes.FirstOrDefault(m => m.NumeroLista == nroLista);
+                        if (config != null)
+                        {
+                            config.PorcentajeMargen = nuevoPorcentaje;
+                            config.UltimaModificacion = DateTime.Now; // <-- Se actualiza SOLO esta lista
+                        }
+                    }
+                }
+                db.SaveChanges(); // Persiste en MySQL Workbench de forma definitiva
+
+                // 2. Recalcular los productos según el ámbito seleccionado
                 IQueryable<Producto> query = db.Productos.Where(p => p.Estado);
 
                 if (rbCategoria.Checked && cbCategorias.SelectedItem != null)
@@ -274,7 +250,7 @@ namespace SISTEMAACTUALIZADO.Modals
                     decimal costo = prod.PrecioCosto;
 
                     prod.MargenGanancia = numMargenes[0].Value;
-                    prod.PrecioUnitario = CalcularPrecio(costo, numMargenes[0].Value, redondear); // Lista 1
+                    prod.PrecioUnitario = CalcularPrecio(costo, numMargenes[0].Value, redondear);
                     prod.Precio2 = CalcularPrecio(costo, numMargenes[1].Value, redondear);
                     prod.Precio3 = CalcularPrecio(costo, numMargenes[2].Value, redondear);
                     prod.Precio4 = CalcularPrecio(costo, numMargenes[3].Value, redondear);
@@ -290,19 +266,19 @@ namespace SISTEMAACTUALIZADO.Modals
                 }
 
                 db.SaveChanges();
-                MessageBox.Show($"Precios recalculados con éxito para {productos.Count} producto(s).", "Éxito", MessageBoxButtons.OK, MessageBoxIcon.Information);
+                MessageBox.Show($"Márgenes guardados en BD y precios recalculados para {productos.Count} producto(s).", "Éxito", MessageBoxButtons.OK, MessageBoxIcon.Information);
                 this.DialogResult = DialogResult.OK;
             }
             catch (Exception ex)
             {
-                MessageBox.Show($"Error al guardar: {ex.Message}", "Error DB", MessageBoxButtons.OK, MessageBoxIcon.Error);
+                MessageBox.Show($"Error al guardar márgenes:\n{ex.Message}", "Error DB", MessageBoxButtons.OK, MessageBoxIcon.Error);
             }
         }
 
         private decimal CalcularPrecio(decimal costo, decimal margen, bool redondear)
         {
-            if (costo <= 0 || margen == 0) return 0;
-            decimal neto = costo * (1 + (margen / 100m));
+            if (costo <= 0 || margen <= 0) return 0;
+            decimal neto = costo * (1m + (margen / 100m));
             decimal bruto = neto * 1.19m;
             return redondear ? Math.Round(bruto / 10m, MidpointRounding.AwayFromZero) * 10m : Math.Round(bruto, 0);
         }

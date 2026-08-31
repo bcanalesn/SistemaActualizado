@@ -6,6 +6,7 @@ namespace SISTEMAACTUALIZADO.Data
     public class AppDbContext : DbContext
     {
         public DbSet<Producto> Productos { get; set; } = null!;
+        public DbSet<ConfiguracionMargen> ConfiguracionMargenes { get; set; } = null!;
         public DbSet<PrecioQ> PreciosQ { get; set; } = null!;
         public DbSet<TVE2607> TVE2607 { get; set; } = null!;
         public DbSet<TVD2607> TVD2607 { get; set; } = null!;
@@ -21,7 +22,7 @@ namespace SISTEMAACTUALIZADO.Data
         {
             if (!optionsBuilder.IsConfigured)
             {
-                optionsBuilder.UseMySql("Server=localhost;Database=sistemaepos;Uid=root;Pwd=;", 
+                optionsBuilder.UseMySql("Server=localhost;Database=sistemaepos;Uid=root;Pwd=root;", 
                     new MySqlServerVersion(new Version(8, 0, 30)));
             }
         }

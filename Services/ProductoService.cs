@@ -172,31 +172,22 @@ namespace SISTEMAACTUALIZADO.Services
         // Obtiene los márgenes globales vigentes configurados en el sistema
         public static decimal[] ObtenerMargenesConfigurados()
         {
+            decimal[] margenes = new decimal[10];
             try
             {
                 using var db = new AppDbContext();
-                var prod = db.Productos.FirstOrDefault(p => p.Estado && p.PrecioCosto > 0 && p.PrecioUnitario > 0);
-                if (prod != null)
-                {
-                    decimal costo = prod.PrecioCosto;
-                    decimal[] precios = new decimal[] { prod.PrecioUnitario, prod.Precio2, prod.Precio3, prod.Precio4, prod.Precio5, prod.Precio6, prod.Precio7, prod.Precio8, prod.Precio9, prod.Precio10 };
-                    decimal[] margenes = new decimal[10];
+                var listaMargenes = db.ConfiguracionMargenes.ToList();
 
-                    for (int i = 0; i < 10; i++)
-                    {
-                        if (precios[i] > 0)
-                        {
-                            decimal neto = precios[i] / 1.19m;
-                            decimal margenCalc = ((neto / costo) - 1m) * 100m;
-                            margenes[i] = Math.Round(margenCalc, 1);
-                        }
-                    }
-                    return margenes;
+                for (int i = 0; i < 10; i++)
+                {
+                    int nroLista = i + 1;
+                    var item = listaMargenes.FirstOrDefault(m => m.NumeroLista == nroLista);
+                    margenes[i] = item != null ? item.PorcentajeMargen : 0m;
                 }
             }
             catch { }
 
-            return new decimal[] { 60m, 50m, 18m, 12m, 5m, 0m, 0m, 0m, 0m, 0m };
+            return margenes; // Retorna exactamente lo que tú hayas guardado en el modal
         }
 
         // Calcula el precio bruto final con IVA y redondeo a la decena
