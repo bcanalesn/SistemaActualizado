@@ -17,12 +17,16 @@ namespace SISTEMAACTUALIZADO.Data
         public DbSet<Compra> Compras { get; set; } = null!;
         public DbSet<DetalleCompra> DetalleCompras { get; set; } = null!;
         public DbSet<PrecioEspecialCliente> PreciosEspecialesClientes { get; set; } = null!;
-
+        public DbSet<Feriado> Feriados { get; set; } = null!;
+        public DbSet<CuentaPorCobrar> CuentasPorCobrar { get; set; } = null!;
+        public DbSet<PagoCliente> PagosClientes { get; set; } = null!;
+        public DbSet<PagoDetalleFactura> PagosDetalleFacturas { get; set; } = null!;
+        public DbSet<HistorialCondicionesCredito> HistorialCondicionesCredito { get; set; } = null!;
         protected override void OnConfiguring(DbContextOptionsBuilder optionsBuilder)
         {
             if (!optionsBuilder.IsConfigured)
             {
-                optionsBuilder.UseMySql("Server=localhost;Database=sistemaepos;Uid=root;Pwd=root;", 
+                optionsBuilder.UseMySql("Server=localhost;Database=sistemaepos;Uid=root;Pwd=;", 
                     new MySqlServerVersion(new Version(8, 0, 30)));
             }
         }

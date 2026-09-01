@@ -19,10 +19,11 @@ namespace SISTEMAACTUALIZADO
         private Button btnCaja = new Button();
         private Button btnVentas = new Button();
         private Button btnLibroVentas = new Button();
-        private Button btnLibroCompras = new Button(); // <-- Botón Libro de Compras agregado
+        private Button btnLibroCompras = new Button();
         private Button btnFolios = new Button();
         private Button btnCompras = new Button();
         private Button btnClientes = new Button();
+        private Button btnCuentasPorCobrar = new Button(); // <-- NUEVO BOTÓN
         private Button btnProductos = new Button();
         private Button btnUsuarios = new Button();
         private Button btnReportes = new Button();
@@ -91,6 +92,7 @@ namespace SISTEMAACTUALIZADO
             ConfigurarBotonSidebar(this.btnFolios, "📄  Control de Folios", yPos); yPos += espaciado;
             ConfigurarBotonSidebar(this.btnCompras, "📥  Recepción Compras", yPos); yPos += espaciado;
             ConfigurarBotonSidebar(this.btnClientes, "👥  Clientes", yPos); yPos += espaciado;
+            ConfigurarBotonSidebar(this.btnCuentasPorCobrar, "💳  Cuentas por Cobrar", yPos); yPos += espaciado;
             ConfigurarBotonSidebar(this.btnProductos, "📦  Productos", yPos); yPos += espaciado;
             ConfigurarBotonSidebar(this.btnUsuarios, "👤  Usuarios", yPos); yPos += espaciado;
             ConfigurarBotonSidebar(this.btnReportes, "📊  Reportes", yPos);
@@ -98,6 +100,7 @@ namespace SISTEMAACTUALIZADO
             pnlNav.Controls.Add(this.btnReportes);
             pnlNav.Controls.Add(this.btnUsuarios);
             pnlNav.Controls.Add(this.btnProductos);
+            pnlNav.Controls.Add(this.btnCuentasPorCobrar);
             pnlNav.Controls.Add(this.btnClientes);
             pnlNav.Controls.Add(this.btnCompras);
             pnlNav.Controls.Add(this.btnFolios);
@@ -124,6 +127,7 @@ namespace SISTEMAACTUALIZADO
             this.btnFolios.Click += (s, e) => AbrirFormEnContent(new FormFolios(), "Control de Folios Autorizados (SII)", btnFolios);
             this.btnCompras.Click += (s, e) => AbrirFormEnContent(new FormCompras(), "Recepción de Compras e Incremento de Stock", btnCompras);
             this.btnClientes.Click += (s, e) => AbrirFormEnContent(new FormClientes(), "Gestión de Clientes (CRM)", btnClientes);
+            this.btnCuentasPorCobrar.Click += (s, e) => AbrirFormEnContent(new SISTEMAACTUALIZADO.Forms.FormCuentasPorCobrar(), "Gestión de Cuentas por Cobrar y Control de Crédito Comercial", btnCuentasPorCobrar);
             this.btnProductos.Click += (s, e) => AbrirFormEnContent(new FormProductos(), "Gestión de Productos e Inventario", btnProductos);
             this.btnUsuarios.Click += (s, e) => AbrirFormEnContent(new FormUsuarios(), "Gestión de Cuentas de Usuarios", btnUsuarios);
             this.btnReportes.Click += (s, e) => AbrirFormEnContent(new FormReportes(), "Reportes y Estadísticas de Ventas", btnReportes);
@@ -198,6 +202,7 @@ namespace SISTEMAACTUALIZADO
                 btnLibroVentas.Visible = false;
                 btnLibroCompras.Visible = false;
                 btnCompras.Visible = false;
+                btnCuentasPorCobrar.Visible = false;
             }
         }
 
@@ -238,7 +243,7 @@ namespace SISTEMAACTUALIZADO
         {
             Button[] botones = new[] { 
                 btnCaja, btnVentas, btnLibroVentas, btnLibroCompras, btnFolios, 
-                btnCompras, btnClientes, btnProductos, 
+                btnCompras, btnClientes, btnCuentasPorCobrar, btnProductos, 
                 btnUsuarios, btnReportes, btnCerrarSesion 
             };
 

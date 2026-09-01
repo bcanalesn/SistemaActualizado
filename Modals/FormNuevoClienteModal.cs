@@ -1,6 +1,7 @@
 using System;
 using System.Drawing;
 using System.Windows.Forms;
+using SISTEMAACTUALIZADO.Data;
 using SISTEMAACTUALIZADO.Helpers;
 using SISTEMAACTUALIZADO.Models;
 using SISTEMAACTUALIZADO.Services;
@@ -282,8 +283,8 @@ namespace SISTEMAACTUALIZADO.Modals
                 // Cupo de Crédito
                 txtCupoCredito.Text = _clienteAEditar.CupoCredito.ToString("0");
 
-                // Días de Crédito
-                int dias = _clienteAEditar.DiasCredito;
+                // Días de Crédito Hábiles
+                int dias = _clienteAEditar.DiasCreditoHabiles > 0 ? _clienteAEditar.DiasCreditoHabiles : _clienteAEditar.DiasCredito;
                 cbDiasCredito.SelectedIndex = dias switch
                 {
                     7 => 1,
@@ -349,6 +350,11 @@ namespace SISTEMAACTUALIZADO.Modals
                 bool esNuevo = (_clienteAEditar == null);
                 Cliente clienteGuardar = _clienteAEditar ?? new Cliente();
 
+                // Detección de cambios crediticios para auditoría
+                int diasAnteriores = clienteGuardar.DiasCreditoHabiles;
+                decimal cupoAnterior = clienteGuardar.CupoCredito;
+                string estadoAnterior = clienteGuardar.EstadoCrediticio ?? "ACTIVO";
+
                 clienteGuardar.Rut = rutLimpio;
                 clienteGuardar.RazonSocial = txtRazon.Text.Trim();
                 clienteGuardar.Giro = txtGiro.Text.Trim();
@@ -358,15 +364,43 @@ namespace SISTEMAACTUALIZADO.Modals
                 clienteGuardar.Comuna = txtComuna.Text.Trim();
                 clienteGuardar.Ciudad = txtCiudad.Text.Trim();
                 
-                // Parámetros comerciales
+                // Parámetros comerciales y de crédito
                 clienteGuardar.CategoriaCliente = cbCategoriaTipo.SelectedItem?.ToString() ?? "MINORISTA";
                 clienteGuardar.CupoCredito = cupo;
                 clienteGuardar.DiasCredito = diasCredito;
+                clienteGuardar.DiasCreditoHabiles = diasCredito;
+                clienteGuardar.PermiteCredito = diasCredito > 0;
+                clienteGuardar.ModalidadPago = diasCredito > 0 ? "CONTADO_CREDITO" : "SOLO_CONTADO";
+                clienteGuardar.EstadoCrediticio = string.IsNullOrEmpty(clienteGuardar.EstadoCrediticio) ? "ACTIVO" : clienteGuardar.EstadoCrediticio;
                 clienteGuardar.FormaPago = formaPago;
                 clienteGuardar.ListaPrecioDefecto = cbListaPrecio.SelectedIndex + 1;
                 clienteGuardar.Estado = true;
 
                 _clienteService.GuardarCliente(clienteGuardar, esNuevo);
+
+                // Auditoría: Registrar cambio en historial si no es nuevo y variaron condiciones
+                if (!esNuevo && (diasAnteriores != diasCredito || cupoAnterior != cupo))
+                {
+                    try
+                    {
+                        using var db = new AppDbContext();
+                        db.HistorialCondicionesCredito.Add(new HistorialCondicionesCredito
+                        {
+                            IdCliente = clienteGuardar.IdCliente,
+                            DiasCreditoAnterior = diasAnteriores,
+                            DiasCreditoNuevo = diasCredito,
+                            CupoAnterior = cupoAnterior,
+                            CupoNuevo = cupo,
+                            EstadoAnterior = estadoAnterior,
+                            EstadoNuevo = clienteGuardar.EstadoCrediticio,
+                            Motivo = "Modificación de condiciones crediticias desde ficha de cliente",
+                            FechaCambio = DateTime.Now,
+                            UsuarioResponsable = "ADMIN"
+                        });
+                        db.SaveChanges();
+                    }
+                    catch { }
+                }
 
                 MessageBox.Show("Cliente guardado correctamente.", "Éxito", MessageBoxButtons.OK, MessageBoxIcon.Information);
                 this.DialogResult = DialogResult.OK;
