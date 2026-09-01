@@ -1,6 +1,8 @@
 using System;
 using System.Collections.Generic;
+using System.Diagnostics;
 using System.Drawing;
+using System.Drawing.Printing;
 using System.IO;
 using System.Linq;
 using System.Text;
@@ -22,7 +24,7 @@ namespace SISTEMAACTUALIZADO.Forms
         private Button btnBuscar = null!;
         private Button btnLimpiar = null!;
         private Button btnExportarCsv = null!;
-        private Button btnExportarExcel = null!;
+        private Button btnExportarPdf = null!;
 
         // Filtros Rápidos
         private Button btnFiltroHoy = null!;
@@ -31,8 +33,9 @@ namespace SISTEMAACTUALIZADO.Forms
         private Button btnFiltroEsteMes = null!;
         private Button btnFiltroMesAnterior = null!;
 
-        // Tarjetas KPI Superiores
-        private Label lblKpiComprasMonto = null!;
+        // Tarjetas KPI Superiores (5 Tarjetas)
+        private Label lblKpiTotalBrutoMonto = null!;
+        private Label lblKpiComprasNetoMonto = null!;
         private Label lblKpiFacturasCant = null!;
         private Label lblKpiIvaMonto = null!;
         private Label lblKpiProveedoresCant = null!;
@@ -42,6 +45,8 @@ namespace SISTEMAACTUALIZADO.Forms
         private Label lblContadorFooter = null!;
 
         private List<Compra> _comprasCargadas = new List<Compra>();
+        private int _filaImpresionActual = 0;
+        private int _nroPaginaPdf = 1;
 
         public FormLibroCompras()
         {
@@ -65,17 +70,12 @@ namespace SISTEMAACTUALIZADO.Forms
             Panel pnlMain = new Panel
             {
                 Dock = DockStyle.Fill,
-                Padding = new Padding(16, 10, 16, 14),
+                Padding = new Padding(16, 12, 16, 16),
                 AutoScroll = true
             };
 
-            // 1. Tarjetas KPI Superiores (Optimizadas en altura)
             Panel pnlKpis = CrearTarjetasKpi();
-
-            // 2. Tarjeta de Filtros
             Panel pnlFiltros = CrearSeccionFiltros();
-
-            // 3. Grilla Principal (Aprovecha toda la altura)
             Panel pnlGrilla = CrearSeccionGrilla();
 
             pnlMain.Controls.Add(pnlGrilla);
@@ -88,32 +88,37 @@ namespace SISTEMAACTUALIZADO.Forms
 
         private Panel CrearTarjetasKpi()
         {
-            Panel pnlWrapper = new Panel { Dock = DockStyle.Top, Height = 86, Margin = new Padding(0, 0, 0, 10) };
+            // Se amplía la separación inferior de 10px a 16px para evitar contacto con los filtros
+            Panel pnlWrapper = new Panel { Dock = DockStyle.Top, Height = 90, Margin = new Padding(0, 0, 0, 16) };
 
             TableLayoutPanel tlp = new TableLayoutPanel
             {
                 Dock = DockStyle.Fill,
-                ColumnCount = 4,
+                ColumnCount = 5,
                 RowCount = 1,
                 Margin = new Padding(0),
                 Padding = new Padding(0)
             };
-            tlp.ColumnStyles.Add(new ColumnStyle(SizeType.Percent, 25F));
-            tlp.ColumnStyles.Add(new ColumnStyle(SizeType.Percent, 25F));
-            tlp.ColumnStyles.Add(new ColumnStyle(SizeType.Percent, 25F));
-            tlp.ColumnStyles.Add(new ColumnStyle(SizeType.Percent, 25F));
+            tlp.ColumnStyles.Add(new ColumnStyle(SizeType.Percent, 22F)); // Total Compras Bruto
+            tlp.ColumnStyles.Add(new ColumnStyle(SizeType.Percent, 20F)); // Neto
+            tlp.ColumnStyles.Add(new ColumnStyle(SizeType.Percent, 18F)); // Facturas
+            tlp.ColumnStyles.Add(new ColumnStyle(SizeType.Percent, 20F)); // IVA Crédito
+            tlp.ColumnStyles.Add(new ColumnStyle(SizeType.Percent, 20F)); // Proveedores
 
-            // KPI 1: Total Compras
-            tlp.Controls.Add(CrearCardKpi("💲", Color.FromArgb(220, 252, 231), Color.FromArgb(22, 163, 74), "Compras del período", out lblKpiComprasMonto, "$ 0", "Total neto"), 0, 0);
+            // KPI 1: TOTAL COMPRAS (BRUTO)
+            tlp.Controls.Add(CrearCardKpi("💰", Color.FromArgb(209, 250, 229), Color.FromArgb(5, 150, 105), "Total Compras", out lblKpiTotalBrutoMonto, "$ 0", "Total bruto (con IVA)"), 0, 0);
 
-            // KPI 2: Cantidad Facturas
-            tlp.Controls.Add(CrearCardKpi("📄", Color.FromArgb(239, 246, 255), Color.FromArgb(37, 99, 235), "Facturas recibidas", out lblKpiFacturasCant, "0", "100% del total"), 1, 0);
+            // KPI 2: Total Neto
+            tlp.Controls.Add(CrearCardKpi("💲", Color.FromArgb(240, 253, 244), Color.FromArgb(22, 163, 74), "Total Neto", out lblKpiComprasNetoMonto, "$ 0", "Total neto del período"), 1, 0);
 
-            // KPI 3: IVA Crédito
-            tlp.Controls.Add(CrearCardKpi("🏷️", Color.FromArgb(243, 232, 255), Color.FromArgb(147, 51, 234), "IVA Crédito Fiscal", out lblKpiIvaMonto, "$ 0", "Total IVA recuperable"), 2, 0);
+            // KPI 3: IVA Crédito Fiscal
+            tlp.Controls.Add(CrearCardKpi("🏷️", Color.FromArgb(243, 232, 255), Color.FromArgb(147, 51, 234), "Total IVA", out lblKpiIvaMonto, "$ 0", "Total IVA recuperable"), 3, 0);
+            
+            // KPI 4: Facturas Recibidas
+            tlp.Controls.Add(CrearCardKpi("📄", Color.FromArgb(239, 246, 255), Color.FromArgb(37, 99, 235), "Facturas Recibidas", out lblKpiFacturasCant, "0", "100% del total"), 2, 0);
 
-            // KPI 4: Proveedores Activos
-            tlp.Controls.Add(CrearCardKpi("👥", Color.FromArgb(254, 243, 199), Color.FromArgb(217, 119, 6), "Proveedores activos", out lblKpiProveedoresCant, "0", "Con compras en el período"), 3, 0);
+            // KPI 5: Proveedores Activos
+            tlp.Controls.Add(CrearCardKpi("👥", Color.FromArgb(254, 243, 199), Color.FromArgb(217, 119, 6), "Proveedores Activos", out lblKpiProveedoresCant, "0", "Con compras en el período"), 4, 0);
 
             pnlWrapper.Controls.Add(tlp);
             return pnlWrapper;
@@ -126,45 +131,45 @@ namespace SISTEMAACTUALIZADO.Forms
                 Dock = DockStyle.Fill,
                 BackColor = Color.White,
                 Margin = new Padding(4, 0, 4, 0),
-                Padding = new Padding(12, 8, 12, 8)
+                Padding = new Padding(10, 8, 10, 8)
             };
             card.Paint += (s, e) => ControlPaint.DrawBorder(e.Graphics, card.ClientRectangle, Color.FromArgb(226, 232, 240), ButtonBorderStyle.Solid);
 
             Label lblIcon = new Label
             {
                 Text = icono,
-                Font = new Font("Segoe UI", 13F),
+                Font = new Font("Segoe UI", 12F),
                 BackColor = bgIcon,
                 ForeColor = iconColor,
-                Size = new Size(38, 38),
-                Location = new Point(12, 12),
+                Size = new Size(36, 36),
+                Location = new Point(10, 14),
                 TextAlign = ContentAlignment.MiddleCenter
             };
 
             Label lblTit = new Label
             {
                 Text = titulo,
-                Font = new Font("Segoe UI", 8F, FontStyle.Bold),
+                Font = new Font("Segoe UI", 7.5F, FontStyle.Bold),
                 ForeColor = Color.FromArgb(100, 116, 139),
-                Location = new Point(58, 8),
+                Location = new Point(50, 8),
                 AutoSize = true
             };
 
             lblValor = new Label
             {
                 Text = valorInicial,
-                Font = new Font("Segoe UI", 13F, FontStyle.Bold),
+                Font = new Font("Segoe UI", 12F, FontStyle.Bold),
                 ForeColor = Color.FromArgb(15, 23, 42),
-                Location = new Point(56, 24),
+                Location = new Point(48, 24),
                 AutoSize = true
             };
 
             Label lblSub = new Label
             {
                 Text = subtitulo,
-                Font = new Font("Segoe UI", 7.5F),
+                Font = new Font("Segoe UI", 7F),
                 ForeColor = Color.FromArgb(148, 163, 184),
-                Location = new Point(58, 48),
+                Location = new Point(50, 48),
                 AutoSize = true
             };
 
@@ -180,11 +185,10 @@ namespace SISTEMAACTUALIZADO.Forms
                 Height = 110,
                 BackColor = Color.White,
                 Padding = new Padding(14, 8, 14, 8),
-                Margin = new Padding(0, 0, 0, 10)
+                Margin = new Padding(0, 0, 0, 14) // Separación inferior con respecto a la grilla
             };
             pnl.Paint += (s, e) => ControlPaint.DrawBorder(e.Graphics, pnl.ClientRectangle, Color.FromArgb(226, 232, 240), ButtonBorderStyle.Solid);
 
-            // Fila 1: Filtros
             FlowLayoutPanel flp1 = new FlowLayoutPanel
             {
                 Dock = DockStyle.Top,
@@ -233,7 +237,6 @@ namespace SISTEMAACTUALIZADO.Forms
 
             flp1.Controls.AddRange(new Control[] { pnlTxt, pnlDesde, pnlHasta, pnlTipo, pnlEstado, btnBuscar, btnLimpiar });
 
-            // Fila 2: Filtros Rápidos y Exportar
             Panel pnlFila2 = new Panel { Dock = DockStyle.Bottom, Height = 32 };
 
             FlowLayoutPanel flpRapidos = new FlowLayoutPanel { Dock = DockStyle.Left, AutoSize = true, WrapContents = false };
@@ -252,11 +255,11 @@ namespace SISTEMAACTUALIZADO.Forms
             btnExportarCsv.FlatAppearance.BorderColor = Color.FromArgb(187, 247, 208);
             btnExportarCsv.Click += (s, e) => ExportarACSV();
 
-            btnExportarExcel = new Button { Text = "📊 Exportar Excel", Size = new Size(120, 26), BackColor = Color.FromArgb(241, 245, 249), ForeColor = Color.FromArgb(30, 41, 59), FlatStyle = FlatStyle.Flat, Font = new Font("Segoe UI", 8F, FontStyle.Bold), Cursor = Cursors.Hand, Margin = new Padding(0) };
-            btnExportarExcel.FlatAppearance.BorderColor = Color.FromArgb(203, 213, 225);
-            btnExportarExcel.Click += (s, e) => ExportarACSV();
+            btnExportarPdf = new Button { Text = "📄 Exportar PDF", Size = new Size(120, 26), BackColor = Color.FromArgb(254, 242, 242), ForeColor = Color.FromArgb(220, 38, 38), FlatStyle = FlatStyle.Flat, Font = new Font("Segoe UI", 8F, FontStyle.Bold), Cursor = Cursors.Hand, Margin = new Padding(0) };
+            btnExportarPdf.FlatAppearance.BorderColor = Color.FromArgb(254, 202, 202);
+            btnExportarPdf.Click += (s, e) => GenerarReportePdf();
 
-            flpExport.Controls.AddRange(new Control[] { btnExportarCsv, btnExportarExcel });
+            flpExport.Controls.AddRange(new Control[] { btnExportarCsv, btnExportarPdf });
 
             pnlFila2.Controls.Add(flpRapidos);
             pnlFila2.Controls.Add(flpExport);
@@ -291,7 +294,7 @@ namespace SISTEMAACTUALIZADO.Forms
                 SelectionMode = DataGridViewSelectionMode.FullRowSelect,
                 MultiSelect = false,
                 ReadOnly = true,
-                AutoSizeColumnsMode = DataGridViewAutoSizeColumnsMode.None, // Se configuran anchos exactos
+                AutoSizeColumnsMode = DataGridViewAutoSizeColumnsMode.None,
                 RowTemplate = { Height = 32 },
                 GridColor = Color.FromArgb(241, 245, 249)
             };
@@ -330,7 +333,6 @@ namespace SISTEMAACTUALIZADO.Forms
             dgvLibro.Columns.Add("Total", "TOTAL");
             dgvLibro.Columns.Add("Estado", "ESTADO");
 
-            // Anchos y Alineaciones bien proporcionados para evitar texto cortado
             dgvLibro.Columns["TipoDoc"].Width = 85;
             dgvLibro.Columns["TipoDoc"].DefaultCellStyle.Alignment = DataGridViewContentAlignment.MiddleCenter;
             dgvLibro.Columns["TipoDoc"].DefaultCellStyle.ForeColor = Color.FromArgb(37, 99, 235);
@@ -418,12 +420,15 @@ namespace SISTEMAACTUALIZADO.Forms
                     );
                 }
 
+                // Cálculo y asignación de los 5 KPIs
+                decimal totalBruto = _comprasCargadas.Sum(c => c.MontoTotal);
                 decimal totalNeto = _comprasCargadas.Sum(c => c.MontoNeto);
                 decimal totalIva = _comprasCargadas.Sum(c => c.MontoIva);
                 int totalFacturas = _comprasCargadas.Count;
                 int totalProveedores = _comprasCargadas.Select(c => c.RutProveedor).Distinct().Count();
 
-                lblKpiComprasMonto.Text = $"$ {totalNeto:N0}";
+                lblKpiTotalBrutoMonto.Text = $"$ {totalBruto:N0}";
+                lblKpiComprasNetoMonto.Text = $"$ {totalNeto:N0}";
                 lblKpiFacturasCant.Text = totalFacturas.ToString("N0");
                 lblKpiIvaMonto.Text = $"$ {totalIva:N0}";
                 lblKpiProveedoresCant.Text = totalProveedores.ToString("N0");
@@ -515,13 +520,182 @@ namespace SISTEMAACTUALIZADO.Forms
                     }
 
                     File.WriteAllText(sfd.FileName, sb.ToString(), Encoding.UTF8);
-                    MessageBox.Show("Libro de Compras exportado exitosamente.", "Exportación Completa", MessageBoxButtons.OK, MessageBoxIcon.Information);
+                    MessageBox.Show("Libro de Compras exportado exitosamente en formato CSV.", "Exportación Completa", MessageBoxButtons.OK, MessageBoxIcon.Information);
                 }
                 catch (Exception ex)
                 {
-                    MessageBox.Show($"Error al exportar: {ex.Message}", "Error", MessageBoxButtons.OK, MessageBoxIcon.Error);
+                    MessageBox.Show($"Error al exportar CSV: {ex.Message}", "Error", MessageBoxButtons.OK, MessageBoxIcon.Error);
                 }
             }
+        }
+
+        private void GenerarReportePdf()
+        {
+            if (_comprasCargadas.Count == 0)
+            {
+                MessageBox.Show("No hay registros para generar el informe PDF en este período.", "Aviso", MessageBoxButtons.OK, MessageBoxIcon.Information);
+                return;
+            }
+
+            using SaveFileDialog sfd = new SaveFileDialog
+            {
+                Filter = "Documento PDF (*.pdf)|*.pdf",
+                FileName = $"Reporte_Libro_Compras_{dtpFechaDesde.Value:yyyyMMdd}_{dtpFechaHasta.Value:yyyyMMdd}.pdf"
+            };
+
+            if (sfd.ShowDialog() == DialogResult.OK)
+            {
+                try
+                {
+                    _filaImpresionActual = 0;
+                    _nroPaginaPdf = 1;
+
+                    PrintDocument doc = new PrintDocument();
+                    doc.DefaultPageSettings.Landscape = true;
+                    doc.DefaultPageSettings.Margins = new Margins(40, 40, 40, 40);
+                    doc.PrinterSettings.PrinterName = "Microsoft Print to PDF";
+                    doc.PrinterSettings.PrintToFile = true;
+                    doc.PrinterSettings.PrintFileName = sfd.FileName;
+
+                    doc.PrintPage += Doc_PrintPage;
+                    doc.Print();
+
+                    var res = MessageBox.Show("Reporte PDF generado exitosamente.\n\n¿Desea abrir el archivo generado ahora?", "Exportación PDF", MessageBoxButtons.YesNo, MessageBoxIcon.Information);
+                    if (res == DialogResult.Yes)
+                    {
+                        Process.Start(new ProcessStartInfo { FileName = sfd.FileName, UseShellExecute = true });
+                    }
+                }
+                catch (Exception ex)
+                {
+                    MessageBox.Show($"Error al generar el PDF: {ex.Message}", "Error PDF", MessageBoxButtons.OK, MessageBoxIcon.Error);
+                }
+            }
+        }
+
+        private void Doc_PrintPage(object sender, PrintPageEventArgs e)
+        {
+            Graphics g = e.Graphics!;
+            int left = e.MarginBounds.Left;
+            int right = e.MarginBounds.Right;
+            int top = e.MarginBounds.Top;
+            int width = e.MarginBounds.Width;
+            int y = top;
+
+            if (_nroPaginaPdf == 1)
+            {
+                using Font fontTit = new Font("Segoe UI", 16, FontStyle.Bold);
+                using Font fontSub = new Font("Segoe UI", 9, FontStyle.Regular);
+                using Brush brushTit = new SolidBrush(Color.FromArgb(15, 23, 42));
+                using Brush brushSub = new SolidBrush(Color.FromArgb(100, 116, 139));
+
+                g.DrawString("SISTEMA POS MODERNO - LIBRO DE COMPRAS", fontTit, brushTit, left, y);
+                y += 24;
+
+                string rango = $"Período: {dtpFechaDesde.Value:dd/MM/yyyy} al {dtpFechaHasta.Value:dd/MM/yyyy}  |  Emitido: {DateTime.Now:dd/MM/yyyy HH:mm}";
+                g.DrawString(rango, fontSub, brushSub, left, y);
+                y += 22;
+
+                decimal totalBruto = _comprasCargadas.Sum(c => c.MontoTotal);
+                decimal netoTot = _comprasCargadas.Sum(c => c.MontoNeto);
+                decimal ivaTot = _comprasCargadas.Sum(c => c.MontoIva);
+                int cantDoc = _comprasCargadas.Count;
+                int provs = _comprasCargadas.Select(c => c.RutProveedor).Distinct().Count();
+
+                Rectangle kpiRect = new Rectangle(left, y, width, 32);
+                using Brush bgKpi = new SolidBrush(Color.FromArgb(241, 245, 249));
+                using Pen penKpi = new Pen(Color.FromArgb(203, 213, 225));
+                g.FillRectangle(bgKpi, kpiRect);
+                g.DrawRectangle(penKpi, kpiRect);
+
+                using Font fontKpi = new Font("Segoe UI", 8.5F, FontStyle.Bold);
+                using Brush brushKpi = new SolidBrush(Color.FromArgb(30, 41, 59));
+                string resumenTexto = $"Documentos: {cantDoc}   |   Proveedores: {provs}   |   Neto: ${netoTot:N0}   |   IVA (19%): ${ivaTot:N0}   |   TOTAL COMPRAS: ${totalBruto:N0}";
+                g.DrawString(resumenTexto, fontKpi, brushKpi, left + 10, y + 8);
+                y += 42;
+            }
+
+            int[] colWidths = new int[] { 60, 80, 85, 320, 100, 100, 90, 110 };
+            string[] headers = new string[] { "TIPO", "FOLIO", "FECHA", "PROVEEDOR / RAZÓN SOCIAL", "RUT", "NETO", "IVA (19%)", "TOTAL" };
+
+            Rectangle headerRect = new Rectangle(left, y, width, 24);
+            using Brush bgHead = new SolidBrush(Color.FromArgb(15, 23, 42));
+            g.FillRectangle(bgHead, headerRect);
+
+            using Font fontHeader = new Font("Segoe UI", 8F, FontStyle.Bold);
+            using Brush brushHeadTxt = new SolidBrush(Color.White);
+
+            int curX = left;
+            for (int i = 0; i < headers.Length; i++)
+            {
+                StringFormat sf = new StringFormat
+                {
+                    Alignment = (i >= 5) ? StringAlignment.Far : (i == 0 || i == 1 || i == 2 ? StringAlignment.Center : StringAlignment.Near),
+                    LineAlignment = StringAlignment.Center
+                };
+                g.DrawString(headers[i], fontHeader, brushHeadTxt, new RectangleF(curX + 4, y, colWidths[i] - 8, 24), sf);
+                curX += colWidths[i];
+            }
+            y += 26;
+
+            using Font fontRow = new Font("Segoe UI", 8F, FontStyle.Regular);
+            using Font fontRowBold = new Font("Segoe UI", 8F, FontStyle.Bold);
+            using Brush brushText = new SolidBrush(Color.FromArgb(15, 23, 42));
+            using Brush brushAlt = new SolidBrush(Color.FromArgb(248, 250, 252));
+            using Pen penLine = new Pen(Color.FromArgb(226, 232, 240));
+
+            while (_filaImpresionActual < _comprasCargadas.Count)
+            {
+                if (y + 24 > e.MarginBounds.Bottom - 30)
+                {
+                    e.HasMorePages = true;
+                    _nroPaginaPdf++;
+                    return;
+                }
+
+                var c = _comprasCargadas[_filaImpresionActual];
+
+                if (_filaImpresionActual % 2 == 1)
+                {
+                    g.FillRectangle(brushAlt, new Rectangle(left, y, width, 22));
+                }
+                g.DrawLine(penLine, left, y + 22, right, y + 22);
+
+                curX = left;
+                string[] cValores = new string[]
+                {
+                    ObtenerCodigoDte(c.TipoDocumento),
+                    c.NroFacturaProveedor.ToString(),
+                    c.FechaEmision.ToString("dd/MM/yyyy"),
+                    c.RazonSocialProveedor,
+                    c.RutProveedor,
+                    $"${c.MontoNeto:N0}",
+                    $"${c.MontoIva:N0}",
+                    $"${c.MontoTotal:N0}"
+                };
+
+                for (int i = 0; i < cValores.Length; i++)
+                {
+                    StringFormat sf = new StringFormat
+                    {
+                        Alignment = (i >= 5) ? StringAlignment.Far : (i == 0 || i == 1 || i == 2 ? StringAlignment.Center : StringAlignment.Near),
+                        LineAlignment = StringAlignment.Center,
+                        Trimming = StringTrimming.EllipsisCharacter
+                    };
+                    Font f = (i == 1 || i == 7) ? fontRowBold : fontRow;
+                    g.DrawString(cValores[i], f, brushText, new RectangleF(curX + 4, y, colWidths[i] - 8, 22), sf);
+                    curX += colWidths[i];
+                }
+
+                y += 22;
+                _filaImpresionActual++;
+            }
+
+            using Font fontFoot = new Font("Segoe UI", 7.5F, FontStyle.Italic);
+            using Brush brushFoot = new SolidBrush(Color.FromArgb(148, 163, 184));
+            g.DrawString($"Página {_nroPaginaPdf}  -  Sistema POS Moderno", fontFoot, brushFoot, left, e.MarginBounds.Bottom - 14);
+
+            e.HasMorePages = false;
         }
 
         private void DgvLibro_DoubleClick(object? sender, EventArgs e)
