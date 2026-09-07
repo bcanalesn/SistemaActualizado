@@ -27,6 +27,7 @@ namespace SISTEMAACTUALIZADO
         private Button btnProductos = new Button();
         private Button btnUsuarios = new Button();
         private Button btnReportes = new Button();
+        private Button btnConfiguracion = new Button();
         private Button btnCerrarSesion = new Button();
         private Button btnSalir = new Button();
 
@@ -96,7 +97,10 @@ namespace SISTEMAACTUALIZADO
             ConfigurarBotonSidebar(this.btnProductos, "📦  Productos", yPos); yPos += espaciado;
             ConfigurarBotonSidebar(this.btnUsuarios, "👤  Usuarios", yPos); yPos += espaciado;
             ConfigurarBotonSidebar(this.btnReportes, "📊  Reportes", yPos);
+            ConfigurarBotonSidebar(this.btnConfiguracion, "⚙️  Configuración", yPos);
+            
 
+            pnlNav.Controls.Add(this.btnConfiguracion);
             pnlNav.Controls.Add(this.btnReportes);
             pnlNav.Controls.Add(this.btnUsuarios);
             pnlNav.Controls.Add(this.btnProductos);
@@ -131,6 +135,7 @@ namespace SISTEMAACTUALIZADO
             this.btnProductos.Click += (s, e) => AbrirFormEnContent(new FormProductos(), "Gestión de Productos e Inventario", btnProductos);
             this.btnUsuarios.Click += (s, e) => AbrirFormEnContent(new FormUsuarios(), "Gestión de Cuentas de Usuarios", btnUsuarios);
             this.btnReportes.Click += (s, e) => AbrirFormEnContent(new FormReportes(), "Reportes y Estadísticas de Ventas", btnReportes);
+            this.btnConfiguracion.Click += (s, e) => AbrirFormEnContent(new FormConfiguracion(), "Configuración General del Negocio y Datos Tributarios", btnConfiguracion);
 
             this.btnCerrarSesion.Click += (s, e) =>
             {
@@ -203,6 +208,7 @@ namespace SISTEMAACTUALIZADO
                 btnLibroCompras.Visible = false;
                 btnCompras.Visible = false;
                 btnCuentasPorCobrar.Visible = false;
+                btnConfiguracion.Visible = false;
             }
         }
 
@@ -244,7 +250,7 @@ namespace SISTEMAACTUALIZADO
             Button[] botones = new[] { 
                 btnCaja, btnVentas, btnLibroVentas, btnLibroCompras, btnFolios, 
                 btnCompras, btnClientes, btnCuentasPorCobrar, btnProductos, 
-                btnUsuarios, btnReportes, btnCerrarSesion 
+                btnUsuarios, btnReportes, btnConfiguracion, btnCerrarSesion 
             };
 
             foreach (var b in botones)

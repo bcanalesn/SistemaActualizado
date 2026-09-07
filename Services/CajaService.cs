@@ -1,6 +1,7 @@
 using System;
 using System.Collections.Generic;
 using System.Linq;
+using System.Text.RegularExpressions;
 using SISTEMAACTUALIZADO.Data;
 using SISTEMAACTUALIZADO.Models;
 
@@ -19,6 +20,7 @@ namespace SISTEMAACTUALIZADO.Services
         public decimal VentasEfectivo { get; set; }
         public decimal VentasTarjetas { get; set; }
         public decimal VentasTransferencia { get; set; }
+        public decimal VentasCreditoComercial { get; set; }
         public decimal MontoAnulaciones { get; set; }
         public int CantVentas { get; set; }
         public int CantAnulaciones { get; set; }
@@ -53,7 +55,6 @@ namespace SISTEMAACTUALIZADO.Services
 
             int iddoc = tipoDoc.Contains("Factura") ? 33 : 39;
 
-            // 1. OBTENER EL RANGO ACTIVO DE LA TABLA FOLIOS
             var rangoFolio = _db.Folios.FirstOrDefault(r => r.TipoDocumento == tipoDoc && r.Activo);
             
             int folioOficial;
@@ -67,12 +68,11 @@ namespace SISTEMAACTUALIZADO.Services
                 folioOficial = (int)(DateTime.Now.Ticks % 100000);
             }
 
-            // 2. ACTUALIZAR ENCABEZADO DE VENTA (TVE2607)
             ticket.iddocDTE = iddoc;
             ticket.Documento = tipoDoc;
             ticket.nroDTE = folioOficial;
-            ticket.MedioPago = medioPago; // Se guarda en su propia columna
-            ticket.Vuelto = vuelto;       // Se guarda el vuelto real
+            ticket.MedioPago = medioPago;
+            ticket.Vuelto = vuelto;
             ticket.status = "Emitido";
 
             if (tipoDoc.Contains("Factura"))
@@ -87,7 +87,6 @@ namespace SISTEMAACTUALIZADO.Services
                 ticket.RazonSocial = string.IsNullOrWhiteSpace(razonSocial) ? "Consumidor Final" : razonSocial;
             }
 
-            // 3. ACTUALIZAR DETALLE DE VENTA (TVD2607)
             var detalles = _db.TVD2607.Where(d => d.idTve == ticket.idTve).ToList();
             foreach (var item in detalles)
             {
@@ -125,9 +124,31 @@ namespace SISTEMAACTUALIZADO.Services
         {
             try
             {
-                return _db.TVE2607
-                    .Where(v => v.FecDoc >= fechaApertura && v.status == "Emitido" && (string.IsNullOrEmpty(v.UserDTE) || v.UserDTE.Contains("Efectivo") || v.UserDTE.Contains("Múltiple") || v.UserDTE.Contains("Cajero")))
-                    .Sum(v => (decimal?)(v.iddocDTE == 61 ? -v.Total : v.Total)) ?? 0;
+                var ventasEmitidas = _db.TVE2607
+                    .Where(v => v.FecDoc >= fechaApertura && v.status == "Emitido")
+                    .ToList();
+
+                decimal totalEfectivo = 0;
+
+                foreach (var v in ventasEmitidas)
+                {
+                    string medio = v.MedioPago ?? "";
+
+                    if (medio.Equals("Efectivo", StringComparison.OrdinalIgnoreCase))
+                    {
+                        totalEfectivo += (v.iddocDTE == 61 ? -v.Total : v.Total);
+                    }
+                    else if (medio.StartsWith("Múltiple", StringComparison.OrdinalIgnoreCase))
+                    {
+                        var matchEfec = Regex.Match(medio, @"Efec:\s*\$?([\d\.,]+)");
+                        if (matchEfec.Success && decimal.TryParse(matchEfec.Groups[1].Value.Replace(".", "").Replace(",", ""), out decimal efecMonto))
+                        {
+                            totalEfectivo += efecMonto - v.Vuelto;
+                        }
+                    }
+                }
+
+                return totalEfectivo;
             }
             catch
             {
@@ -140,8 +161,13 @@ namespace SISTEMAACTUALIZADO.Services
             var metricas = new MetricasTurno();
             try
             {
-                var ventasEmitidas = _db.TVE2607.Where(v => v.FecDoc >= fechaApertura && v.status == "Emitido").ToList();
-                var anulaciones = _db.TVE2607.Where(v => v.FecDoc >= fechaApertura && v.status == "Anulado").ToList();
+                var ventasEmitidas = _db.TVE2607
+                    .Where(v => v.FecDoc >= fechaApertura && v.status == "Emitido")
+                    .ToList();
+
+                var anulaciones = _db.TVE2607
+                    .Where(v => v.FecDoc >= fechaApertura && v.status == "Anulado")
+                    .ToList();
 
                 metricas.VentasTotales = ventasEmitidas.Sum(v => v.Total);
                 metricas.CantVentas = ventasEmitidas.Count;
@@ -150,54 +176,87 @@ namespace SISTEMAACTUALIZADO.Services
                 metricas.CantAnulaciones = anulaciones.Count;
 
                 var idsEmitidos = ventasEmitidas.Select(v => v.idTve).ToList();
-                metricas.CantProductos = _db.TVD2607.Where(d => idsEmitidos.Contains(d.idTve)).Sum(d => (int?)d.Cantidad) ?? 0;
+                metricas.CantProductos = _db.TVD2607
+                    .Where(d => idsEmitidos.Contains(d.idTve))
+                    .Sum(d => (int?)d.Cantidad) ?? 0;
 
-                // Desglose por Medio de Pago en Base al UserDTE / Documento
                 decimal mEfectivo = 0;
                 decimal mDebito = 0;
-                decimal mCredito = 0;
+                decimal mTarjetaCredito = 0;
+                decimal mCreditoComercial = 0;
                 decimal mTransferencia = 0;
-                decimal mMultiple = 0;
 
                 foreach (var v in ventasEmitidas)
-            {
-                string infoPago = v.UserDTE ?? "";
-
-                if (infoPago.Contains("Débito") || infoPago.Contains("Debito"))
                 {
-                    mDebito += v.Total;
+                    string medio = (v.MedioPago ?? "").Trim();
+
+                    if (medio.Equals("Efectivo", StringComparison.OrdinalIgnoreCase))
+                    {
+                        mEfectivo += v.Total;
+                    }
+                    else if (medio.Equals("Crédito Comercial", StringComparison.OrdinalIgnoreCase) || medio.Contains("PLAZO"))
+                    {
+                        mCreditoComercial += v.Total;
+                    }
+                    else if (medio.Equals("Débito", StringComparison.OrdinalIgnoreCase))
+                    {
+                        mDebito += v.Total;
+                    }
+                    else if (medio.Equals("Tarjeta Crédito", StringComparison.OrdinalIgnoreCase) || medio.Equals("Crédito", StringComparison.OrdinalIgnoreCase))
+                    {
+                        mTarjetaCredito += v.Total;
+                    }
+                    else if (medio.Equals("Transferencia", StringComparison.OrdinalIgnoreCase))
+                    {
+                        mTransferencia += v.Total;
+                    }
+                    else if (medio.StartsWith("Múltiple", StringComparison.OrdinalIgnoreCase))
+                    {
+                        var matchEfec = Regex.Match(medio, @"Efec:\s*\$?([\d\.,]+)");
+                        var matchTarj = Regex.Match(medio, @"Tarj:\s*\$?([\d\.,]+)");
+                        var matchTransf = Regex.Match(medio, @"Transf:\s*\$?([\d\.,]+)");
+
+                        decimal ef = 0, tar = 0, tr = 0;
+                        if (matchEfec.Success) decimal.TryParse(matchEfec.Groups[1].Value.Replace(".", "").Replace(",", ""), out ef);
+                        if (matchTarj.Success) decimal.TryParse(matchTarj.Groups[1].Value.Replace(".", "").Replace(",", ""), out tar);
+                        if (matchTransf.Success) decimal.TryParse(matchTransf.Groups[1].Value.Replace(".", "").Replace(",", ""), out tr);
+
+                        mEfectivo += (ef - v.Vuelto);
+                        mDebito += tar;
+                        mTransferencia += tr;
+                    }
+                    else
+                    {
+                        mEfectivo += v.Total;
+                    }
                 }
-                else if (infoPago.Contains("Crédito") || infoPago.Contains("Credito"))
+
+                metricas.VentasEfectivo = mEfectivo;
+                metricas.VentasTarjetas = mDebito + mTarjetaCredito;
+                metricas.VentasTransferencia = mTransferencia;
+                metricas.VentasCreditoComercial = mCreditoComercial;
+
+                decimal total = metricas.VentasTotales > 0 ? metricas.VentasTotales : 1;
+
+                if (mEfectivo > 0)
+                    metricas.ListaDesglose.Add(new DesgloseMedioPago { Medio = "Efectivo", Monto = mEfectivo, Porcentaje = Math.Round((mEfectivo / total) * 100, 1) });
+                
+                if (mCreditoComercial > 0)
+                    metricas.ListaDesglose.Add(new DesgloseMedioPago { Medio = "Crédito Comercial", Monto = mCreditoComercial, Porcentaje = Math.Round((mCreditoComercial / total) * 100, 1) });
+
+                if (mDebito > 0)
+                    metricas.ListaDesglose.Add(new DesgloseMedioPago { Medio = "Débito", Monto = mDebito, Porcentaje = Math.Round((mDebito / total) * 100, 1) });
+
+                if (mTarjetaCredito > 0)
+                    metricas.ListaDesglose.Add(new DesgloseMedioPago { Medio = "Tarjeta Crédito", Monto = mTarjetaCredito, Porcentaje = Math.Round((mTarjetaCredito / total) * 100, 1) });
+
+                if (mTransferencia > 0)
+                    metricas.ListaDesglose.Add(new DesgloseMedioPago { Medio = "Transferencia", Monto = mTransferencia, Porcentaje = Math.Round((mTransferencia / total) * 100, 1) });
+
+                if (metricas.ListaDesglose.Count == 0)
                 {
-                    mCredito += v.Total;
+                    metricas.ListaDesglose.Add(new DesgloseMedioPago { Medio = "Efectivo", Monto = 0, Porcentaje = 100 });
                 }
-                else if (infoPago.Contains("Transferencia"))
-                {
-                    mTransferencia += v.Total;
-                }
-                else
-                {
-                    // Todo lo demás (Efectivo y la porción cobrada directamente) computa a Efectivo
-                    mEfectivo += v.Total;
-                }
-            }
-
-            metricas.VentasEfectivo = mEfectivo;
-            metricas.VentasTarjetas = mDebito + mCredito;
-            metricas.VentasTransferencia = mTransferencia;
-
-            decimal total = metricas.VentasTotales > 0 ? metricas.VentasTotales : 1;
-
-            // Solo mantenemos los 4 medios principales en el desglose
-            if (mEfectivo > 0) metricas.ListaDesglose.Add(new DesgloseMedioPago { Medio = "Efectivo", Monto = mEfectivo, Porcentaje = Math.Round((mEfectivo / total) * 100, 0) });
-            if (mDebito > 0) metricas.ListaDesglose.Add(new DesgloseMedioPago { Medio = "Débito", Monto = mDebito, Porcentaje = Math.Round((mDebito / total) * 100, 0) });
-            if (mCredito > 0) metricas.ListaDesglose.Add(new DesgloseMedioPago { Medio = "Crédito", Monto = mCredito, Porcentaje = Math.Round((mCredito / total) * 100, 0) });
-            if (mTransferencia > 0) metricas.ListaDesglose.Add(new DesgloseMedioPago { Medio = "Transferencia", Monto = mTransferencia, Porcentaje = Math.Round((mTransferencia / total) * 100, 0) });
-
-            if (metricas.ListaDesglose.Count == 0)
-            {
-                metricas.ListaDesglose.Add(new DesgloseMedioPago { Medio = "Efectivo", Monto = 0, Porcentaje = 100 });
-            }
             }
             catch { }
 

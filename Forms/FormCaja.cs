@@ -897,8 +897,13 @@ namespace SISTEMAACTUALIZADO
                 { 
                     Location = new Point(20, 45), 
                     Size = new Size(260, 28), 
-                    Font = new Font("Segoe UI", 11F, FontStyle.Bold),
-                    PlaceholderText = "Ej: 20000"
+                    Font = new Font("Segoe UI", 11F, FontStyle.Bold)
+                };
+
+                // Forzar a Windows a mostrar el placeholder incluso cuando el control tiene el foco activo
+                modalApertura.Shown += (s, ev) =>
+                {
+                    SendMessage(txtM.Handle, EM_SETCUEBANNER, 1, "Ej: 200000");
                 };
 
                 Button btnA = new Button { Text = "🚀 Iniciar Turno", Location = new Point(20, 95), Size = new Size(260, 40), BackColor = Color.FromArgb(16, 185, 129), ForeColor = Color.White, FlatStyle = FlatStyle.Flat, Font = new Font("Segoe UI", 9.5F, FontStyle.Bold), Cursor = Cursors.Hand };

@@ -20,8 +20,12 @@ namespace SISTEMAACTUALIZADO.Modals
 
         private void InitializeComponent()
         {
+            var datos = _cajaService.ObtenerMetricasResumenTurno(_turno.FechaApertura);
+
             this.Text = "Resumen del Turno";
-            this.Size = new Size(390, 540);
+            int itemsCount = Math.Max(datos.ListaDesglose.Count, 1);
+            int altoMedios = 35 + (itemsCount * 22) + 25;
+            this.Size = new Size(395, 470 + altoMedios);
             this.StartPosition = FormStartPosition.CenterParent;
             this.FormBorderStyle = FormBorderStyle.FixedDialog;
             this.MaximizeBox = false;
@@ -29,17 +33,14 @@ namespace SISTEMAACTUALIZADO.Modals
             this.ControlBox = false;
             this.BackColor = Color.White;
 
-            var datos = _cajaService.ObtenerMetricasResumenTurno(_turno.FechaApertura);
+            Panel pnlMain = new Panel { Dock = DockStyle.Fill, Padding = new Padding(12), AutoScroll = true };
 
-            Panel pnlMain = new Panel { Dock = DockStyle.Fill, Padding = new Padding(12) };
-
-            // Encabezado
             Button btnClose = new Button
             {
                 Text = "✕",
                 Font = new Font("Segoe UI", 10F, FontStyle.Bold),
                 ForeColor = Color.FromArgb(100, 116, 139),
-                Location = new Point(335, 10),
+                Location = new Point(340, 10),
                 Size = new Size(26, 26),
                 FlatStyle = FlatStyle.Flat,
                 Cursor = Cursors.Hand
@@ -50,83 +51,88 @@ namespace SISTEMAACTUALIZADO.Modals
             Label lblTitle = new Label { Text = "📈 Resumen del Turno", Location = new Point(12, 10), Font = new Font("Segoe UI", 12F, FontStyle.Bold), ForeColor = Color.FromArgb(15, 23, 42), AutoSize = true };
             Label lblSubTitle = new Label { Text = "Turno #" + _turno.FechaApertura.ToString("yyyy-MM-dd") + "-" + _turno.CajaTurnoID.ToString("D3"), Location = new Point(12, 34), Font = new Font("Segoe UI", 8.5F, FontStyle.Regular), ForeColor = Color.FromArgb(100, 116, 139), AutoSize = true };
 
-            Panel badgeEstado = new Panel { Location = new Point(270, 34), Size = new Size(60, 20), BackColor = Color.FromArgb(220, 252, 231) };
+            Panel badgeEstado = new Panel { Location = new Point(270, 34), Size = new Size(65, 20), BackColor = Color.FromArgb(220, 252, 231) };
             Label lblEstadoText = new Label { Text = "ABIERTO", Font = new Font("Segoe UI", 7.5F, FontStyle.Bold), ForeColor = Color.FromArgb(22, 101, 52), Dock = DockStyle.Fill, TextAlign = ContentAlignment.MiddleCenter };
             badgeEstado.Controls.Add(lblEstadoText);
 
             // 1. TARJETA BALANCE
-            Panel pnlBalance = CrearPanelTarjeta(12, 60, 350, 185);
+            Panel pnlBalance = CrearPanelTarjeta(12, 60, 354, 160);
 
             decimal fondoInicial = _turno.MontoInicial;
             decimal ventasTotales = datos.VentasTotales;
             decimal anulaciones = datos.MontoAnulaciones;
-            decimal totalIngresos = ventasTotales - anulaciones;
             decimal efectivoEsperado = fondoInicial + datos.VentasEfectivo;
 
             int yPos = 8;
             CrearFilaMetrica(pnlBalance, "Fondo Inicial", "$ " + fondoInicial.ToString("N0"), ref yPos, isBold: true);
-            CrearFilaMetrica(pnlBalance, "Ventas Totales (" + datos.CantVentas + ")", "$ " + ventasTotales.ToString("N0"), ref yPos);
+            CrearFilaMetrica(pnlBalance, "Ventas Totales (" + datos.CantVentas + ")", "$ " + ventasTotales.ToString("N0"), ref yPos, isBold: true);
             CrearFilaMetrica(pnlBalance, "Anulaciones (" + datos.CantAnulaciones + ")", "$ " + anulaciones.ToString("N0"), ref yPos, colorValor: Color.FromArgb(239, 68, 68));
-            CrearFilaMetrica(pnlBalance, "Total Ingresos", "$ " + totalIngresos.ToString("N0"), ref yPos, isBold: true, colorValor: Color.FromArgb(22, 163, 74));
             
             yPos += 4;
-            CrearFilaMetrica(pnlBalance, "Efectivo Esperado", "$ " + efectivoEsperado.ToString("N0"), ref yPos, isBold: true, colorValor: Color.FromArgb(37, 99, 235));
-            CrearFilaMetrica(pnlBalance, "Efectivo en Caja", "$ " + efectivoEsperado.ToString("N0"), ref yPos, isBold: true, colorValor: Color.FromArgb(22, 163, 74));
+            CrearFilaMetrica(pnlBalance, "Efectivo Esperado en Caja", "$ " + efectivoEsperado.ToString("N0"), ref yPos, isBold: true, colorValor: Color.FromArgb(37, 99, 235));
 
-            // Diferencia
-            Panel pnlDiferencia = new Panel { Location = new Point(12, 250), Size = new Size(350, 32), BackColor = Color.FromArgb(240, 253, 244) };
-            pnlDiferencia.Paint += (s, e) => ControlPaint.DrawBorder(e.Graphics, pnlDiferencia.ClientRectangle, Color.FromArgb(187, 247, 208), ButtonBorderStyle.Solid);
-            
-            Label lblDifT = new Label { Text = "Diferencia", Location = new Point(10, 7), Font = new Font("Segoe UI", 9F, FontStyle.Bold), ForeColor = Color.FromArgb(22, 101, 52), AutoSize = true };
-            Label lblDifV = new Label { Text = "$ 0", Location = new Point(275, 6), Font = new Font("Segoe UI", 10F, FontStyle.Bold), ForeColor = Color.FromArgb(22, 163, 74), AutoSize = true };
-            pnlDiferencia.Controls.AddRange(new Control[] { lblDifT, lblDifV });
 
-            // 2. VENTAS POR MEDIO DE PAGO (DINÁMICO)
-            int altoMedios = 35 + (datos.ListaDesglose.Count * 22) + 20;
-            Panel pnlMediosPago = CrearPanelTarjeta(12, 288, 350, Math.Max(altoMedios, 110));
+            // 2. VENTAS POR MEDIO DE PAGO
+            Panel pnlMediosPago = CrearPanelTarjeta(12, 264, 354, altoMedios);
             Label lblTitMedios = new Label { Text = "VENTAS POR MEDIO DE PAGO", Location = new Point(10, 8), Font = new Font("Segoe UI", 7.5F, FontStyle.Bold), ForeColor = Color.FromArgb(100, 116, 139), AutoSize = true };
 
-            // Donut Chart Dintáimico
-            Panel pnlChart = new Panel { Location = new Point(12, 28), Size = new Size(68, 68), BackColor = Color.White };
+            // Donut Chart Dinámico con segmentos reales
+            Panel pnlChart = new Panel { Location = new Point(10, 28), Size = new Size(72, 72), BackColor = Color.White };
             pnlChart.Paint += (s, e) =>
             {
                 Graphics g = e.Graphics;
                 g.SmoothingMode = SmoothingMode.AntiAlias;
 
-                using Pen penDonut = new Pen(Color.FromArgb(16, 185, 129), 10);
-                g.DrawEllipse(penDonut, 6, 6, 54, 54);
+                Rectangle rect = new Rectangle(8, 8, 56, 56);
+                float startAngle = -90f;
+
+                if (ventasTotales > 0)
+                {
+                    foreach (var item in datos.ListaDesglose)
+                    {
+                        float sweepAngle = (float)((item.Monto / ventasTotales) * 360m);
+                        if (sweepAngle <= 0) continue;
+
+                        Color colorSegmento = ObtenerColorMedio(item.Medio);
+                        using Pen penSegmento = new Pen(colorSegmento, 10);
+                        g.DrawArc(penSegmento, rect, startAngle, sweepAngle);
+                        startAngle += sweepAngle;
+                    }
+                }
+                else
+                {
+                    using Pen penVacio = new Pen(Color.FromArgb(226, 232, 240), 10);
+                    g.DrawEllipse(penVacio, rect);
+                }
 
                 using StringFormat sf = new StringFormat { Alignment = StringAlignment.Center, LineAlignment = StringAlignment.Center };
-                using Font fontPercent = new Font("Segoe UI", 7.5F, FontStyle.Bold);
-                g.DrawString("100%", fontPercent, Brushes.Black, new RectangleF(0, 0, 68, 68), sf);
+                using Font fontCenter = new Font("Segoe UI", 7F, FontStyle.Bold);
+                g.DrawString("100%", fontCenter, Brushes.Black, new RectangleF(0, 0, 72, 72), sf);
             };
 
             pnlMediosPago.Controls.Add(lblTitMedios);
             pnlMediosPago.Controls.Add(pnlChart);
 
             int yMedio = 28;
-           foreach (var item in datos.ListaDesglose)
-        {
-            Color colorTag = item.Medio == "Efectivo" ? Color.FromArgb(16, 185, 129) :
-                            item.Medio == "Débito" ? Color.FromArgb(37, 99, 235) :
-                            item.Medio == "Crédito" ? Color.FromArgb(124, 58, 237) : 
-                            Color.FromArgb(13, 148, 136); // Transferencia
+            foreach (var item in datos.ListaDesglose)
+            {
+                Color colorTag = ObtenerColorMedio(item.Medio);
 
-            Panel pnlB = new Panel { Location = new Point(95, yMedio + 4), Size = new Size(8, 8), BackColor = colorTag };
-            Label lblT = new Label { Text = item.Medio, Location = new Point(108, yMedio), Font = new Font("Segoe UI", 8F, FontStyle.Bold), ForeColor = Color.FromArgb(15, 23, 42), AutoSize = true };
-            Label lblV = new Label { Text = "$ " + item.Monto.ToString("N0"), Location = new Point(200, yMedio), Size = new Size(80, 16), Font = new Font("Segoe UI", 8F, FontStyle.Bold), ForeColor = Color.FromArgb(15, 23, 42), TextAlign = ContentAlignment.TopRight };
-            Label lblP = new Label { Text = item.Porcentaje.ToString("N0") + "%", Location = new Point(290, yMedio), Font = new Font("Segoe UI", 7.5F), ForeColor = Color.FromArgb(100, 116, 139), AutoSize = true };
+                Panel pnlB = new Panel { Location = new Point(88, yMedio + 4), Size = new Size(8, 8), BackColor = colorTag };
+                Label lblT = new Label { Text = item.Medio, Location = new Point(100, yMedio), Size = new Size(110, 16), Font = new Font("Segoe UI", 8F, FontStyle.Bold), ForeColor = Color.FromArgb(15, 23, 42), AutoSize = false };
+                Label lblV = new Label { Text = "$ " + item.Monto.ToString("N0"), Location = new Point(210, yMedio), Size = new Size(80, 16), Font = new Font("Segoe UI", 8F, FontStyle.Bold), ForeColor = Color.FromArgb(15, 23, 42), TextAlign = ContentAlignment.TopRight };
+                Label lblP = new Label { Text = item.Porcentaje.ToString("0.#") + "%", Location = new Point(295, yMedio), Size = new Size(48, 16), Font = new Font("Segoe UI", 7.5F), ForeColor = Color.FromArgb(100, 116, 139), TextAlign = ContentAlignment.TopRight };
 
-            pnlMediosPago.Controls.AddRange(new Control[] { pnlB, lblT, lblV, lblP });
-            yMedio += 20;
-        }
+                pnlMediosPago.Controls.AddRange(new Control[] { pnlB, lblT, lblV, lblP });
+                yMedio += 22;
+            }
 
-            Label lblTotalTag = new Label { Text = "Total", Location = new Point(108, yMedio + 2), Font = new Font("Segoe UI", 8F, FontStyle.Bold), ForeColor = Color.FromArgb(15, 23, 42), AutoSize = true };
-            Label lblTotalVal = new Label { Text = "$ " + ventasTotales.ToString("N0"), Location = new Point(200, yMedio + 2), Size = new Size(80, 16), Font = new Font("Segoe UI", 8F, FontStyle.Bold), ForeColor = Color.FromArgb(15, 23, 42), TextAlign = ContentAlignment.TopRight };
+            Label lblTotalTag = new Label { Text = "Total Ventas", Location = new Point(100, yMedio + 2), Font = new Font("Segoe UI", 8F, FontStyle.Bold), ForeColor = Color.FromArgb(15, 23, 42), AutoSize = true };
+            Label lblTotalVal = new Label { Text = "$ " + ventasTotales.ToString("N0"), Location = new Point(210, yMedio + 2), Size = new Size(80, 16), Font = new Font("Segoe UI", 8F, FontStyle.Bold), ForeColor = Color.FromArgb(15, 23, 42), TextAlign = ContentAlignment.TopRight };
             pnlMediosPago.Controls.AddRange(new Control[] { lblTotalTag, lblTotalVal });
 
             // 3. DETALLE RÁPIDO
-            Panel pnlDetalleRapido = CrearPanelTarjeta(12, 288 + Math.Max(altoMedios, 110) + 8, 350, 95);
+            Panel pnlDetalleRapido = CrearPanelTarjeta(12, 264 + altoMedios + 8, 354, 95);
             Label lblTitDet = new Label { Text = "DETALLE RÁPIDO", Location = new Point(10, 6), Font = new Font("Segoe UI", 7.5F, FontStyle.Bold), ForeColor = Color.FromArgb(100, 116, 139), AutoSize = true };
 
             int yDet = 24;
@@ -140,10 +146,23 @@ namespace SISTEMAACTUALIZADO.Modals
 
             pnlMain.Controls.AddRange(new Control[] {
                 btnClose, lblTitle, lblSubTitle, badgeEstado,
-                pnlBalance, pnlDiferencia, pnlMediosPago, pnlDetalleRapido
+                pnlBalance, pnlMediosPago, pnlDetalleRapido
             });
 
             this.Controls.Add(pnlMain);
+        }
+
+        private Color ObtenerColorMedio(string medio)
+        {
+            return medio switch
+            {
+                "Efectivo" => Color.FromArgb(16, 185, 129),           // Verde
+                "Crédito Comercial" => Color.FromArgb(234, 88, 12),   // Naranja
+                "Débito" => Color.FromArgb(37, 99, 235),              // Azul
+                "Tarjeta Crédito" or "Crédito" => Color.FromArgb(124, 58, 237), // Violeta
+                "Transferencia" => Color.FromArgb(13, 148, 136),      // Turquesa
+                _ => Color.FromArgb(100, 116, 139)                   // Gris
+            };
         }
 
         private Panel CrearPanelTarjeta(int x, int y, int ancho, int alto)
@@ -168,7 +187,7 @@ namespace SISTEMAACTUALIZADO.Modals
             {
                 Text = valor,
                 Location = new Point(230, y),
-                Size = new Size(110, 18),
+                Size = new Size(114, 18),
                 Font = new Font("Segoe UI", 8F, isBold ? FontStyle.Bold : FontStyle.Regular),
                 ForeColor = colorValor ?? Color.FromArgb(15, 23, 42),
                 TextAlign = ContentAlignment.TopRight
@@ -183,7 +202,7 @@ namespace SISTEMAACTUALIZADO.Modals
         {
             Label lblI = new Label { Text = icono, Location = new Point(10, y), AutoSize = true, Font = new Font("Segoe UI", 8F) };
             Label lblT = new Label { Text = titulo, Location = new Point(32, y), AutoSize = true, Font = new Font("Segoe UI", 8F), ForeColor = Color.FromArgb(100, 116, 139) };
-            Label lblV = new Label { Text = valor, Location = new Point(230, y), Size = new Size(110, 16), Font = new Font("Segoe UI", 8F, FontStyle.Bold), ForeColor = Color.FromArgb(15, 23, 42), TextAlign = ContentAlignment.TopRight };
+            Label lblV = new Label { Text = valor, Location = new Point(230, y), Size = new Size(114, 16), Font = new Font("Segoe UI", 8F, FontStyle.Bold), ForeColor = Color.FromArgb(15, 23, 42), TextAlign = ContentAlignment.TopRight };
 
             pnl.Controls.AddRange(new Control[] { lblI, lblT, lblV });
             y += 20;
