@@ -3,6 +3,7 @@ using System.Collections.Generic;
 using System.Linq;
 using SISTEMAACTUALIZADO.Data;
 using SISTEMAACTUALIZADO.Models;
+using SISTEMAACTUALIZADO.Helpers;
 
 namespace SISTEMAACTUALIZADO.Services
 {
@@ -12,11 +13,14 @@ namespace SISTEMAACTUALIZADO.Services
         {
             using (var db = new AppDbContext())
             {
-                // 1. Obtener el último nroInT registrado y sumar 1
                 int ultimoNroInT = db.TVE2607.Max(v => (int?)v.nroInT) ?? 0;
                 int siguienteNroInT = ultimoNroInT + 1;
 
                 int nroTicketAtencion = (int)(DateTime.Now.Ticks % 1000000);
+
+                // Buscar datos del cliente si no es consumidor final
+                string rutLimpio = RutHelper.Limpiar(clienteRut ?? "");
+                var clienteDb = db.Clientes.FirstOrDefault(c => !string.IsNullOrEmpty(rutLimpio) && (c.Rut == rutLimpio || c.Rut == clienteRut));
 
                 var nuevaVenta = new TVE2607
                 {
@@ -34,15 +38,21 @@ namespace SISTEMAACTUALIZADO.Services
                     Total = carrito.Sum(c => c.Subtotal),
                     UserDTE = vendedor,
                     Vendedor = vendedor,
-                    RuT = clienteRut,
-                    RazonSocial = clienteNombre,
+                    Idcliente = clienteDb?.IdCliente ?? 0,
+                    RuT = clienteDb != null ? RutHelper.Formatear(clienteDb.Rut) : clienteRut,
+                    RazonSocial = clienteDb?.RazonSocial ?? clienteNombre,
+                    Giro = clienteDb?.Giro ?? "PARTICULAR",
+                    Direccion = clienteDb?.Direccion ?? "",
+                    nComuna = clienteDb?.Comuna ?? "SANTIAGO",
+                    nCiudad = clienteDb?.Ciudad ?? "SANTIAGO",
+                    Fono1 = clienteDb?.Telefono ?? "",
+                    email = clienteDb?.Email ?? "",
                     status = "Pendiente"
                 };
 
                 db.TVE2607.Add(nuevaVenta);
-                db.SaveChanges(); // Guarda encabezado
+                db.SaveChanges();
 
-                // 2. Guardar detalle Y DESCONTAR STOCK PERMANENTE EN BD
                 foreach (var item in carrito)
                 {
                     var detalle = new TVD2607
@@ -66,7 +76,6 @@ namespace SISTEMAACTUALIZADO.Services
 
                     db.TVD2607.Add(detalle);
 
-                    // --- AQUÍ ESTABA LA FALTA: DESCONTAR DE LA TABLA PRODUCTOS ---
                     var prodBD = db.Productos.FirstOrDefault(p => p.ProductoID == item.ProductoID);
                     if (prodBD != null)
                     {
@@ -75,7 +84,7 @@ namespace SISTEMAACTUALIZADO.Services
                     }
                 }
 
-                db.SaveChanges(); // Guarda detalles y nuevos stocks en MySQL
+                db.SaveChanges();
                 return nroTicketAtencion;
             }
         }

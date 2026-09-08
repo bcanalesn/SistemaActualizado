@@ -23,6 +23,8 @@ namespace SISTEMAACTUALIZADO.Data
         public DbSet<PagoCliente> PagosClientes { get; set; } = null!;
         public DbSet<PagoDetalleFactura> PagosDetalleFacturas { get; set; } = null!;
         public DbSet<HistorialCondicionesCredito> HistorialCondicionesCredito { get; set; } = null!;
+        public DbSet<CajaTurno> CajaTurnos { get; set; } = null!; // REGISTRADO
+
         protected override void OnConfiguring(DbContextOptionsBuilder optionsBuilder)
         {
             if (!optionsBuilder.IsConfigured)

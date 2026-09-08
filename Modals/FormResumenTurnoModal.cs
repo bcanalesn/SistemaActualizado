@@ -20,7 +20,7 @@ namespace SISTEMAACTUALIZADO.Modals
 
         private void InitializeComponent()
         {
-            var datos = _cajaService.ObtenerMetricasResumenTurno(_turno.FechaApertura);
+            var datos = _cajaService.ObtenerMetricasResumenTurno(_turno.CajaTurnoID);
 
             this.Text = "Resumen del Turno";
             int itemsCount = Math.Max(datos.ListaDesglose.Count, 1);
@@ -58,18 +58,20 @@ namespace SISTEMAACTUALIZADO.Modals
             // 1. TARJETA BALANCE
             Panel pnlBalance = CrearPanelTarjeta(12, 60, 354, 160);
 
+            var cl = new System.Globalization.CultureInfo("es-CL");
+
             decimal fondoInicial = _turno.MontoInicial;
             decimal ventasTotales = datos.VentasTotales;
             decimal anulaciones = datos.MontoAnulaciones;
             decimal efectivoEsperado = fondoInicial + datos.VentasEfectivo;
 
             int yPos = 8;
-            CrearFilaMetrica(pnlBalance, "Fondo Inicial", "$ " + fondoInicial.ToString("N0"), ref yPos, isBold: true);
-            CrearFilaMetrica(pnlBalance, "Ventas Totales (" + datos.CantVentas + ")", "$ " + ventasTotales.ToString("N0"), ref yPos, isBold: true);
-            CrearFilaMetrica(pnlBalance, "Anulaciones (" + datos.CantAnulaciones + ")", "$ " + anulaciones.ToString("N0"), ref yPos, colorValor: Color.FromArgb(239, 68, 68));
-            
+            CrearFilaMetrica(pnlBalance, "Fondo Inicial", "$ " + fondoInicial.ToString("N0", cl), ref yPos, isBold: true);
+            CrearFilaMetrica(pnlBalance, "Ventas Totales (" + datos.CantVentas + ")", "$ " + ventasTotales.ToString("N0", cl), ref yPos, isBold: true);
+            CrearFilaMetrica(pnlBalance, "Anulaciones (" + datos.CantAnulaciones + ")", "$ " + anulaciones.ToString("N0", cl), ref yPos, colorValor: Color.FromArgb(239, 68, 68));
+
             yPos += 4;
-            CrearFilaMetrica(pnlBalance, "Efectivo Esperado en Caja", "$ " + efectivoEsperado.ToString("N0"), ref yPos, isBold: true, colorValor: Color.FromArgb(37, 99, 235));
+            CrearFilaMetrica(pnlBalance, "Efectivo Esperado en Caja", "$ " + efectivoEsperado.ToString("N0", cl), ref yPos, isBold: true, colorValor: Color.FromArgb(37, 99, 235));
 
 
             // 2. VENTAS POR MEDIO DE PAGO
@@ -120,7 +122,7 @@ namespace SISTEMAACTUALIZADO.Modals
 
                 Panel pnlB = new Panel { Location = new Point(88, yMedio + 4), Size = new Size(8, 8), BackColor = colorTag };
                 Label lblT = new Label { Text = item.Medio, Location = new Point(100, yMedio), Size = new Size(110, 16), Font = new Font("Segoe UI", 8F, FontStyle.Bold), ForeColor = Color.FromArgb(15, 23, 42), AutoSize = false };
-                Label lblV = new Label { Text = "$ " + item.Monto.ToString("N0"), Location = new Point(210, yMedio), Size = new Size(80, 16), Font = new Font("Segoe UI", 8F, FontStyle.Bold), ForeColor = Color.FromArgb(15, 23, 42), TextAlign = ContentAlignment.TopRight };
+                Label lblV = new Label { Text = "$ " + item.Monto.ToString("N0", cl), Location = new Point(210, yMedio), Size = new Size(80, 16), Font = new Font("Segoe UI", 8F, FontStyle.Bold), ForeColor = Color.FromArgb(15, 23, 42), TextAlign = ContentAlignment.TopRight };
                 Label lblP = new Label { Text = item.Porcentaje.ToString("0.#") + "%", Location = new Point(295, yMedio), Size = new Size(48, 16), Font = new Font("Segoe UI", 7.5F), ForeColor = Color.FromArgb(100, 116, 139), TextAlign = ContentAlignment.TopRight };
 
                 pnlMediosPago.Controls.AddRange(new Control[] { pnlB, lblT, lblV, lblP });
@@ -128,7 +130,7 @@ namespace SISTEMAACTUALIZADO.Modals
             }
 
             Label lblTotalTag = new Label { Text = "Total Ventas", Location = new Point(100, yMedio + 2), Font = new Font("Segoe UI", 8F, FontStyle.Bold), ForeColor = Color.FromArgb(15, 23, 42), AutoSize = true };
-            Label lblTotalVal = new Label { Text = "$ " + ventasTotales.ToString("N0"), Location = new Point(210, yMedio + 2), Size = new Size(80, 16), Font = new Font("Segoe UI", 8F, FontStyle.Bold), ForeColor = Color.FromArgb(15, 23, 42), TextAlign = ContentAlignment.TopRight };
+            Label lblTotalVal = new Label { Text = "$ " + ventasTotales.ToString("N0", cl), Location = new Point(210, yMedio + 2), Size = new Size(80, 16), Font = new Font("Segoe UI", 8F, FontStyle.Bold), ForeColor = Color.FromArgb(15, 23, 42), TextAlign = ContentAlignment.TopRight };
             pnlMediosPago.Controls.AddRange(new Control[] { lblTotalTag, lblTotalVal });
 
             // 3. DETALLE RÁPIDO
