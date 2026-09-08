@@ -5,11 +5,12 @@ using System.ComponentModel.DataAnnotations.Schema;
 
 namespace SISTEMAACTUALIZADO.Models
 {
-    [Table("TVE2607")]
+    [Table("tve2607")]
     public class TVE2607
     {
         [Key]
         public int idTve { get; set; }
+        public int? CajaTurnoID { get; set; } // Enlaza la venta al turno de caja exacto
         public int idLocal { get; set; } = 1;
         public string nmbLocal { get; set; } = "Local Principal";
         public int iddocDTE { get; set; } = 39;
@@ -25,8 +26,8 @@ namespace SISTEMAACTUALIZADO.Models
         public decimal Impto3 { get; set; }
         public decimal IvA { get; set; }
         public decimal Total { get; set; }
-        public string UserDTE { get; set; } = "barbara";
-        public string Vendedor { get; set; } = "Barbara";
+        public string UserDTE { get; set; } = "barbara"; // Cajero que cobró
+        public string Vendedor { get; set; } = "Barbara"; // Vendedor de preventa en mesón
         public int nroZ { get; set; }
         public string Url { get; set; } = string.Empty;
         public int nPAX { get; set; } = 1;
@@ -53,7 +54,6 @@ namespace SISTEMAACTUALIZADO.Models
         public string MedioPago { get; set; } = "Efectivo";
         public decimal Vuelto { get; set; } = 0;
 
-        // Relación inversa limpia
         [InverseProperty("VentaEncabezado")]
         public List<TVD2607> Detalles { get; set; } = new List<TVD2607>();
     }

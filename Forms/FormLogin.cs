@@ -6,6 +6,7 @@ using System.Linq;
 using System.Windows.Forms;
 using SISTEMAACTUALIZADO.Data;
 using SISTEMAACTUALIZADO.Models;
+using SISTEMAACTUALIZADO.Services;
 
 namespace SISTEMAACTUALIZADO
 {
@@ -491,48 +492,21 @@ namespace SISTEMAACTUALIZADO
             string user = txtUsuario.Text.Trim();
             string pass = txtClave.Text.Trim();
 
-            if (string.IsNullOrEmpty(user) || string.IsNullOrEmpty(pass))
+            var authService = new AuthService();
+            var resultado = authService.IniciarSesion(user, pass);
+
+            if (resultado.Exitoso && resultado.Usuario != null)
             {
-                lblError.Text = "⚠️ Por favor ingresa usuario y contraseña";
-                return;
+                GuardarOlimpiarUsuarioRecordado(user);
+                UsuarioAutenticado = resultado.Usuario;
+                this.DialogResult = DialogResult.OK;
+                this.Close();
             }
-
-            try
+            else
             {
-                using var db = new AppDbContext();
-
-                // Validación directa contra la base de datos (Usuario, Clave y Estado Activo)
-                var usuarioEncontrado = db.Usuarios
-                    .FirstOrDefault(u => u.NombreUsuario.ToLower() == user.ToLower() && 
-                                         u.Clave == pass && 
-                                         u.Estado);
-
-                if (usuarioEncontrado != null)
-                {
-                    if (string.IsNullOrWhiteSpace(usuarioEncontrado.Rol))
-                    {
-                        lblError.Text = "❌ El usuario no tiene un rol válido asignado.";
-                        return;
-                    }
-
-                    // Guardar o limpiar el usuario según el checkbox "Recordarme"
-                    GuardarOlimpiarUsuarioRecordado(user);
-
-                    UsuarioAutenticado = usuarioEncontrado;
-                    this.DialogResult = DialogResult.OK;
-                    this.Close();
-                }
-                else
-                {
-                    lblError.Text = "❌ Credenciales incorrectas o usuario inactivo";
-                    txtClave.Clear();
-                    txtClave.Focus();
-                }
-            }
-            catch (Exception ex)
-            {
-                lblError.Text = "❌ Error de conexión con la base de datos";
-                MessageBox.Show($"No se pudo verificar la sesión:\n{ex.Message}", "Error de Conexión", MessageBoxButtons.OK, MessageBoxIcon.Error);
+                lblError.Text = $"❌ {resultado.Mensaje}";
+                txtClave.Clear();
+                txtClave.Focus();
             }
         }
     }

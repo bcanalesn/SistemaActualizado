@@ -72,6 +72,9 @@ namespace SISTEMAACTUALIZADO
         {
             _usuarioActual = usuario;
             InitializeComponent();
+            
+            string nomUser = _usuarioActual?.NombreUsuario ?? "admin";
+            _turnoActual = _cajaService.ObtenerTurnoAbierto(nomUser);
             ActualizarEstadoCajaUI();
         }
 
@@ -246,9 +249,15 @@ namespace SISTEMAACTUALIZADO
             dgvDetalleTicket.Columns.Add(new DataGridViewTextBoxColumn { Name = "IdProducto", DataPropertyName = "IdProducto", HeaderText = "CÓDIGO", FillWeight = 20 });
             dgvDetalleTicket.Columns.Add(new DataGridViewTextBoxColumn { Name = "NmbProducto", DataPropertyName = "NmbProducto", HeaderText = "PRODUCTO", FillWeight = 45 });
             dgvDetalleTicket.Columns.Add(new DataGridViewTextBoxColumn { Name = "Cantidad", DataPropertyName = "Cantidad", HeaderText = "CANT.", FillWeight = 12 });
-            dgvDetalleTicket.Columns.Add(new DataGridViewTextBoxColumn { Name = "Precio", DataPropertyName = "Precio", HeaderText = "PRECIO UNIT.", FillWeight = 23, DefaultCellStyle = new DataGridViewCellStyle { Format = "$#,##0" } });
-            dgvDetalleTicket.Columns.Add(new DataGridViewTextBoxColumn { Name = "SubTotal", DataPropertyName = "SubTotal", HeaderText = "SUBTOTAL", FillWeight = 23, DefaultCellStyle = new DataGridViewCellStyle { Format = "$#,##0" } });
+            var estiloMonedaCL = new DataGridViewCellStyle 
+            { 
+                FormatProvider = new System.Globalization.CultureInfo("es-CL"), 
+                Format = "$ #,##0", 
+                Alignment = DataGridViewContentAlignment.MiddleRight 
+            };
 
+            dgvDetalleTicket.Columns.Add(new DataGridViewTextBoxColumn { Name = "Precio", DataPropertyName = "Precio", HeaderText = "PRECIO UNIT.", FillWeight = 23, DefaultCellStyle = estiloMonedaCL });
+            dgvDetalleTicket.Columns.Add(new DataGridViewTextBoxColumn { Name = "SubTotal", DataPropertyName = "SubTotal", HeaderText = "SUBTOTAL", FillWeight = 23, DefaultCellStyle = estiloMonedaCL });
             ConfigurarEstiloTabla(dgvDetalleTicket);
 
             pnlCardDetalle.Controls.Add(dgvDetalleTicket);
@@ -329,7 +338,14 @@ namespace SISTEMAACTUALIZADO
 
             Label lblP = new Label { Text = "PAGA CON", Location = new Point(8, 4), AutoSize = true, Font = new Font("Segoe UI", 7.5F, FontStyle.Bold), ForeColor = Color.FromArgb(15, 23, 42) };
             Label lblSigno = new Label { Text = "$", Location = new Point(8, 22), AutoSize = true, Font = new Font("Segoe UI", 11F, FontStyle.Bold), ForeColor = Color.FromArgb(100, 116, 139) };
-            txtPagaCon = new TextBox { Location = new Point(28, 20), Size = new Size(cW - 36, 26), Font = new Font("Segoe UI", 11F, FontStyle.Bold), BorderStyle = BorderStyle.None, BackColor = Color.FromArgb(248, 250, 252) };
+            txtPagaCon = new TextBox { Location = new Point(28, 20), Size = new Size(cW - 36, 26), Font = new Font("Segoe UI", 11F, FontStyle.Bold), BorderStyle = BorderStyle.None, BackColor = Color.FromArgb(248, 250, 252),MaxLength = 10 };
+            txtPagaCon.KeyPress += (s, e) =>
+            {
+                if (!char.IsControl(e.KeyChar) && !char.IsDigit(e.KeyChar))
+                {
+                    e.Handled = true;
+                }
+            };
             txtPagaCon.TextChanged += TxtPagaCon_TextChanged;
             pnlPagaCon.Controls.AddRange(new Control[] { lblP, lblSigno, txtPagaCon });
 
@@ -688,27 +704,27 @@ namespace SISTEMAACTUALIZADO
             if (_ticketSeleccionado == null)
             {
                 txtPagaCon.Text = "";
-                lblVuelto.Text = "$0";
+                lblVuelto.Text = "$ 0";
                 return;
             }
 
             if (_medioPagoSeleccionado == "Efectivo")
             {
                 txtPagaCon.Enabled = true;
-                txtPagaCon.Text = _ticketSeleccionado.Total.ToString();
-                lblVuelto.Text = "$0";
+                txtPagaCon.Text = MonedaHelper.Formatear(_ticketSeleccionado.Total); // Ej: "3.990"
+                lblVuelto.Text = "$ 0";
             }
             else if (_medioPagoSeleccionado == "Crédito Comercial")
             {
                 txtPagaCon.Enabled = false;
                 txtPagaCon.Text = "0 (A Plazo)";
-                lblVuelto.Text = "$0";
+                lblVuelto.Text = "$ 0";
             }
             else
             {
                 txtPagaCon.Enabled = false;
-                txtPagaCon.Text = _ticketSeleccionado.Total.ToString();
-                lblVuelto.Text = "$0";
+                txtPagaCon.Text = MonedaHelper.Formatear(_ticketSeleccionado.Total);
+                lblVuelto.Text = "$ 0";
             }
         }
 
@@ -755,7 +771,7 @@ namespace SISTEMAACTUALIZADO
                 lblEstadoTag.Text = "🟢 CAJA ABIERTA";
                 lblEstadoDetalle.Text = $"Turno #{_turnoActual!.CajaTurnoID}";
                 lblHoraApertura.Text = _turnoActual.FechaApertura.ToString("HH:mm:ss");
-                lblFondoInicial.Text = $"$ {_turnoActual.MontoInicial:N0}";
+                lblFondoInicial.Text = _turnoActual.MontoInicial.ToString("$ #,##0", new System.Globalization.CultureInfo("es-CL"));
             }
             else
             {
@@ -774,7 +790,7 @@ namespace SISTEMAACTUALIZADO
             Form modalMixto = new Form
             {
                 Text = "Configurar Pago Múltiple",
-                Size = new Size(380, 360),
+                Size = new Size(380, 390),
                 StartPosition = FormStartPosition.CenterParent,
                 FormBorderStyle = FormBorderStyle.FixedDialog,
                 MaximizeBox = false,
@@ -782,49 +798,78 @@ namespace SISTEMAACTUALIZADO
                 BackColor = Color.White
             };
 
-            Label lblT = new Label { Text = $"💳 TOTAL TICKET: ${totalTicket:N0}", Location = new Point(20, 15), Font = new Font("Segoe UI", 12F, FontStyle.Bold), ForeColor = Color.FromArgb(37, 99, 235), AutoSize = true };
+            Label lblT = new Label 
+            { 
+                Text = $"💳 TOTAL TICKET: {MonedaHelper.Formatear(totalTicket, conSigno: true)}", 
+                Location = new Point(20, 15), 
+                Font = new Font("Segoe UI", 12F, FontStyle.Bold), 
+                ForeColor = Color.FromArgb(37, 99, 235), 
+                AutoSize = true 
+            };
+
+            // 1. Campo Efectivo
             Label lblEf = new Label { Text = "Monto en Efectivo ($):", Location = new Point(20, 52), AutoSize = true, Font = new Font("Segoe UI", 8.5F, FontStyle.Bold) };
-            TextBox txtEf = new TextBox { Text = "0", Location = new Point(20, 72), Size = new Size(320, 26), Font = new Font("Segoe UI", 10F) };
+            TextBox txtEf = CrearInputMonedaModal(20, 72, 320);
 
-            Label lblTar = new Label { Text = "Monto en Tarjeta ($):", Location = new Point(20, 107), AutoSize = true, Font = new Font("Segoe UI", 8.5F, FontStyle.Bold) };
-            TextBox txtTar = new TextBox { Text = "0", Location = new Point(20, 127), Size = new Size(320, 26), Font = new Font("Segoe UI", 10F) };
+            // 2. Campo Tarjeta
+            Label lblTar = new Label { Text = "Monto en Tarjeta ($):", Location = new Point(20, 110), AutoSize = true, Font = new Font("Segoe UI", 8.5F, FontStyle.Bold) };
+            TextBox txtTar = CrearInputMonedaModal(20, 130, 320);
 
-            Label lblTrans = new Label { Text = "Monto en Transferencia ($):", Location = new Point(20, 162), AutoSize = true, Font = new Font("Segoe UI", 8.5F, FontStyle.Bold) };
-            TextBox txtTrans = new TextBox { Text = "0", Location = new Point(20, 182), Size = new Size(320, 26), Font = new Font("Segoe UI", 10F) };
+            // 3. Campo Transferencia
+            Label lblTrans = new Label { Text = "Monto en Transferencia ($):", Location = new Point(20, 168), AutoSize = true, Font = new Font("Segoe UI", 8.5F, FontStyle.Bold) };
+            TextBox txtTrans = CrearInputMonedaModal(20, 188, 320);
 
-            Label lblEstadoSuma = new Label { Text = $"Falta por cubrir: ${totalTicket:N0}", Location = new Point(20, 220), AutoSize = true, Font = new Font("Segoe UI", 10F, FontStyle.Bold), ForeColor = Color.FromArgb(239, 68, 68) };
+            Label lblEstadoSuma = new Label 
+            { 
+                Text = $"Falta por cubrir: {MonedaHelper.Formatear(totalTicket, conSigno: true)}", 
+                Location = new Point(20, 230), 
+                AutoSize = true, 
+                Font = new Font("Segoe UI", 9.5F, FontStyle.Bold), 
+                ForeColor = Color.FromArgb(239, 68, 68) 
+            };
 
+            // Recálculo dinámico en tiempo real
             Action recalcular = () =>
             {
-                decimal.TryParse(txtEf.Text.Trim(), out decimal ef);
-                decimal.TryParse(txtTar.Text.Trim(), out decimal tar);
-                decimal.TryParse(txtTrans.Text.Trim(), out decimal tr);
+                decimal ef = MonedaHelper.Limpiar(txtEf.Text);
+                decimal tar = MonedaHelper.Limpiar(txtTar.Text);
+                decimal tr = MonedaHelper.Limpiar(txtTrans.Text);
 
-                decimal sumaTotal = ef + tar + tr;
-                decimal diferencia = totalTicket - (tar + tr);
+                decimal electronico = tar + tr;
+                decimal sumaTotal = ef + electronico;
+
+                // Regla de negocio: Tarjeta + Transferencia no pueden superar el total del ticket
+                if (electronico > totalTicket)
+                {
+                    lblEstadoSuma.Text = "⚠️ Tarjeta y Transferencia no pueden superar el total";
+                    lblEstadoSuma.ForeColor = Color.FromArgb(239, 68, 68);
+                    return;
+                }
 
                 if (sumaTotal < totalTicket)
                 {
-                    lblEstadoSuma.Text = $"Falta por cubrir: ${(totalTicket - sumaTotal):N0}";
+                    decimal restante = totalTicket - sumaTotal;
+                    lblEstadoSuma.Text = $"Falta por cubrir: {MonedaHelper.Formatear(restante, conSigno: true)}";
                     lblEstadoSuma.ForeColor = Color.FromArgb(239, 68, 68);
                 }
                 else
                 {
-                    decimal vuelto = ef > diferencia ? ef - diferencia : 0;
-                    lblEstadoSuma.Text = $"✔ Total cubierto | Vuelto: ${vuelto:N0}";
+                    decimal saldoRestanteParaEfectivo = totalTicket - electronico;
+                    decimal vuelto = ef > saldoRestanteParaEfectivo ? ef - saldoRestanteParaEfectivo : 0;
+                    lblEstadoSuma.Text = $"✔ Total cubierto | Vuelto: {MonedaHelper.Formatear(vuelto, conSigno: true)}";
                     lblEstadoSuma.ForeColor = Color.FromArgb(22, 163, 74);
                 }
             };
 
-            txtEf.TextChanged += (s, e) => recalcular();
-            txtTar.TextChanged += (s, e) => recalcular();
-            txtTrans.TextChanged += (s, e) => recalcular();
+            txtEf.TextChanged += (s, e) => { MonedaHelper.AplicarMascaraEnVivo(txtEf); recalcular(); };
+            txtTar.TextChanged += (s, e) => { MonedaHelper.AplicarMascaraEnVivo(txtTar); recalcular(); };
+            txtTrans.TextChanged += (s, e) => { MonedaHelper.AplicarMascaraEnVivo(txtTrans); recalcular(); };
 
             Button btnAplicar = new Button
             {
                 Text = "✔ Confirmar Pago Múltiple",
-                Location = new Point(20, 255),
-                Size = new Size(320, 42),
+                Location = new Point(20, 275),
+                Size = new Size(320, 44),
                 BackColor = Color.FromArgb(16, 185, 129),
                 ForeColor = Color.White,
                 FlatStyle = FlatStyle.Flat,
@@ -835,52 +880,172 @@ namespace SISTEMAACTUALIZADO
 
             btnAplicar.Click += (s, e) =>
             {
-                decimal.TryParse(txtEf.Text.Trim(), out _pagoEfectivo);
-                decimal.TryParse(txtTar.Text.Trim(), out _pagoTarjeta);
-                decimal.TryParse(txtTrans.Text.Trim(), out _pagoTransferencia);
+                decimal ef = MonedaHelper.Limpiar(txtEf.Text);
+                decimal tar = MonedaHelper.Limpiar(txtTar.Text);
+                decimal tr = MonedaHelper.Limpiar(txtTrans.Text);
 
-                decimal sumaTotal = _pagoEfectivo + _pagoTarjeta + _pagoTransferencia;
+                decimal sumaTotal = ef + tar + tr;
                 if (sumaTotal < totalTicket)
                 {
-                    MessageBox.Show($"La suma (${sumaTotal:N0}) no cubre el total (${totalTicket:N0}).", "Atención", MessageBoxButtons.OK, MessageBoxIcon.Warning);
+                    MessageBox.Show($"La suma ingresada ({MonedaHelper.Formatear(sumaTotal, conSigno: true)}) no cubre el total ({MonedaHelper.Formatear(totalTicket, conSigno: true)}).", "Monto Insuficiente", MessageBoxButtons.OK, MessageBoxIcon.Warning);
                     return;
                 }
 
-                _vueltoMixto = sumaTotal - totalTicket;
+                if ((tar + tr) > totalTicket)
+                {
+                    MessageBox.Show("El pago con Tarjeta y Transferencia no puede ser mayor al total a cobrar.", "Monto Electrónico Inválido", MessageBoxButtons.OK, MessageBoxIcon.Warning);
+                    return;
+                }
+
+                _pagoEfectivo = ef;
+                _pagoTarjeta = tar;
+                _pagoTransferencia = tr;
+
+                decimal saldoCobradoPorEfectivo = totalTicket - (tar + tr);
+                _vueltoMixto = ef > saldoCobradoPorEfectivo ? ef - saldoCobradoPorEfectivo : 0;
                 _pagoMixtoConfirmado = true;
-                txtPagaCon.Text = _pagoEfectivo.ToString();
-                lblVuelto.Text = $"${_vueltoMixto:N0}";
+
+                txtPagaCon.Text = MonedaHelper.Formatear(_pagoEfectivo);
+                lblVuelto.Text = MonedaHelper.Formatear(_vueltoMixto, conSigno: true);
 
                 modalMixto.DialogResult = DialogResult.OK;
                 modalMixto.Close();
             };
 
             modalMixto.Controls.AddRange(new Control[] { lblT, lblEf, txtEf, lblTar, txtTar, lblTrans, txtTrans, lblEstadoSuma, btnAplicar });
+
             if (modalMixto.ShowDialog(this) != DialogResult.OK)
             {
                 SeleccionarMedioPago("Efectivo");
             }
         }
 
+        private TextBox CrearInputMonedaModal(int x, int y, int ancho)
+        {
+            TextBox txt = new TextBox
+            {
+                Location = new Point(x, y),
+                Size = new Size(ancho, 26),
+                Font = new Font("Segoe UI", 10F, FontStyle.Bold),
+                MaxLength = 10 // Máximo 8 dígitos más puntos ($99.999.999)
+            };
+
+            txt.KeyPress += (s, e) =>
+            {
+                // Solo permitir números y tecla de borrar
+                if (!char.IsControl(e.KeyChar) && !char.IsDigit(e.KeyChar))
+                {
+                    e.Handled = true;
+                }
+            };
+
+            return txt;
+        }
+
         private void BtnAbrirCaja_Click(object? sender, EventArgs e)
         {
             if (_turnoActual != null && _turnoActual.Estado == "Abierta")
             {
-                decimal ventasEfectivo = _cajaService.CalcularVentasEfectivo(_turnoActual.FechaApertura);
-                decimal totalEsperado = _turnoActual.MontoInicial + ventasEfectivo;
+                decimal ventasEfectivo = _cajaService.CalcularVentasEfectivo(_turnoActual.CajaTurnoID);
+                decimal fondoInicial = _turnoActual.MontoInicial;
+                decimal efectivoEsperado = fondoInicial + ventasEfectivo;
 
-                var resp = MessageBox.Show($"¿Desea cerrar la caja?\n\n• Fondo Inicial: ${_turnoActual.MontoInicial:N0}\n• Ventas Efectivo: ${ventasEfectivo:N0}\n• Total Esperado: ${totalEsperado:N0}", "Cierre de Caja", MessageBoxButtons.YesNo, MessageBoxIcon.Question);
-
-                if (resp == DialogResult.Yes)
+                // Modal de Arqueo y Cierre
+                using Form modalCierre = new Form
                 {
+                    Text = "Arqueo y Cierre de Caja",
+                    Size = new Size(380, 410),
+                    StartPosition = FormStartPosition.CenterParent,
+                    FormBorderStyle = FormBorderStyle.FixedDialog,
+                    MaximizeBox = false,
+                    MinimizeBox = false,
+                    BackColor = Color.White
+                };
+
+                Label lblT = new Label { Text = "🔒 ARQUEO Y CIERRE DE TURNO", Location = new Point(20, 15), AutoSize = true, Font = new Font("Segoe UI", 11F, FontStyle.Bold), ForeColor = Color.FromArgb(15, 23, 42) };
+                Label lblPrompt = new Label { Text = "Ingrese el Efectivo Físico Contado ($):", Location = new Point(20, 50), AutoSize = true, Font = new Font("Segoe UI", 8.5F, FontStyle.Bold) };
+                TextBox txtEfectivoReal = new TextBox { Location = new Point(20, 72), Size = new Size(325, 28), Font = new Font("Segoe UI", 11F, FontStyle.Bold) };
+
+                Label lblResultadoDif = new Label { Text = "Esperando conteo...", Location = new Point(20, 110), Size = new Size(325, 22), Font = new Font("Segoe UI", 9F, FontStyle.Bold), ForeColor = Color.FromArgb(100, 116, 139) };
+                Label lblObs = new Label { Text = "Motivo del descuadre (Obligatorio si no cuadra):", Location = new Point(20, 140), AutoSize = true, Font = new Font("Segoe UI", 8F, FontStyle.Bold), Visible = false };
+                TextBox txtObs = new TextBox { Location = new Point(20, 162), Size = new Size(325, 60), Multiline = true, Font = new Font("Segoe UI", 9F), Visible = false };
+
+                txtEfectivoReal.TextChanged += (s, ev) =>
+                {
+                    if (decimal.TryParse(txtEfectivoReal.Text.Trim(), out decimal real))
+                    {
+                        decimal dif = real - efectivoEsperado;
+                        if (dif == 0)
+                        {
+                            lblResultadoDif.Text = "✔ Caja Cuadrada ($0)";
+                            lblResultadoDif.ForeColor = Color.FromArgb(22, 163, 74);
+                            lblObs.Visible = false;
+                            txtObs.Visible = false;
+                        }
+                        else if (dif < 0)
+                        {
+                            lblResultadoDif.Text = $"⚠️ Faltante: -${Math.Abs(dif):N0}";
+                            lblResultadoDif.ForeColor = Color.FromArgb(239, 68, 68);
+                            lblObs.Visible = true;
+                            txtObs.Visible = true;
+                        }
+                        else
+                        {
+                            lblResultadoDif.Text = $"ℹ️ Sobrante: +${dif:N0}";
+                            lblResultadoDif.ForeColor = Color.FromArgb(234, 88, 12);
+                            lblObs.Visible = true;
+                            txtObs.Visible = true;
+                        }
+                    }
+                    else
+                    {
+                        lblResultadoDif.Text = "Ingrese un monto válido";
+                        lblResultadoDif.ForeColor = Color.FromArgb(100, 116, 139);
+                    }
+                };
+
+                Button btnConfirmar = new Button
+                {
+                    Text = "🔒 Confirmar Cierre",
+                    Location = new Point(20, 240),
+                    Size = new Size(325, 42),
+                    BackColor = Color.FromArgb(239, 68, 68),
+                    ForeColor = Color.White,
+                    FlatStyle = FlatStyle.Flat,
+                    Font = new Font("Segoe UI", 9.5F, FontStyle.Bold),
+                    Cursor = Cursors.Hand
+                };
+                btnConfirmar.FlatAppearance.BorderSize = 0;
+
+                btnConfirmar.Click += (s, ev) =>
+                {
+                    if (!decimal.TryParse(txtEfectivoReal.Text.Trim(), out decimal realDeclarado))
+                    {
+                        MessageBox.Show("Ingrese el monto contado.", "Atención", MessageBoxButtons.OK, MessageBoxIcon.Warning);
+                        return;
+                    }
+
+                    decimal dif = realDeclarado - efectivoEsperado;
+                    if (dif != 0 && string.IsNullOrWhiteSpace(txtObs.Text))
+                    {
+                        MessageBox.Show("Debe indicar el motivo del descuadre.", "Justificación Obligatoria", MessageBoxButtons.OK, MessageBoxIcon.Warning);
+                        return;
+                    }
+
+                    _cajaService.CerrarTurno(_turnoActual.CajaTurnoID, realDeclarado, txtObs.Text.Trim());
                     _turnoActual = null;
                     ActualizarEstadoCajaUI();
-                    MessageBox.Show("Caja cerrada correctamente.", "Éxito", MessageBoxButtons.OK, MessageBoxIcon.Information);
-                }
+                    modalCierre.Close();
+                    MessageBox.Show($"Caja cerrada exitosamente.\n\n• Esperado: ${efectivoEsperado:N0}\n• Declarado: ${realDeclarado:N0}\n• Diferencia: ${(dif >= 0 ? "+$" : "-$")}{Math.Abs(dif):N0}", "Turno Finalizado", MessageBoxButtons.OK, MessageBoxIcon.Information);
+                };
+
+                modalCierre.Controls.AddRange(new Control[] { lblT, lblPrompt, txtEfectivoReal, lblResultadoDif, lblObs, txtObs, btnConfirmar });
+                modalCierre.ShowDialog(this);
             }
             else
             {
-                Form modalApertura = new Form
+                // Modal Apertura
+                using Form modalApertura = new Form
                 {
                     Text = "Apertura de Caja",
                     Size = new Size(320, 215),
@@ -891,45 +1056,17 @@ namespace SISTEMAACTUALIZADO
                     BackColor = Color.White
                 };
 
-                Label lblM = new Label { Text = "Monto Inicial de Caja ($):", Location = new Point(20, 20), AutoSize = true, Font = new Font("Segoe UI", 9F, FontStyle.Bold), ForeColor = Color.FromArgb(15, 23, 42) };
-                
-                TextBox txtM = new TextBox 
-                { 
-                    Location = new Point(20, 45), 
-                    Size = new Size(260, 28), 
-                    Font = new Font("Segoe UI", 11F, FontStyle.Bold)
-                };
-
-                // Forzar a Windows a mostrar el placeholder incluso cuando el control tiene el foco activo
-                modalApertura.Shown += (s, ev) =>
-                {
-                    SendMessage(txtM.Handle, EM_SETCUEBANNER, 1, "Ej: 200000");
-                };
-
+                Label lblM = new Label { Text = "Monto Inicial de Caja ($):", Location = new Point(20, 20), AutoSize = true, Font = new Font("Segoe UI", 9F, FontStyle.Bold) };
+                TextBox txtM = new TextBox { Location = new Point(20, 45), Size = new Size(260, 28), Font = new Font("Segoe UI", 11F, FontStyle.Bold) };
                 Button btnA = new Button { Text = "🚀 Iniciar Turno", Location = new Point(20, 95), Size = new Size(260, 40), BackColor = Color.FromArgb(16, 185, 129), ForeColor = Color.White, FlatStyle = FlatStyle.Flat, Font = new Font("Segoe UI", 9.5F, FontStyle.Bold), Cursor = Cursors.Hand };
                 btnA.FlatAppearance.BorderSize = 0;
 
-                Action ejecutarApertura = () =>
+                btnA.Click += (sa, ea) =>
                 {
-                    string valorIngresado = txtM.Text.Trim();
-
-                    if (string.IsNullOrWhiteSpace(valorIngresado))
+                    if (decimal.TryParse(txtM.Text.Trim(), out decimal monto) && monto >= 0)
                     {
-                        MessageBox.Show("Por favor ingrese el monto inicial de la caja.", "Monto Requerido", MessageBoxButtons.OK, MessageBoxIcon.Warning);
-                        return;
-                    }
-
-                    if (decimal.TryParse(valorIngresado, out decimal monto) && monto >= 0)
-                    {
-                        _turnoActual = new CajaTurno
-                        {
-                            CajaTurnoID = (int)(DateTime.Now.Ticks % 1000),
-                            Usuario = _usuarioActual?.NombreUsuario ?? "Bárbara",
-                            FechaApertura = DateTime.Now,
-                            MontoInicial = monto,
-                            Estado = "Abierta"
-                        };
-
+                        string usuario = _usuarioActual?.NombreUsuario ?? "admin";
+                        _turnoActual = _cajaService.AbrirTurno(usuario, monto);
                         modalApertura.DialogResult = DialogResult.OK;
                         modalApertura.Close();
                     }
@@ -938,10 +1075,6 @@ namespace SISTEMAACTUALIZADO
                         MessageBox.Show("Ingrese un monto numérico válido.", "Monto Inválido", MessageBoxButtons.OK, MessageBoxIcon.Warning);
                     }
                 };
-
-                btnA.Click += (sa, ea) => ejecutarApertura();
-                txtM.KeyDown += (sa, ea) => { if (ea.KeyCode == Keys.Enter) { ea.SuppressKeyPress = true; ejecutarApertura(); } };
-                modalApertura.AcceptButton = btnA;
 
                 modalApertura.Controls.AddRange(new Control[] { lblM, txtM, btnA });
                 if (modalApertura.ShowDialog(this) == DialogResult.OK)
@@ -974,10 +1107,19 @@ namespace SISTEMAACTUALIZADO
                 if (dgvTicketsPendientes.Columns["nroDTE"] != null) dgvTicketsPendientes.Columns["nroDTE"].HeaderText = "N° TICKET";
                 if (dgvTicketsPendientes.Columns["FecDoc"] != null) { dgvTicketsPendientes.Columns["FecDoc"].HeaderText = "HORA"; dgvTicketsPendientes.Columns["FecDoc"].DefaultCellStyle.Format = "HH:mm:ss"; }
                 if (dgvTicketsPendientes.Columns["RazonSocial"] != null) dgvTicketsPendientes.Columns["RazonSocial"].HeaderText = "CLIENTE";
-                if (dgvTicketsPendientes.Columns["Total"] != null) { dgvTicketsPendientes.Columns["Total"].HeaderText = "TOTAL"; dgvTicketsPendientes.Columns["Total"].DefaultCellStyle.Format = "$#,##0"; }
+                if (dgvTicketsPendientes.Columns["Total"] != null) 
+                { 
+                    dgvTicketsPendientes.Columns["Total"].HeaderText = "TOTAL"; 
+                    dgvTicketsPendientes.Columns["Total"].DefaultCellStyle = new DataGridViewCellStyle 
+                    { 
+                        FormatProvider = new System.Globalization.CultureInfo("es-CL"), 
+                        Format = "$ #,##0", 
+                        Alignment = DataGridViewContentAlignment.MiddleRight 
+                    };
+                }
                 if (dgvTicketsPendientes.Columns["UserDTE"] != null) dgvTicketsPendientes.Columns["UserDTE"].HeaderText = "VENDEDOR";
 
-                string[] ocultar = new string[] { "idTve", "idLocal", "nmbLocal", "iddocDTE", "Documento", "nroInT", "SubTotal", "Descuento", "Neto", "Impto1", "Impto2", "Impto3", "IvA", "Vendedor", "nroZ", "Url", "nPAX", "Idcliente", "DNI", "RuT", "dv", "Giro", "Direccion", "idcomuna", "nComuna", "idCiudad", "nCiudad", "Fono1", "Fono2", "email", "status", "idREF", "nroREF", "codigoREF", "FechaREF", "HoraDoc", "Detalles", "MedioPago", "Vuelto" };
+                string[] ocultar = new string[] { "idTve", "CajaTurnoID", "idLocal", "nmbLocal", "iddocDTE", "Documento", "nroInT", "SubTotal", "Descuento", "Neto", "Impto1", "Impto2", "Impto3", "IvA", "Vendedor", "nroZ", "Url", "nPAX", "Idcliente", "DNI", "RuT", "dv", "Giro", "Direccion", "idcomuna", "nComuna", "idCiudad", "nCiudad", "Fono1", "Fono2", "email", "status", "idREF", "nroREF", "codigoREF", "FechaREF", "HoraDoc", "Detalles", "MedioPago", "Vuelto" };
                 foreach (var col in ocultar)
                 {
                     if (dgvTicketsPendientes.Columns[col] != null) dgvTicketsPendientes.Columns[col].Visible = false;
@@ -1037,39 +1179,35 @@ namespace SISTEMAACTUALIZADO
         {
             if (_ticketSeleccionado == null || _pagoMixtoConfirmado) return;
 
-            if (decimal.TryParse(txtPagaCon.Text.Trim(), out decimal pagaCon))
-            {
-                decimal vuelto = pagaCon - _ticketSeleccionado.Total;
-                lblVuelto.Text = vuelto >= 0 ? $"${vuelto:N0}" : "$0";
-                lblVuelto.ForeColor = vuelto >= 0 ? Color.FromArgb(16, 185, 129) : Color.FromArgb(239, 68, 68);
-            }
-            else
-            {
-                lblVuelto.Text = "$0";
-            }
+            MonedaHelper.AplicarMascaraEnVivo(txtPagaCon);
+            decimal pagaCon = MonedaHelper.Limpiar(txtPagaCon.Text);
+
+            decimal vuelto = pagaCon - _ticketSeleccionado.Total;
+            lblVuelto.Text = MonedaHelper.Formatear(vuelto >= 0 ? vuelto : 0, conSigno: true);
+            lblVuelto.ForeColor = vuelto >= 0 ? Color.FromArgb(16, 185, 129) : Color.FromArgb(239, 68, 68);
         }
 
         private void BtnCobrarTicket_Click(object? sender, EventArgs e)
         {
-            if (_ticketSeleccionado == null) return;
+            if (_ticketSeleccionado == null || _turnoActual == null) return;
 
             string tipoDoc = _tipoDocSeleccionado;
             string medioPago = _medioPagoSeleccionado;
             decimal pagaCon = 0;
             decimal vuelto = 0;
 
-            // =========================================================================
-            // VALIDACIÓN DE CRÉDITO COMERCIAL EN CAJA (Boleta o Factura)
-            // =========================================================================
+            // Validación preventiva de Factura
+            if (tipoDoc.Contains("Factura") && (string.IsNullOrWhiteSpace(_ticketSeleccionado.RuT) || _ticketSeleccionado.RuT.Contains("66.666.666")))
+            {
+                MessageBox.Show("Para emitir Factura Electrónica el ticket debe tener asignado un cliente formal con RUT y Razón Social.", "Factura Requiere Cliente", MessageBoxButtons.OK, MessageBoxIcon.Warning);
+                return;
+            }
+
             if (medioPago == "Crédito Comercial")
             {
                 using var db = new AppDbContext();
                 string rutLimpio = RutHelper.Limpiar(_ticketSeleccionado.RuT ?? "");
-                
-                var cliente = db.Clientes.FirstOrDefault(c => 
-                    (c.IdCliente == _ticketSeleccionado.Idcliente && c.IdCliente > 0) ||
-                    (c.Rut == rutLimpio || c.Rut == _ticketSeleccionado.RuT));
-
+                var cliente = db.Clientes.FirstOrDefault(c => (c.IdCliente == _ticketSeleccionado.Idcliente && c.IdCliente > 0) || (c.Rut == rutLimpio || c.Rut == _ticketSeleccionado.RuT));
                 if (cliente == null)
                 {
                     MessageBox.Show("El ticket no tiene un cliente válido registrado para otorgar crédito comercial.", "Cliente Requerido", MessageBoxButtons.OK, MessageBoxIcon.Warning);
@@ -1082,9 +1220,6 @@ namespace SISTEMAACTUALIZADO
                     MessageBox.Show(resCredito.MensajeError, "Crédito Comercial Denegado", MessageBoxButtons.OK, MessageBoxIcon.Stop);
                     return;
                 }
-
-                pagaCon = 0;
-                vuelto = 0;
             }
             else if (medioPago.Contains("Múltiple"))
             {
@@ -1099,7 +1234,8 @@ namespace SISTEMAACTUALIZADO
             }
             else if (medioPago == "Efectivo")
             {
-                if (!decimal.TryParse(txtPagaCon.Text.Trim(), out pagaCon) || pagaCon < _ticketSeleccionado.Total)
+                pagaCon = MonedaHelper.Limpiar(txtPagaCon.Text);
+                if (pagaCon < _ticketSeleccionado.Total)
                 {
                     MessageBox.Show("Ingrese un monto en efectivo suficiente para el cobro.", "Atención", MessageBoxButtons.OK, MessageBoxIcon.Warning);
                     return;
@@ -1114,9 +1250,13 @@ namespace SISTEMAACTUALIZADO
 
             try
             {
-                int folioOficial = _cajaService.ProcesarCobroTicket(_ticketSeleccionado, tipoDoc, medioPago, _ticketSeleccionado.RuT, _ticketSeleccionado.RazonSocial, "GENERAL", vuelto);
+                string cajero = _usuarioActual?.NombreUsuario ?? "admin";
+                
+                // El servicio asigna folios, busca cliente, completa giro/dirección y actualiza el objeto en memoria
+                int folioOficial = _cajaService.ProcesarCobroTicket(
+                    _ticketSeleccionado, tipoDoc, medioPago, vuelto, _turnoActual.CajaTurnoID, cajero
+                );
 
-                // Si fue a Crédito Comercial, registrar automáticamente la Cuenta por Cobrar
                 if (_medioPagoSeleccionado == "Crédito Comercial")
                 {
                     using var db = new AppDbContext();
@@ -1124,8 +1264,7 @@ namespace SISTEMAACTUALIZADO
                     var cliente = db.Clientes.FirstOrDefault(c => (c.IdCliente == _ticketSeleccionado.Idcliente && c.IdCliente > 0) || (c.Rut == rutLimpio || c.Rut == _ticketSeleccionado.RuT));
                     if (cliente != null)
                     {
-                        string emisor = _usuarioActual?.NombreCompleto ?? "CAJA";
-                        CreditoService.RegistrarFacturaCredito(_ticketSeleccionado.idTve, folioOficial, DateTime.Now, cliente, _ticketSeleccionado.Total, emisor, db);
+                        CreditoService.RegistrarFacturaCredito(_ticketSeleccionado.idTve, folioOficial, DateTime.Now, cliente, _ticketSeleccionado.Total, cajero, db);
                     }
                 }
 
@@ -1144,6 +1283,7 @@ namespace SISTEMAACTUALIZADO
                                 $"• Vuelto: ${vuelto:N0}",
                                 "Cobro Finalizado", MessageBoxButtons.OK, MessageBoxIcon.Information);
 
+                // Ahora _ticketSeleccionado viaja con iddocDTE = 33/39 y sus datos de cliente completos
                 FormTicketModal formTicket = new FormTicketModal(_ticketSeleccionado, itemsCarrito, pagaCon, vuelto);
                 formTicket.ShowDialog(this);
 
