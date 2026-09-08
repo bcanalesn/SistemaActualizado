@@ -52,12 +52,11 @@ namespace SISTEMAACTUALIZADO.Modals
             this.Font = new Font("Segoe UI", 9F, FontStyle.Regular, GraphicsUnit.Point);
 
             const int mX = 28;
-            const int aW = 484;           // Ancho completo disponible
-            const int colW = 236;         // Ancho para campos en doble columna
-            const int col2X = mX + colW + 12; // Posición X de la segunda columna
+            const int aW = 484;
+            const int colW = 236;
+            const int col2X = mX + colW + 12;
             int yPos = 18;
 
-            // Encabezado
             Label lblTitle = new Label
             {
                 Text = esEdicion ? "✏️ Editar Cliente" : "👤 Registrar Nuevo Cliente",
@@ -68,7 +67,7 @@ namespace SISTEMAACTUALIZADO.Modals
             };
             yPos += 42;
 
-            // 1. RUT (Columna 1) y Giro Comercial (Columna 2)
+            // 1. RUT y Giro Comercial
             Label lblRut = CrearLabel("RUT / DNI Cliente:", mX, yPos);
             Label lblGiro = CrearLabel("Giro Comercial / Actividad:", col2X, yPos);
             yPos += 20;
@@ -89,7 +88,7 @@ namespace SISTEMAACTUALIZADO.Modals
             txtGiro = new TextBox { Location = new Point(col2X, yPos), Size = new Size(colW, 27), Font = new Font("Segoe UI", 9.5F), Text = "PARTICULAR" };
             yPos += 38;
 
-            // 2. Razón Social / Nombre Completo (Ancho completo)
+            // 2. Razón Social
             Label lblRazon = CrearLabel("Razón Social / Nombre Completo:", mX, yPos);
             yPos += 20;
             txtRazon = new TextBox { Location = new Point(mX, yPos), Size = new Size(aW, 27), Font = new Font("Segoe UI", 9.5F) };
@@ -102,7 +101,7 @@ namespace SISTEMAACTUALIZADO.Modals
             };
             yPos += 38;
 
-            // 3. Teléfono y Correo Electrónico (Doble Columna)
+            // 3. Teléfono y Correo
             Label lblTel = CrearLabel("Teléfono (9 dígitos):", mX, yPos);
             Label lblMail = CrearLabel("Correo Electrónico:", col2X, yPos);
             yPos += 20;
@@ -119,13 +118,13 @@ namespace SISTEMAACTUALIZADO.Modals
             txtEmail = new TextBox { Location = new Point(col2X, yPos), Size = new Size(colW, 27), Font = new Font("Segoe UI", 9.5F) };
             yPos += 38;
 
-            // 4. Dirección (Ancho completo)
+            // 4. Dirección
             Label lblDir = CrearLabel("Dirección Particular / Comercial:", mX, yPos);
             yPos += 20;
             txtDireccion = new TextBox { Location = new Point(mX, yPos), Size = new Size(aW, 27), Font = new Font("Segoe UI", 9.5F) };
             yPos += 38;
 
-            // 5. Comuna y Ciudad (Doble Columna)
+            // 5. Comuna y Ciudad
             Label lblComuna = CrearLabel("Comuna:", mX, yPos);
             Label lblCiudad = CrearLabel("Ciudad:", col2X, yPos);
             yPos += 20;
@@ -134,7 +133,7 @@ namespace SISTEMAACTUALIZADO.Modals
             txtCiudad = new TextBox { Location = new Point(col2X, yPos), Size = new Size(colW, 27), Font = new Font("Segoe UI", 9.5F), Text = "SANTIAGO" };
             yPos += 38;
 
-            // 6. Tipo/Categoría y Cupo de Crédito (Doble Columna)
+            // 6. Tipo y Cupo de Crédito (con máscara en vivo)
             Label lblTipo = CrearLabel("Tipo de Cliente (Categoría):", mX, yPos);
             Label lblCupo = CrearLabel("Cupo de Crédito ($):", col2X, yPos);
             yPos += 20;
@@ -163,9 +162,10 @@ namespace SISTEMAACTUALIZADO.Modals
                     e.Handled = true;
                 }
             };
+            txtCupoCredito.TextChanged += (s, e) => MonedaHelper.AplicarMascaraEnVivo(txtCupoCredito);
             yPos += 38;
 
-            // 7. Días de Crédito y Lista de Precios Asignada (Doble Columna)
+            // 7. Días de Crédito y Lista
             Label lblDias = CrearLabel("Días de Crédito (Plazo):", mX, yPos);
             Label lblLista = CrearLabel("Lista de Precios Asignada:", col2X, yPos);
             yPos += 20;
@@ -207,7 +207,6 @@ namespace SISTEMAACTUALIZADO.Modals
             cbListaPrecio.SelectedIndex = 0;
             yPos += 54;
 
-            // Botonera Inferior
             btnGuardar = new Button
             {
                 Text = esEdicion ? "💾 Guardar Cambios" : "💾 Guardar Cliente",
@@ -275,15 +274,12 @@ namespace SISTEMAACTUALIZADO.Modals
                 txtComuna.Text = !string.IsNullOrWhiteSpace(_clienteAEditar.Comuna) ? _clienteAEditar.Comuna : "SANTIAGO";
                 txtCiudad.Text = !string.IsNullOrWhiteSpace(_clienteAEditar.Ciudad) ? _clienteAEditar.Ciudad : "SANTIAGO";
 
-                // Categoría / Tipo
                 string cat = string.IsNullOrWhiteSpace(_clienteAEditar.CategoriaCliente) ? "MINORISTA" : _clienteAEditar.CategoriaCliente.Trim();
                 int idxCat = cbCategoriaTipo.Items.IndexOf(cat);
                 cbCategoriaTipo.SelectedIndex = idxCat >= 0 ? idxCat : 0;
 
-                // Cupo de Crédito
-                txtCupoCredito.Text = _clienteAEditar.CupoCredito.ToString("0");
+                txtCupoCredito.Text = MonedaHelper.Formatear(_clienteAEditar.CupoCredito);
 
-                // Días de Crédito Hábiles
                 int dias = _clienteAEditar.DiasCreditoHabiles > 0 ? _clienteAEditar.DiasCreditoHabiles : _clienteAEditar.DiasCredito;
                 cbDiasCredito.SelectedIndex = dias switch
                 {
@@ -295,7 +291,6 @@ namespace SISTEMAACTUALIZADO.Modals
                     _ => 0
                 };
 
-                // Lista de Precios (1 a 10)
                 int listaIdx = Math.Max(1, Math.Min(10, _clienteAEditar.ListaPrecioDefecto)) - 1;
                 cbListaPrecio.SelectedIndex = listaIdx;
             }
@@ -331,7 +326,7 @@ namespace SISTEMAACTUALIZADO.Modals
                 return;
             }
 
-            decimal.TryParse(txtCupoCredito.Text.Trim(), out decimal cupo);
+            decimal cupo = MonedaHelper.Limpiar(txtCupoCredito.Text);
 
             int diasCredito = cbDiasCredito.SelectedIndex switch
             {
@@ -350,7 +345,6 @@ namespace SISTEMAACTUALIZADO.Modals
                 bool esNuevo = (_clienteAEditar == null);
                 Cliente clienteGuardar = _clienteAEditar ?? new Cliente();
 
-                // Detección de cambios crediticios para auditoría
                 int diasAnteriores = clienteGuardar.DiasCreditoHabiles;
                 decimal cupoAnterior = clienteGuardar.CupoCredito;
                 string estadoAnterior = clienteGuardar.EstadoCrediticio ?? "ACTIVO";
@@ -364,7 +358,6 @@ namespace SISTEMAACTUALIZADO.Modals
                 clienteGuardar.Comuna = txtComuna.Text.Trim();
                 clienteGuardar.Ciudad = txtCiudad.Text.Trim();
                 
-                // Parámetros comerciales y de crédito
                 clienteGuardar.CategoriaCliente = cbCategoriaTipo.SelectedItem?.ToString() ?? "MINORISTA";
                 clienteGuardar.CupoCredito = cupo;
                 clienteGuardar.DiasCredito = diasCredito;
@@ -378,7 +371,6 @@ namespace SISTEMAACTUALIZADO.Modals
 
                 _clienteService.GuardarCliente(clienteGuardar, esNuevo);
 
-                // Auditoría: Registrar cambio en historial si no es nuevo y variaron condiciones
                 if (!esNuevo && (diasAnteriores != diasCredito || cupoAnterior != cupo))
                 {
                     try

@@ -2,6 +2,7 @@ using System;
 using System.Drawing;
 using System.IO;
 using System.Windows.Forms;
+using SISTEMAACTUALIZADO.Helpers;
 
 namespace SISTEMAACTUALIZADO.Modals
 {
@@ -40,14 +41,9 @@ namespace SISTEMAACTUALIZADO.Modals
             this.FormBorderStyle = FormBorderStyle.FixedDialog;
             this.MaximizeBox = false;
             this.MinimizeBox = false;
-            
-            // 1. ACTIVAR LA "X" ESTÁNDAR DE LA BARRA DE TÍTULO
             this.ControlBox = true;
-            
             this.BackColor = Color.White;
             this.KeyPreview = true;
-
-            // 2. SE ELIMINÓ EL BOTÓN PERSONALIZADO btnClose QUE DIBUJAVA LA "✕" INTERNA
 
             Control ctrlIcono;
             if (!string.IsNullOrEmpty(imagenPath) && File.Exists(imagenPath))
@@ -74,7 +70,7 @@ namespace SISTEMAACTUALIZADO.Modals
             }
 
             Label lblTitle = new Label { Text = nombreProducto, Font = new Font("Segoe UI", 11F, FontStyle.Bold), ForeColor = Color.FromArgb(15, 23, 42), Location = new Point(75, 18), AutoSize = true };
-            Label lblSub = new Label { Text = $"Precio: ${_precioUnitario:N0}  |  Stock disp: {_stockDisponible} un.", Font = new Font("Segoe UI", 8.5F, FontStyle.Bold), ForeColor = Color.FromArgb(2, 132, 199), Location = new Point(75, 40), AutoSize = true };
+            Label lblSub = new Label { Text = $"Precio: {MonedaHelper.Formatear(_precioUnitario, conSigno: true)}  |  Stock disp: {_stockDisponible} un.", Font = new Font("Segoe UI", 8.5F, FontStyle.Bold), ForeColor = Color.FromArgb(2, 132, 199), Location = new Point(75, 40), AutoSize = true };
             Label lblDivider = new Label { Height = 1, BackColor = Color.FromArgb(226, 232, 240), Location = new Point(15, 68), Width = 355 };
             Label lblCantHeader = new Label { Text = "Cantidad (Escriba con teclado o seleccione botón)", Font = new Font("Segoe UI", 8F, FontStyle.Bold), ForeColor = Color.FromArgb(100, 116, 139), Location = new Point(15, 76), Width = 355, TextAlign = ContentAlignment.MiddleCenter };
 
@@ -181,7 +177,7 @@ namespace SISTEMAACTUALIZADO.Modals
             pnlTotalBox.Paint += (s, e) => { ControlPaint.DrawBorder(e.Graphics, pnlTotalBox.ClientRectangle, Color.FromArgb(226, 232, 240), ButtonBorderStyle.Solid); };
 
             Label lblTotalCap = new Label { Text = "Total", Font = new Font("Segoe UI", 9F, FontStyle.Bold), ForeColor = Color.FromArgb(15, 23, 42), Location = new Point(12, 10), AutoSize = true };
-            lblTotalPreview = new Label { Text = $"${_precioUnitario * _cantidad:N0}", Font = new Font("Segoe UI", 12F, FontStyle.Bold), ForeColor = Color.FromArgb(16, 185, 129), Location = new Point(200, 8), Size = new Size(120, 24), TextAlign = ContentAlignment.MiddleRight };
+            lblTotalPreview = new Label { Text = MonedaHelper.Formatear(_precioUnitario * _cantidad, conSigno: true), Font = new Font("Segoe UI", 12F, FontStyle.Bold), ForeColor = Color.FromArgb(16, 185, 129), Location = new Point(170, 8), Size = new Size(150, 24), TextAlign = ContentAlignment.MiddleRight };
 
             pnlTotalBox.Controls.Add(lblTotalCap);
             pnlTotalBox.Controls.Add(lblTotalPreview);
@@ -398,7 +394,7 @@ namespace SISTEMAACTUALIZADO.Modals
         private void ActualizarValores()
         {
             lblCantidadDisplay.Text = _cantidad.ToString();
-            lblTotalPreview.Text = $"${_precioUnitario * _cantidad:N0}";
+            lblTotalPreview.Text = MonedaHelper.Formatear(_precioUnitario * _cantidad, conSigno: true);
             btnAgregarAccion.Text = $"🛒 Agregar {_cantidad} a la venta";
         }
     }

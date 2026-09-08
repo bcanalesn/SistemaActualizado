@@ -2,6 +2,7 @@ using System;
 using System.Drawing;
 using System.Drawing.Drawing2D;
 using System.Windows.Forms;
+using SISTEMAACTUALIZADO.Helpers;
 using SISTEMAACTUALIZADO.Models;
 using SISTEMAACTUALIZADO.Services;
 
@@ -55,10 +56,10 @@ namespace SISTEMAACTUALIZADO.Modals
             Label lblEstadoText = new Label { Text = "ABIERTO", Font = new Font("Segoe UI", 7.5F, FontStyle.Bold), ForeColor = Color.FromArgb(22, 101, 52), Dock = DockStyle.Fill, TextAlign = ContentAlignment.MiddleCenter };
             badgeEstado.Controls.Add(lblEstadoText);
 
-            // 1. TARJETA BALANCE
+            // ========================================================
+            // 1. TARJETA BALANCE (Ítem A: Formato chileno con puntos)
+            // ========================================================
             Panel pnlBalance = CrearPanelTarjeta(12, 60, 354, 160);
-
-            var cl = new System.Globalization.CultureInfo("es-CL");
 
             decimal fondoInicial = _turno.MontoInicial;
             decimal ventasTotales = datos.VentasTotales;
@@ -66,15 +67,16 @@ namespace SISTEMAACTUALIZADO.Modals
             decimal efectivoEsperado = fondoInicial + datos.VentasEfectivo;
 
             int yPos = 8;
-            CrearFilaMetrica(pnlBalance, "Fondo Inicial", "$ " + fondoInicial.ToString("N0", cl), ref yPos, isBold: true);
-            CrearFilaMetrica(pnlBalance, "Ventas Totales (" + datos.CantVentas + ")", "$ " + ventasTotales.ToString("N0", cl), ref yPos, isBold: true);
-            CrearFilaMetrica(pnlBalance, "Anulaciones (" + datos.CantAnulaciones + ")", "$ " + anulaciones.ToString("N0", cl), ref yPos, colorValor: Color.FromArgb(239, 68, 68));
-
+            CrearFilaMetrica(pnlBalance, "Fondo Inicial", MonedaHelper.Formatear(fondoInicial, conSigno: true), ref yPos, isBold: true);
+            CrearFilaMetrica(pnlBalance, "Ventas Totales (" + datos.CantVentas + ")", MonedaHelper.Formatear(ventasTotales, conSigno: true), ref yPos, isBold: true);
+            CrearFilaMetrica(pnlBalance, "Anulaciones (" + datos.CantAnulaciones + ")", MonedaHelper.Formatear(anulaciones, conSigno: true), ref yPos, colorValor: Color.FromArgb(239, 68, 68));
+            
             yPos += 4;
-            CrearFilaMetrica(pnlBalance, "Efectivo Esperado en Caja", "$ " + efectivoEsperado.ToString("N0", cl), ref yPos, isBold: true, colorValor: Color.FromArgb(37, 99, 235));
+            CrearFilaMetrica(pnlBalance, "Efectivo Esperado en Caja", MonedaHelper.Formatear(efectivoEsperado, conSigno: true), ref yPos, isBold: true, colorValor: Color.FromArgb(37, 99, 235));
 
-
-            // 2. VENTAS POR MEDIO DE PAGO
+            // ========================================================
+            // 2. VENTAS POR MEDIO DE PAGO (Ítem B)
+            // ========================================================
             Panel pnlMediosPago = CrearPanelTarjeta(12, 264, 354, altoMedios);
             Label lblTitMedios = new Label { Text = "VENTAS POR MEDIO DE PAGO", Location = new Point(10, 8), Font = new Font("Segoe UI", 7.5F, FontStyle.Bold), ForeColor = Color.FromArgb(100, 116, 139), AutoSize = true };
 
@@ -122,7 +124,7 @@ namespace SISTEMAACTUALIZADO.Modals
 
                 Panel pnlB = new Panel { Location = new Point(88, yMedio + 4), Size = new Size(8, 8), BackColor = colorTag };
                 Label lblT = new Label { Text = item.Medio, Location = new Point(100, yMedio), Size = new Size(110, 16), Font = new Font("Segoe UI", 8F, FontStyle.Bold), ForeColor = Color.FromArgb(15, 23, 42), AutoSize = false };
-                Label lblV = new Label { Text = "$ " + item.Monto.ToString("N0", cl), Location = new Point(210, yMedio), Size = new Size(80, 16), Font = new Font("Segoe UI", 8F, FontStyle.Bold), ForeColor = Color.FromArgb(15, 23, 42), TextAlign = ContentAlignment.TopRight };
+                Label lblV = new Label { Text = MonedaHelper.Formatear(item.Monto, conSigno: true), Location = new Point(210, yMedio), Size = new Size(80, 16), Font = new Font("Segoe UI", 8F, FontStyle.Bold), ForeColor = Color.FromArgb(15, 23, 42), TextAlign = ContentAlignment.TopRight };
                 Label lblP = new Label { Text = item.Porcentaje.ToString("0.#") + "%", Location = new Point(295, yMedio), Size = new Size(48, 16), Font = new Font("Segoe UI", 7.5F), ForeColor = Color.FromArgb(100, 116, 139), TextAlign = ContentAlignment.TopRight };
 
                 pnlMediosPago.Controls.AddRange(new Control[] { pnlB, lblT, lblV, lblP });
@@ -130,10 +132,12 @@ namespace SISTEMAACTUALIZADO.Modals
             }
 
             Label lblTotalTag = new Label { Text = "Total Ventas", Location = new Point(100, yMedio + 2), Font = new Font("Segoe UI", 8F, FontStyle.Bold), ForeColor = Color.FromArgb(15, 23, 42), AutoSize = true };
-            Label lblTotalVal = new Label { Text = "$ " + ventasTotales.ToString("N0", cl), Location = new Point(210, yMedio + 2), Size = new Size(80, 16), Font = new Font("Segoe UI", 8F, FontStyle.Bold), ForeColor = Color.FromArgb(15, 23, 42), TextAlign = ContentAlignment.TopRight };
+            Label lblTotalVal = new Label { Text = MonedaHelper.Formatear(ventasTotales, conSigno: true), Location = new Point(210, yMedio + 2), Size = new Size(80, 16), Font = new Font("Segoe UI", 8F, FontStyle.Bold), ForeColor = Color.FromArgb(15, 23, 42), TextAlign = ContentAlignment.TopRight };
             pnlMediosPago.Controls.AddRange(new Control[] { lblTotalTag, lblTotalVal });
 
+            // ========================================================
             // 3. DETALLE RÁPIDO
+            // ========================================================
             Panel pnlDetalleRapido = CrearPanelTarjeta(12, 264 + altoMedios + 8, 354, 95);
             Label lblTitDet = new Label { Text = "DETALLE RÁPIDO", Location = new Point(10, 6), Font = new Font("Segoe UI", 7.5F, FontStyle.Bold), ForeColor = Color.FromArgb(100, 116, 139), AutoSize = true };
 
@@ -188,8 +192,8 @@ namespace SISTEMAACTUALIZADO.Modals
             Label lblV = new Label
             {
                 Text = valor,
-                Location = new Point(230, y),
-                Size = new Size(114, 18),
+                Location = new Point(200, y),
+                Size = new Size(144, 18),
                 Font = new Font("Segoe UI", 8F, isBold ? FontStyle.Bold : FontStyle.Regular),
                 ForeColor = colorValor ?? Color.FromArgb(15, 23, 42),
                 TextAlign = ContentAlignment.TopRight

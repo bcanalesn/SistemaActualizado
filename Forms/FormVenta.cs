@@ -4,6 +4,7 @@ using System.Drawing;
 using System.Linq;
 using System.Windows.Forms;
 using SISTEMAACTUALIZADO.Data;
+using SISTEMAACTUALIZADO.Helpers;
 using SISTEMAACTUALIZADO.Models;
 using SISTEMAACTUALIZADO.Modals;
 using SISTEMAACTUALIZADO.Services;
@@ -263,9 +264,9 @@ namespace SISTEMAACTUALIZADO
                 BackColor = Color.Transparent
             };
             pnlIzquierda.ColumnStyles.Add(new ColumnStyle(SizeType.Percent, 100F));
-            pnlIzquierda.RowStyles.Add(new RowStyle(SizeType.Absolute, 46F));  // Fila 0: Buscador
-            pnlIzquierda.RowStyles.Add(new RowStyle(SizeType.Absolute, 70F));  // Fila 1: Categorías (se recalcula dinámicamente)
-            pnlIzquierda.RowStyles.Add(new RowStyle(SizeType.Percent, 100F));   // Fila 2: Productos
+            pnlIzquierda.RowStyles.Add(new RowStyle(SizeType.Absolute, 46F));
+            pnlIzquierda.RowStyles.Add(new RowStyle(SizeType.Absolute, 70F));
+            pnlIzquierda.RowStyles.Add(new RowStyle(SizeType.Percent, 100F));
 
             // 1. Buscador y Vendedor
             Panel pnlTopBar = new Panel 
@@ -379,7 +380,7 @@ namespace SISTEMAACTUALIZADO
             pnlCatSection.Controls.Add(flowCategorias);
             pnlCatSection.Controls.Add(lblCatTitle);
 
-            // 3. Grid de Productos (Fila inferior)
+            // 3. Grid de Productos
             Panel pnlProdMain = new Panel 
             { 
                 Dock = DockStyle.Fill, 
@@ -429,7 +430,6 @@ namespace SISTEMAACTUALIZADO
         {
             flowCategorias.Controls.Clear();
 
-            // Botón Todas
             flowCategorias.Controls.Add(CrearBotonCategoria(
                 "Todas", "▦",
                 Color.FromArgb(239, 246, 255),
@@ -545,7 +545,6 @@ namespace SISTEMAACTUALIZADO
                 }
             }
 
-            // Cálculo físico de filas
             int cantBotones = flowCategorias.Controls.Count;
             int filas = (int)Math.Ceiling((double)cantBotones / columnas);
             if (filas < 1) filas = 1;
@@ -559,7 +558,6 @@ namespace SISTEMAACTUALIZADO
             int altoTotalSeccion = 20 + altoCategorias + altoSubFamilias + 8;
             pnlCatSection.Height = altoTotalSeccion;
 
-            // Modificar la altura de la fila en el TableLayoutPanel para empujar Productos
             if (pnlIzquierda.RowStyles.Count > 1)
             {
                 pnlIzquierda.RowStyles[1].SizeType = SizeType.Absolute;
@@ -630,12 +628,9 @@ namespace SISTEMAACTUALIZADO
 
         private void CargarProductosDesdeBD()
         {
-            // 1. Recargar el catálogo fresco desde la base de datos
             _productosCache = _productoService.ObtenerProductosActivos();
-
             int clienteId = _clienteActual?.IdCliente ?? 0;
 
-            // 2. Recalcular los precios unitarios de los ítems en los carritos según los nuevos tramos, listas o precios especiales
             foreach (var carritoVendedor in _carritosPorVendedor.Values)
             {
                 foreach (var item in carritoVendedor)
@@ -644,15 +639,12 @@ namespace SISTEMAACTUALIZADO
                     if (prod != null)
                     {
                         item.PrecioUnitario = _productoService.ObtenerPrecioProductoConCliente(prod, _listaClienteActivo, item.Cantidad, clienteId);
-
-                        // Descontar del stock visible en las tarjetas
                         prod.Stock -= item.Cantidad;
                         if (prod.Stock < 0) prod.Stock = 0;
                     }
                 }
             }
 
-            // 3. Refrescar la cuadrícula de tarjetas de productos
             FiltrarProductosPorJerarquia();
         }
 
@@ -725,13 +717,13 @@ namespace SISTEMAACTUALIZADO
                 TextAlign = ContentAlignment.TopCenter
             };
 
-            // Obtener el precio dinámico según precios especiales, lista preferencial o tramos
             decimal precioVenta = ObtenerPrecioActivoProducto(prod);
             Color colorPrecio = prod.ListaDefectoPOS > 1 ? Color.FromArgb(2, 132, 199) : Color.FromArgb(0, 102, 255);
 
+            // Formato chileno con puntos en la tarjeta de producto
             Label lblPrecio = new Label
             {
-                Text = $"${precioVenta:N0}",
+                Text = MonedaHelper.Formatear(precioVenta, conSigno: true),
                 Font = new Font("Segoe UI", 10.5F, FontStyle.Bold),
                 ForeColor = colorPrecio,
                 Location = new Point(4, 88),
@@ -905,7 +897,6 @@ namespace SISTEMAACTUALIZADO
             var itemExistente = cart.FirstOrDefault(c => c.ProductoID == prod.ProductoID);
             int cantidadInicial = itemExistente != null ? itemExistente.Cantidad : 1;
 
-            // Tomar el precio base activo evaluando cliente y escala
             decimal precioBaseVenta = ObtenerPrecioActivoProducto(prod);
 
             using (FormCantidadModal modal = new FormCantidadModal(prod.Nombre, precioBaseVenta, cantidadInicial, prod.Stock, prod.ImagenPath))
@@ -985,11 +976,12 @@ namespace SISTEMAACTUALIZADO
                 };
 
                 Label lblNombre = new Label { Name = "lblNombre", Text = item.Nombre, Font = new Font("Segoe UI", 8.5F, FontStyle.Bold), ForeColor = Color.FromArgb(15, 23, 42), Location = new Point(6, 4), AutoSize = false, Size = new Size(110, 18) };
-                Label lblPrecioU = new Label { Name = "lblPrecioU", Text = $"${item.PrecioUnitario:N0}", Font = new Font("Segoe UI", 7.5F), ForeColor = Color.FromArgb(100, 116, 139), Location = new Point(6, 24), AutoSize = true };
+                
+                // Formato chileno en precio unitario del item
+                Label lblPrecioU = new Label { Name = "lblPrecioU", Text = MonedaHelper.Formatear(item.PrecioUnitario, conSigno: true), Font = new Font("Segoe UI", 7.5F), ForeColor = Color.FromArgb(100, 116, 139), Location = new Point(6, 24), AutoSize = true };
 
                 var prodOriginal = _productosCache.FirstOrDefault(p => p.ProductoID == item.ProductoID);
 
-                // Botón Restar (-)
                 Button btnRestar = new Button { Name = "btnRestar", Text = "-", Size = new Size(22, 22), FlatStyle = FlatStyle.Flat, BackColor = Color.FromArgb(241, 245, 249), Font = new Font("Segoe UI", 8.5F, FontStyle.Bold), Cursor = Cursors.Hand };
                 btnRestar.FlatAppearance.BorderSize = 0;
                 btnRestar.Click += (s, e) =>
@@ -1011,7 +1003,6 @@ namespace SISTEMAACTUALIZADO
 
                 Label lblQty = new Label { Name = "lblQty", Text = item.Cantidad.ToString(), Font = new Font("Segoe UI", 8.5F, FontStyle.Bold), Size = new Size(22, 18), TextAlign = ContentAlignment.MiddleCenter };
 
-                // Botón Sumar (+)
                 Button btnSumar = new Button { Name = "btnSumar", Text = "+", Size = new Size(22, 22), FlatStyle = FlatStyle.Flat, BackColor = Color.FromArgb(241, 245, 249), Font = new Font("Segoe UI", 8.5F, FontStyle.Bold), Cursor = Cursors.Hand };
                 btnSumar.FlatAppearance.BorderSize = 0;
                 btnSumar.Click += (s, e) =>
@@ -1032,7 +1023,8 @@ namespace SISTEMAACTUALIZADO
                     ActualizarCarritoUI();
                 };
 
-                Label lblSubtotal = new Label { Name = "lblSubtotal", Text = $"${item.Subtotal:N0}", Font = new Font("Segoe UI", 8.5F, FontStyle.Bold), ForeColor = Color.FromArgb(0, 102, 255), AutoSize = true };
+                // Formato chileno en subtotal de línea
+                Label lblSubtotal = new Label { Name = "lblSubtotal", Text = MonedaHelper.Formatear(item.Subtotal, conSigno: true), Font = new Font("Segoe UI", 8.5F, FontStyle.Bold), ForeColor = Color.FromArgb(0, 102, 255), AutoSize = true };
 
                 Button btnDeleteRow = new Button { Name = "btnDeleteRow", Text = "✕", Size = new Size(20, 20), FlatStyle = FlatStyle.Flat, ForeColor = Color.FromArgb(156, 163, 175), Cursor = Cursors.Hand };
                 btnDeleteRow.FlatAppearance.BorderSize = 0;
@@ -1049,9 +1041,9 @@ namespace SISTEMAACTUALIZADO
             lblCantItemsBadge.Text = totalItemsCount.ToString();
 
             decimal subtotal = cart.Sum(c => c.Subtotal);
-            lblSubtotalValue.Text = $"$ {subtotal:N0}";
+            lblSubtotalValue.Text = MonedaHelper.Formatear(subtotal, conSigno: true);
             lblDescuentoValue.Text = "$ 0";
-            lblTotalValue.Text = $"$ {subtotal:N0}";
+            lblTotalValue.Text = MonedaHelper.Formatear(subtotal, conSigno: true);
 
             ReajustarAnchoFilasCarrito();
         }
@@ -1149,11 +1141,10 @@ namespace SISTEMAACTUALIZADO
                 _clienteSeleccionadoRut = cliente.Rut;
                 _listaClienteActivo = cliente.ListaPrecioDefecto > 0 ? cliente.ListaPrecioDefecto : 1;
 
-                // Notificar si el cliente posee acuerdos de precios especiales vigentes
                 var promociones = _productoService.ObtenerPromocionesVigentesCliente(cliente.IdCliente);
                 if (promociones.Count > 0)
                 {
-                    string detalle = string.Join("\n", promociones.Select(p => $"• {p.NombreProducto}: ${p.PrecioPactado:N0} (Válido hasta {p.Fin:dd/MM/yyyy})"));
+                    string detalle = string.Join("\n", promociones.Select(p => $"• {p.NombreProducto}: {MonedaHelper.Formatear(p.PrecioPactado, conSigno: true)} (Válido hasta {p.Fin:dd/MM/yyyy})"));
                     MessageBox.Show($"¡El cliente cuenta con Precios Especiales Vigentes!\n\n{detalle}", "Precios Especiales del Cliente", MessageBoxButtons.OK, MessageBoxIcon.Information);
                 }
             }
@@ -1166,7 +1157,6 @@ namespace SISTEMAACTUALIZADO
 
             btnCliente.Text = $"👤 {_clienteSeleccionadoNombre.Split(' ')[0]}";
 
-            // Al cambiar cliente, refresca los precios del catálogo y recalcula el carro
             CargarProductosDesdeBD();
             ActualizarCarritoUI();
         }

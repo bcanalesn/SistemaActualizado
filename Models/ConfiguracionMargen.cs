@@ -18,6 +18,6 @@ namespace SISTEMAACTUALIZADO.Models
         [Column(TypeName = "decimal(5,2)")]
         public decimal PorcentajeMargen { get; set; } = 0.00m;
 
-        public DateTime UltimaModificacion { get; set; } = DateTime.Now;
+        public DateTime? UltimaModificacion { get; set; } = DateTime.Now;
     }
 }

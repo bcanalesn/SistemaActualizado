@@ -226,7 +226,7 @@ namespace SISTEMAACTUALIZADO
             pnlCardPendientes.Controls.Add(pnlStatusFooter);
             pnlCardPendientes.Controls.Add(lblTitPend);
 
-            // 3. Grilla Detalle Ticket
+            // 3. Grilla Detalle Ticket con Formato Chileno
             Panel pnlCardDetalle = new Panel { Dock = DockStyle.Fill, BackColor = Color.White, Padding = new Padding(8) };
             pnlCardDetalle.Paint += (s, e) => ControlPaint.DrawBorder(e.Graphics, pnlCardDetalle.ClientRectangle, Color.FromArgb(226, 232, 240), ButtonBorderStyle.Solid);
             
@@ -249,6 +249,7 @@ namespace SISTEMAACTUALIZADO
             dgvDetalleTicket.Columns.Add(new DataGridViewTextBoxColumn { Name = "IdProducto", DataPropertyName = "IdProducto", HeaderText = "CÓDIGO", FillWeight = 20 });
             dgvDetalleTicket.Columns.Add(new DataGridViewTextBoxColumn { Name = "NmbProducto", DataPropertyName = "NmbProducto", HeaderText = "PRODUCTO", FillWeight = 45 });
             dgvDetalleTicket.Columns.Add(new DataGridViewTextBoxColumn { Name = "Cantidad", DataPropertyName = "Cantidad", HeaderText = "CANT.", FillWeight = 12 });
+
             var estiloMonedaCL = new DataGridViewCellStyle 
             { 
                 FormatProvider = new System.Globalization.CultureInfo("es-CL"), 
@@ -288,7 +289,7 @@ namespace SISTEMAACTUALIZADO
 
             pnlSec1.Controls.AddRange(new Control[] { circle1, lblT1, lblSub1, btnDocBoleta, btnDocFactura });
 
-            // SECCIÓN 2: MEDIO DE PAGO (2 Filas x 3 Botones)
+            // SECCIÓN 2: MEDIO DE PAGO
             Panel pnlSec2 = CrearContenedorSeccion(108, 142, panelW, Color.FromArgb(203, 213, 225));
             Panel circle2 = CrearBadgeNumero("2", Color.FromArgb(37, 99, 235), new Point(10, 8));
             Label lblT2 = new Label { Text = "MEDIO DE PAGO", Location = new Point(42, 6), AutoSize = true, Font = new Font("Segoe UI", 8.5F, FontStyle.Bold), ForeColor = Color.FromArgb(37, 99, 235) };
@@ -297,7 +298,6 @@ namespace SISTEMAACTUALIZADO
             int btnPW3 = (panelW - 32) / 3;
             int btnH = 44;
 
-            // Fila 1
             btnPagoEfectivo = CrearBotonPagoVectorial("EFECTIVO", "EFECTIVO", new Point(8, 40), new Size(btnPW3, btnH), Color.FromArgb(16, 185, 129), () => _medioPagoSeleccionado == "Efectivo");
             btnPagoEfectivo.Click += (s, e) => SeleccionarMedioPago("Efectivo");
 
@@ -307,7 +307,6 @@ namespace SISTEMAACTUALIZADO
             btnPagoCredito = CrearBotonPagoVectorial("CRÉDITO", "TARJETA CRÉDITO", new Point(8 + (btnPW3 + 6) * 2, 40), new Size(btnPW3, btnH), Color.FromArgb(124, 58, 237), () => _medioPagoSeleccionado == "Tarjeta Crédito");
             btnPagoCredito.Click += (s, e) => SeleccionarMedioPago("Tarjeta Crédito");
 
-            // Fila 2
             btnPagoCreditoComercial = CrearBotonPagoVectorial("CRÉDITO COMERCIAL", "A PLAZO / CRÉDITO", new Point(8, 88), new Size(btnPW3, btnH), Color.FromArgb(234, 88, 12), () => _medioPagoSeleccionado == "Crédito Comercial");
             btnPagoCreditoComercial.Click += (s, e) => SeleccionarMedioPago("Crédito Comercial");
 
@@ -338,7 +337,7 @@ namespace SISTEMAACTUALIZADO
 
             Label lblP = new Label { Text = "PAGA CON", Location = new Point(8, 4), AutoSize = true, Font = new Font("Segoe UI", 7.5F, FontStyle.Bold), ForeColor = Color.FromArgb(15, 23, 42) };
             Label lblSigno = new Label { Text = "$", Location = new Point(8, 22), AutoSize = true, Font = new Font("Segoe UI", 11F, FontStyle.Bold), ForeColor = Color.FromArgb(100, 116, 139) };
-            txtPagaCon = new TextBox { Location = new Point(28, 20), Size = new Size(cW - 36, 26), Font = new Font("Segoe UI", 11F, FontStyle.Bold), BorderStyle = BorderStyle.None, BackColor = Color.FromArgb(248, 250, 252),MaxLength = 10 };
+            txtPagaCon = new TextBox { Location = new Point(28, 20), Size = new Size(cW - 36, 26), Font = new Font("Segoe UI", 11F, FontStyle.Bold), BorderStyle = BorderStyle.None, BackColor = Color.FromArgb(248, 250, 252), MaxLength = 10 };
             txtPagaCon.KeyPress += (s, e) =>
             {
                 if (!char.IsControl(e.KeyChar) && !char.IsDigit(e.KeyChar))
@@ -360,7 +359,7 @@ namespace SISTEMAACTUALIZADO
             };
 
             Label lblVIcon = new Label { Text = "💵 VUELTO", Location = new Point(8, 5), AutoSize = true, Font = new Font("Segoe UI", 7.5F, FontStyle.Bold), ForeColor = Color.FromArgb(22, 101, 52) };
-            lblVuelto = new Label { Text = "$0", Location = new Point(50, 12), Size = new Size(cW - 55, 30), Font = new Font("Segoe UI", 15F, FontStyle.Bold), ForeColor = Color.FromArgb(16, 185, 129), TextAlign = ContentAlignment.MiddleRight };
+            lblVuelto = new Label { Text = "$ 0", Location = new Point(50, 12), Size = new Size(cW - 55, 30), Font = new Font("Segoe UI", 15F, FontStyle.Bold), ForeColor = Color.FromArgb(16, 185, 129), TextAlign = ContentAlignment.MiddleRight };
             pnlVueltoCard.Controls.AddRange(new Control[] { lblVIcon, lblVuelto });
 
             Panel pnlTotalCard = new Panel { Location = new Point(10, 100), Size = new Size(panelW - 20, 50), BackColor = Color.FromArgb(245, 243, 255) };
@@ -375,7 +374,7 @@ namespace SISTEMAACTUALIZADO
 
             Panel pnlTotCircle = CrearBadgeNumero("$", Color.FromArgb(124, 58, 237), new Point(8, 10));
             Label lblTotCap = new Label { Text = "TOTAL A COBRAR", Location = new Point(42, 5), AutoSize = true, Font = new Font("Segoe UI", 7.5F, FontStyle.Bold), ForeColor = Color.FromArgb(124, 58, 237) };
-            lblTotalCobrar = new Label { Text = "$0", Location = new Point(42, 18), AutoSize = true, Font = new Font("Segoe UI", 16F, FontStyle.Bold), ForeColor = Color.FromArgb(124, 58, 237) };
+            lblTotalCobrar = new Label { Text = "$ 0", Location = new Point(42, 18), AutoSize = true, Font = new Font("Segoe UI", 16F, FontStyle.Bold), ForeColor = Color.FromArgb(124, 58, 237) };
             pnlTotalCard.Controls.AddRange(new Control[] { pnlTotCircle, lblTotCap, lblTotalCobrar });
 
             pnlDatosCobroCard.Controls.AddRange(new Control[] { circle3, lblT3, lblSub3, pnlPagaCon, pnlVueltoCard, pnlTotalCard });
@@ -472,8 +471,8 @@ namespace SISTEMAACTUALIZADO
             _ticketSeleccionado = null;
             _pagoMixtoConfirmado = false;
             dgvDetalleTicket.DataSource = null;
-            lblTotalCobrar.Text = "$0";
-            lblVuelto.Text = "$0";
+            lblTotalCobrar.Text = "$ 0";
+            lblVuelto.Text = "$ 0";
             txtPagaCon.Clear();
             btnCobrarTicket.Enabled = false;
             btnAnularTicket.Enabled = false;
@@ -711,7 +710,7 @@ namespace SISTEMAACTUALIZADO
             if (_medioPagoSeleccionado == "Efectivo")
             {
                 txtPagaCon.Enabled = true;
-                txtPagaCon.Text = MonedaHelper.Formatear(_ticketSeleccionado.Total); // Ej: "3.990"
+                txtPagaCon.Text = MonedaHelper.Formatear(_ticketSeleccionado.Total);
                 lblVuelto.Text = "$ 0";
             }
             else if (_medioPagoSeleccionado == "Crédito Comercial")
@@ -771,7 +770,7 @@ namespace SISTEMAACTUALIZADO
                 lblEstadoTag.Text = "🟢 CAJA ABIERTA";
                 lblEstadoDetalle.Text = $"Turno #{_turnoActual!.CajaTurnoID}";
                 lblHoraApertura.Text = _turnoActual.FechaApertura.ToString("HH:mm:ss");
-                lblFondoInicial.Text = _turnoActual.MontoInicial.ToString("$ #,##0", new System.Globalization.CultureInfo("es-CL"));
+                lblFondoInicial.Text = MonedaHelper.Formatear(_turnoActual.MontoInicial, conSigno: true);
             }
             else
             {
@@ -828,7 +827,6 @@ namespace SISTEMAACTUALIZADO
                 ForeColor = Color.FromArgb(239, 68, 68) 
             };
 
-            // Recálculo dinámico en tiempo real
             Action recalcular = () =>
             {
                 decimal ef = MonedaHelper.Limpiar(txtEf.Text);
@@ -838,7 +836,6 @@ namespace SISTEMAACTUALIZADO
                 decimal electronico = tar + tr;
                 decimal sumaTotal = ef + electronico;
 
-                // Regla de negocio: Tarjeta + Transferencia no pueden superar el total del ticket
                 if (electronico > totalTicket)
                 {
                     lblEstadoSuma.Text = "⚠️ Tarjeta y Transferencia no pueden superar el total";
@@ -927,12 +924,11 @@ namespace SISTEMAACTUALIZADO
                 Location = new Point(x, y),
                 Size = new Size(ancho, 26),
                 Font = new Font("Segoe UI", 10F, FontStyle.Bold),
-                MaxLength = 10 // Máximo 8 dígitos más puntos ($99.999.999)
+                MaxLength = 10
             };
 
             txt.KeyPress += (s, e) =>
             {
-                // Solo permitir números y tecla de borrar
                 if (!char.IsControl(e.KeyChar) && !char.IsDigit(e.KeyChar))
                 {
                     e.Handled = true;
@@ -950,7 +946,6 @@ namespace SISTEMAACTUALIZADO
                 decimal fondoInicial = _turnoActual.MontoInicial;
                 decimal efectivoEsperado = fondoInicial + ventasEfectivo;
 
-                // Modal de Arqueo y Cierre
                 using Form modalCierre = new Form
                 {
                     Text = "Arqueo y Cierre de Caja",
@@ -964,7 +959,7 @@ namespace SISTEMAACTUALIZADO
 
                 Label lblT = new Label { Text = "🔒 ARQUEO Y CIERRE DE TURNO", Location = new Point(20, 15), AutoSize = true, Font = new Font("Segoe UI", 11F, FontStyle.Bold), ForeColor = Color.FromArgb(15, 23, 42) };
                 Label lblPrompt = new Label { Text = "Ingrese el Efectivo Físico Contado ($):", Location = new Point(20, 50), AutoSize = true, Font = new Font("Segoe UI", 8.5F, FontStyle.Bold) };
-                TextBox txtEfectivoReal = new TextBox { Location = new Point(20, 72), Size = new Size(325, 28), Font = new Font("Segoe UI", 11F, FontStyle.Bold) };
+                TextBox txtEfectivoReal = CrearInputMonedaModal(20, 72, 325);
 
                 Label lblResultadoDif = new Label { Text = "Esperando conteo...", Location = new Point(20, 110), Size = new Size(325, 22), Font = new Font("Segoe UI", 9F, FontStyle.Bold), ForeColor = Color.FromArgb(100, 116, 139) };
                 Label lblObs = new Label { Text = "Motivo del descuadre (Obligatorio si no cuadra):", Location = new Point(20, 140), AutoSize = true, Font = new Font("Segoe UI", 8F, FontStyle.Bold), Visible = false };
@@ -972,26 +967,29 @@ namespace SISTEMAACTUALIZADO
 
                 txtEfectivoReal.TextChanged += (s, ev) =>
                 {
-                    if (decimal.TryParse(txtEfectivoReal.Text.Trim(), out decimal real))
+                    MonedaHelper.AplicarMascaraEnVivo(txtEfectivoReal);
+                    decimal real = MonedaHelper.Limpiar(txtEfectivoReal.Text);
+
+                    if (real > 0 || txtEfectivoReal.Text == "0")
                     {
                         decimal dif = real - efectivoEsperado;
                         if (dif == 0)
                         {
-                            lblResultadoDif.Text = "✔ Caja Cuadrada ($0)";
+                            lblResultadoDif.Text = $"✔ Caja Cuadrada ({MonedaHelper.Formatear(0, conSigno: true)})";
                             lblResultadoDif.ForeColor = Color.FromArgb(22, 163, 74);
                             lblObs.Visible = false;
                             txtObs.Visible = false;
                         }
                         else if (dif < 0)
                         {
-                            lblResultadoDif.Text = $"⚠️ Faltante: -${Math.Abs(dif):N0}";
+                            lblResultadoDif.Text = $"⚠️ Faltante: -{MonedaHelper.Formatear(Math.Abs(dif), conSigno: true)}";
                             lblResultadoDif.ForeColor = Color.FromArgb(239, 68, 68);
                             lblObs.Visible = true;
                             txtObs.Visible = true;
                         }
                         else
                         {
-                            lblResultadoDif.Text = $"ℹ️ Sobrante: +${dif:N0}";
+                            lblResultadoDif.Text = $"ℹ️ Sobrante: +{MonedaHelper.Formatear(dif, conSigno: true)}";
                             lblResultadoDif.ForeColor = Color.FromArgb(234, 88, 12);
                             lblObs.Visible = true;
                             txtObs.Visible = true;
@@ -999,7 +997,7 @@ namespace SISTEMAACTUALIZADO
                     }
                     else
                     {
-                        lblResultadoDif.Text = "Ingrese un monto válido";
+                        lblResultadoDif.Text = "Esperando conteo...";
                         lblResultadoDif.ForeColor = Color.FromArgb(100, 116, 139);
                     }
                 };
@@ -1019,13 +1017,9 @@ namespace SISTEMAACTUALIZADO
 
                 btnConfirmar.Click += (s, ev) =>
                 {
-                    if (!decimal.TryParse(txtEfectivoReal.Text.Trim(), out decimal realDeclarado))
-                    {
-                        MessageBox.Show("Ingrese el monto contado.", "Atención", MessageBoxButtons.OK, MessageBoxIcon.Warning);
-                        return;
-                    }
-
+                    decimal realDeclarado = MonedaHelper.Limpiar(txtEfectivoReal.Text);
                     decimal dif = realDeclarado - efectivoEsperado;
+
                     if (dif != 0 && string.IsNullOrWhiteSpace(txtObs.Text))
                     {
                         MessageBox.Show("Debe indicar el motivo del descuadre.", "Justificación Obligatoria", MessageBoxButtons.OK, MessageBoxIcon.Warning);
@@ -1036,7 +1030,7 @@ namespace SISTEMAACTUALIZADO
                     _turnoActual = null;
                     ActualizarEstadoCajaUI();
                     modalCierre.Close();
-                    MessageBox.Show($"Caja cerrada exitosamente.\n\n• Esperado: ${efectivoEsperado:N0}\n• Declarado: ${realDeclarado:N0}\n• Diferencia: ${(dif >= 0 ? "+$" : "-$")}{Math.Abs(dif):N0}", "Turno Finalizado", MessageBoxButtons.OK, MessageBoxIcon.Information);
+                    MessageBox.Show($"Caja cerrada exitosamente.\n\n• Esperado: {MonedaHelper.Formatear(efectivoEsperado, conSigno: true)}\n• Declarado: {MonedaHelper.Formatear(realDeclarado, conSigno: true)}\n• Diferencia: {(dif >= 0 ? "+$" : "-$")}{MonedaHelper.Formatear(Math.Abs(dif))}", "Turno Finalizado", MessageBoxButtons.OK, MessageBoxIcon.Information);
                 };
 
                 modalCierre.Controls.AddRange(new Control[] { lblT, lblPrompt, txtEfectivoReal, lblResultadoDif, lblObs, txtObs, btnConfirmar });
@@ -1044,7 +1038,6 @@ namespace SISTEMAACTUALIZADO
             }
             else
             {
-                // Modal Apertura
                 using Form modalApertura = new Form
                 {
                     Text = "Apertura de Caja",
@@ -1057,13 +1050,16 @@ namespace SISTEMAACTUALIZADO
                 };
 
                 Label lblM = new Label { Text = "Monto Inicial de Caja ($):", Location = new Point(20, 20), AutoSize = true, Font = new Font("Segoe UI", 9F, FontStyle.Bold) };
-                TextBox txtM = new TextBox { Location = new Point(20, 45), Size = new Size(260, 28), Font = new Font("Segoe UI", 11F, FontStyle.Bold) };
+                TextBox txtM = CrearInputMonedaModal(20, 45, 260);
+                txtM.TextChanged += (sa, ea) => MonedaHelper.AplicarMascaraEnVivo(txtM);
+
                 Button btnA = new Button { Text = "🚀 Iniciar Turno", Location = new Point(20, 95), Size = new Size(260, 40), BackColor = Color.FromArgb(16, 185, 129), ForeColor = Color.White, FlatStyle = FlatStyle.Flat, Font = new Font("Segoe UI", 9.5F, FontStyle.Bold), Cursor = Cursors.Hand };
                 btnA.FlatAppearance.BorderSize = 0;
 
                 btnA.Click += (sa, ea) =>
                 {
-                    if (decimal.TryParse(txtM.Text.Trim(), out decimal monto) && monto >= 0)
+                    decimal monto = MonedaHelper.Limpiar(txtM.Text);
+                    if (monto >= 0 && !string.IsNullOrWhiteSpace(txtM.Text))
                     {
                         string usuario = _usuarioActual?.NombreUsuario ?? "admin";
                         _turnoActual = _cajaService.AbrirTurno(usuario, monto);
@@ -1142,7 +1138,7 @@ namespace SISTEMAACTUALIZADO
                     _ticketSeleccionado = pendientes[0];
                     btnCobrarTicket.Enabled = true;
                     btnAnularTicket.Enabled = true;
-                    lblTotalCobrar.Text = $"${_ticketSeleccionado.Total:N0}";
+                    lblTotalCobrar.Text = MonedaHelper.Formatear(_ticketSeleccionado.Total, conSigno: true);
 
                     var detalles = _cajaService.ObtenerDetallesTicket(_ticketSeleccionado.idTve);
                     dgvDetalleTicket.DataSource = detalles;
@@ -1163,7 +1159,7 @@ namespace SISTEMAACTUALIZADO
                 _ticketSeleccionado = ticket;
                 btnCobrarTicket.Enabled = true;
                 btnAnularTicket.Enabled = true;
-                lblTotalCobrar.Text = $"${ticket.Total:N0}";
+                lblTotalCobrar.Text = MonedaHelper.Formatear(ticket.Total, conSigno: true);
 
                 var detalles = _cajaService.ObtenerDetallesTicket(ticket.idTve);
                 dgvDetalleTicket.DataSource = detalles;
@@ -1196,7 +1192,6 @@ namespace SISTEMAACTUALIZADO
             decimal pagaCon = 0;
             decimal vuelto = 0;
 
-            // Validación preventiva de Factura
             if (tipoDoc.Contains("Factura") && (string.IsNullOrWhiteSpace(_ticketSeleccionado.RuT) || _ticketSeleccionado.RuT.Contains("66.666.666")))
             {
                 MessageBox.Show("Para emitir Factura Electrónica el ticket debe tener asignado un cliente formal con RUT y Razón Social.", "Factura Requiere Cliente", MessageBoxButtons.OK, MessageBoxIcon.Warning);
@@ -1230,7 +1225,7 @@ namespace SISTEMAACTUALIZADO
                 }
                 pagaCon = _pagoEfectivo + _pagoTarjeta + _pagoTransferencia;
                 vuelto = _vueltoMixto;
-                medioPago = $"Múltiple (Efec: ${_pagoEfectivo:N0} | Tarj: ${_pagoTarjeta:N0} | Transf: ${_pagoTransferencia:N0})";
+                medioPago = $"Múltiple (Efec: {MonedaHelper.Formatear(_pagoEfectivo, conSigno: true)} | Tarj: {MonedaHelper.Formatear(_pagoTarjeta, conSigno: true)} | Transf: {MonedaHelper.Formatear(_pagoTransferencia, conSigno: true)})";
             }
             else if (medioPago == "Efectivo")
             {
@@ -1252,7 +1247,6 @@ namespace SISTEMAACTUALIZADO
             {
                 string cajero = _usuarioActual?.NombreUsuario ?? "admin";
                 
-                // El servicio asigna folios, busca cliente, completa giro/dirección y actualiza el objeto en memoria
                 int folioOficial = _cajaService.ProcesarCobroTicket(
                     _ticketSeleccionado, tipoDoc, medioPago, vuelto, _turnoActual.CajaTurnoID, cajero
                 );
@@ -1279,11 +1273,10 @@ namespace SISTEMAACTUALIZADO
 
                 MessageBox.Show($"¡{tipoDoc.ToUpper()} N° {folioOficial} PROCESADA CON ÉXITO!\n\n" +
                                 $"• Medio de Pago: {medioPago}\n" +
-                                $"• Total: ${_ticketSeleccionado.Total:N0}\n" +
-                                $"• Vuelto: ${vuelto:N0}",
+                                $"• Total: {MonedaHelper.Formatear(_ticketSeleccionado.Total, conSigno: true)}\n" +
+                                $"• Vuelto: {MonedaHelper.Formatear(vuelto, conSigno: true)}",
                                 "Cobro Finalizado", MessageBoxButtons.OK, MessageBoxIcon.Information);
 
-                // Ahora _ticketSeleccionado viaja con iddocDTE = 33/39 y sus datos de cliente completos
                 FormTicketModal formTicket = new FormTicketModal(_ticketSeleccionado, itemsCarrito, pagaCon, vuelto);
                 formTicket.ShowDialog(this);
 

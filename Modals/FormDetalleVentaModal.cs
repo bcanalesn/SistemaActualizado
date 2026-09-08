@@ -5,6 +5,7 @@ using System.Drawing.Drawing2D;
 using System.Linq;
 using System.Windows.Forms;
 using SISTEMAACTUALIZADO.Data;
+using SISTEMAACTUALIZADO.Helpers;
 using SISTEMAACTUALIZADO.Models;
 
 namespace SISTEMAACTUALIZADO.Modals
@@ -40,9 +41,8 @@ namespace SISTEMAACTUALIZADO.Modals
         {
             this.SuspendLayout();
 
-            // Ventana modal estándar, compacta y movible
             this.Text = $"Detalle de Venta — {_venta.Documento} Folio N° {_venta.nroDTE}";
-            this.Size = new Size(840, 530); // Altura compactada
+            this.Size = new Size(840, 530);
             this.StartPosition = FormStartPosition.CenterParent;
             this.FormBorderStyle = FormBorderStyle.FixedDialog;
             this.MaximizeBox = false;
@@ -57,7 +57,7 @@ namespace SISTEMAACTUALIZADO.Modals
                 BackColor = Color.White
             };
 
-            // 1. FILA DE METADATOS (5 Columnas)
+            // 1. Metadatos
             TableLayoutPanel pnlMetadatos = new TableLayoutPanel
             {
                 Dock = DockStyle.Top,
@@ -82,7 +82,7 @@ namespace SISTEMAACTUALIZADO.Modals
             pnlMetadatos.Controls.Add(CrearMetaItem("👤 Vendedora", vendedoraTexto), 3, 0);
             pnlMetadatos.Controls.Add(CrearMetaItem("🏢 Cliente", clienteTexto), 4, 0);
 
-            // 2. BANNER DE ESTADO
+            // 2. Banner de Estado
             bool isAnulado = _venta.status.Contains("Anulado");
             Panel pnlStatusBanner = CrearTarjetaRedondeada(0, 0, 0, 44,
                 isAnulado ? Color.FromArgb(254, 242, 242) : Color.FromArgb(240, 253, 244),
@@ -116,7 +116,7 @@ namespace SISTEMAACTUALIZADO.Modals
             };
             pnlStatusBanner.Controls.AddRange(new Control[] { lblStatusIcon, lblStatusTitle, lblStatusValue });
 
-            // 3. CUERPO: TABLA (IZQUIERDA) + RESUMEN / IMPRIMIR (DERECHA)
+            // 3. Grilla y Resumen
             TableLayoutPanel pnlBodyLayout = new TableLayoutPanel
             {
                 Dock = DockStyle.Fill,
@@ -127,7 +127,6 @@ namespace SISTEMAACTUALIZADO.Modals
             pnlBodyLayout.ColumnStyles.Add(new ColumnStyle(SizeType.Percent, 68F));
             pnlBodyLayout.ColumnStyles.Add(new ColumnStyle(SizeType.Percent, 32F));
 
-            // Columna Izquierda: DataGridView (Ocupa todo el alto sin caja de observaciones)
             Panel pnlLeftContainer = new Panel { Dock = DockStyle.Fill, Padding = new Padding(0, 0, 12, 0) };
 
             DataGridView dgvItems = new DataGridView
@@ -155,15 +154,31 @@ namespace SISTEMAACTUALIZADO.Modals
                 Subtotal = d.SubTotal
             }).ToList();
 
+            var estiloMoneda = new DataGridViewCellStyle
+            {
+                FormatProvider = new System.Globalization.CultureInfo("es-CL"),
+                Format = "$ #,##0",
+                Alignment = DataGridViewContentAlignment.MiddleRight
+            };
+
             if (dgvItems.Columns["Producto"] != null) dgvItems.Columns["Producto"].HeaderText = "Producto";
             if (dgvItems.Columns["Cantidad"] != null) { dgvItems.Columns["Cantidad"].HeaderText = "Cantidad"; dgvItems.Columns["Cantidad"].DefaultCellStyle.Alignment = DataGridViewContentAlignment.MiddleCenter; }
-            if (dgvItems.Columns["PrecioUnitario"] != null) { dgvItems.Columns["PrecioUnitario"].HeaderText = "Precio Unitario"; dgvItems.Columns["PrecioUnitario"].DefaultCellStyle.Format = "$#,##0"; }
+            if (dgvItems.Columns["PrecioUnitario"] != null) { dgvItems.Columns["PrecioUnitario"].HeaderText = "Precio Unitario"; dgvItems.Columns["PrecioUnitario"].DefaultCellStyle = estiloMoneda; }
             if (dgvItems.Columns["Descuento"] != null) { dgvItems.Columns["Descuento"].HeaderText = "Descuento"; dgvItems.Columns["Descuento"].DefaultCellStyle.Alignment = DataGridViewContentAlignment.MiddleCenter; }
-            if (dgvItems.Columns["Subtotal"] != null) { dgvItems.Columns["Subtotal"].HeaderText = "Subtotal"; dgvItems.Columns["Subtotal"].DefaultCellStyle.Format = "$#,##0"; dgvItems.Columns["Subtotal"].DefaultCellStyle.Font = new Font("Segoe UI", 8.5F, FontStyle.Bold); }
+            if (dgvItems.Columns["Subtotal"] != null) 
+            { 
+                dgvItems.Columns["Subtotal"].HeaderText = "Subtotal"; 
+                dgvItems.Columns["Subtotal"].DefaultCellStyle = new DataGridViewCellStyle
+                {
+                    FormatProvider = new System.Globalization.CultureInfo("es-CL"),
+                    Format = "$ #,##0",
+                    Alignment = DataGridViewContentAlignment.MiddleRight,
+                    Font = new Font("Segoe UI", 8.5F, FontStyle.Bold)
+                };
+            }
 
             pnlLeftContainer.Controls.Add(dgvItems);
 
-            // Columna Derecha: Tarjeta de Resumen + Botón Imprimir inmediatamente abajo
             Panel pnlRightContainer = new Panel { Dock = DockStyle.Fill, Padding = new Padding(6, 0, 0, 0) };
 
             Panel pnlResumenCard = CrearTarjetaRedondeada(0, 0, 0, 205, Color.FromArgb(248, 250, 252), Color.FromArgb(226, 232, 240));
@@ -173,22 +188,20 @@ namespace SISTEMAACTUALIZADO.Modals
             Label lblResumenTitle = new Label { Text = "Resumen del Documento", Font = new Font("Segoe UI", 10F, FontStyle.Bold), ForeColor = Color.FromArgb(15, 23, 42), Dock = DockStyle.Top, Height = 26 };
 
             int yOffset = 30;
-            CrearFilaResumenModal("Monto Neto", $"$ {_venta.Neto:N0}", ref yOffset, pnlResumenCard);
-            CrearFilaResumenModal("IVA (19%)", $"$ {_venta.IvA:N0}", ref yOffset, pnlResumenCard);
+            CrearFilaResumenModal("Monto Neto", MonedaHelper.Formatear(_venta.Neto, conSigno: true), ref yOffset, pnlResumenCard);
+            CrearFilaResumenModal("IVA (19%)", MonedaHelper.Formatear(_venta.IvA, conSigno: true), ref yOffset, pnlResumenCard);
 
             Label lblTotalCap = new Label { Text = "Total Documento", Font = new Font("Segoe UI", 8F, FontStyle.Bold), ForeColor = Color.FromArgb(2, 132, 199), Location = new Point(14, yOffset + 12), AutoSize = true };
-            Label lblTotalBig = new Label { Text = $"$ {_venta.Total:N0}", Font = new Font("Segoe UI", 16F, FontStyle.Bold), ForeColor = Color.FromArgb(0, 102, 255), Location = new Point(12, yOffset + 28), AutoSize = true };
-            Label lblDesgloseSmall = new Label { Text = $"(Neto: ${_venta.Neto:N0} | IVA 19%: ${_venta.IvA:N0})", Font = new Font("Segoe UI", 7.5F), ForeColor = Color.FromArgb(100, 116, 139), Location = new Point(14, yOffset + 60), AutoSize = true };
+            Label lblTotalBig = new Label { Text = MonedaHelper.Formatear(_venta.Total, conSigno: true), Font = new Font("Segoe UI", 16F, FontStyle.Bold), ForeColor = Color.FromArgb(0, 102, 255), Location = new Point(12, yOffset + 28), AutoSize = true };
+            Label lblDesgloseSmall = new Label { Text = $"(Neto: {MonedaHelper.Formatear(_venta.Neto, conSigno: true)} | IVA 19%: {MonedaHelper.Formatear(_venta.IvA, conSigno: true)})", Font = new Font("Segoe UI", 7.5F), ForeColor = Color.FromArgb(100, 116, 139), Location = new Point(14, yOffset + 60), AutoSize = true };
 
             pnlResumenCard.Controls.AddRange(new Control[] { lblResumenTitle, lblTotalCap, lblTotalBig, lblDesgloseSmall });
 
-            // Botón Imprimir DTE posicionado directamente debajo de la tarjeta de resumen
             Button btnImprimirModal = CrearBotonRedondeado("🖨️  Imprimir DTE", Color.FromArgb(0, 102, 255), Color.White, new Size(200, 42), 8);
             btnImprimirModal.Dock = DockStyle.Top;
             btnImprimirModal.Margin = new Padding(0, 12, 0, 0);
             btnImprimirModal.Font = new Font("Segoe UI", 9.5F, FontStyle.Bold);
 
-            // Espaciador entre tarjeta y botón
             Panel pnlSpacer = new Panel { Dock = DockStyle.Top, Height = 12, BackColor = Color.Transparent };
 
             btnImprimirModal.Click += (s, e) =>
@@ -201,10 +214,8 @@ namespace SISTEMAACTUALIZADO.Modals
                     Cantidad = d.Cantidad
                 }).ToList();
 
-                // Reconstruye pagoCon sumando el Total + Vuelto guardado en la BD
                 decimal pagoConHistorico = _venta.Total + _venta.Vuelto;
 
-                // Llamada directa con el objeto TVE2607 completo
                 FormTicketModal formTicket = new FormTicketModal(_venta, itemsEjemplo, pagoConHistorico, _venta.Vuelto);
                 formTicket.ShowDialog(this);
             };
@@ -216,7 +227,6 @@ namespace SISTEMAACTUALIZADO.Modals
             pnlBodyLayout.Controls.Add(pnlLeftContainer, 0, 0);
             pnlBodyLayout.Controls.Add(pnlRightContainer, 1, 0);
 
-            // Ensamble
             pnlMainModal.Controls.Add(pnlBodyLayout);
             pnlMainModal.Controls.Add(pnlStatusBanner);
             pnlMainModal.Controls.Add(pnlMetadatos);
@@ -278,7 +288,7 @@ namespace SISTEMAACTUALIZADO.Modals
         private void CrearFilaResumenModal(string titulo, string valor, ref int y, Panel container)
         {
             Label lblT = new Label { Text = titulo, Font = new Font("Segoe UI", 8.5F), ForeColor = Color.FromArgb(100, 116, 139), Location = new Point(14, y), AutoSize = true };
-            Label lblV = new Label { Text = valor, Font = new Font("Segoe UI", 9F, FontStyle.Bold), ForeColor = Color.FromArgb(15, 23, 42), Location = new Point(container.Width - 85, y), AutoSize = true, TextAlign = ContentAlignment.MiddleRight };
+            Label lblV = new Label { Text = valor, Font = new Font("Segoe UI", 9F, FontStyle.Bold), ForeColor = Color.FromArgb(15, 23, 42), Location = new Point(container.Width - 110, y), AutoSize = true, TextAlign = ContentAlignment.MiddleRight };
             container.Controls.Add(lblT);
             container.Controls.Add(lblV);
             y += 24;

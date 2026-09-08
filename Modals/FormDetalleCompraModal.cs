@@ -5,7 +5,9 @@ using System.Linq;
 using System.Runtime.InteropServices;
 using System.Windows.Forms;
 using SISTEMAACTUALIZADO.Data;
+using SISTEMAACTUALIZADO.Helpers;
 using SISTEMAACTUALIZADO.Models;
+
 namespace SISTEMAACTUALIZADO.Modals
 {
     public class FormDetalleCompraModal : Form
@@ -60,7 +62,6 @@ namespace SISTEMAACTUALIZADO.Modals
                 Panel pnlBorde = (Panel)this.Controls[0];
                 pnlBorde.Controls.Clear();
 
-                // Cabecera Modal
                 Panel pnlHeader = new Panel { Dock = DockStyle.Top, Height = 45, BackColor = Color.Transparent };
                 pnlHeader.MouseDown += (s, e) => { ReleaseCapture(); SendMessage(this.Handle, 0x112, 0xf012, 0); };
 
@@ -91,7 +92,6 @@ namespace SISTEMAACTUALIZADO.Modals
 
                 pnlHeader.Controls.AddRange(new Control[] { lblTitulo, btnCerrar });
 
-                // Ficha Resumen del Proveedor y Fecha
                 Panel pnlInfo = new Panel { Dock = DockStyle.Top, Height = 65, BackColor = Color.FromArgb(248, 250, 252), Padding = new Padding(12, 8, 12, 8), Margin = new Padding(0, 8, 0, 10) };
                 pnlInfo.Paint += (s, e) => ControlPaint.DrawBorder(e.Graphics, pnlInfo.ClientRectangle, Color.FromArgb(226, 232, 240), ButtonBorderStyle.Solid);
 
@@ -99,7 +99,6 @@ namespace SISTEMAACTUALIZADO.Modals
                 Label lblFch = new Label { Text = $"Fecha Emisión: {compra.FechaEmision:dd-MM-yyyy}  |  Tipo Origen: {(compra.TipoCompra == "MERCADERIA" ? "Mercadería para Venta (Afectó Stock)" : "Gasto / Insumo Interno")}", Location = new Point(12, 34), AutoSize = true, Font = new Font("Segoe UI", 8.5F), ForeColor = Color.FromArgb(100, 116, 139) };
                 pnlInfo.Controls.AddRange(new Control[] { lblProv, lblFch });
 
-                // Grilla de Ítems
                 DataGridView dgv = new DataGridView
                 {
                     Dock = DockStyle.Fill,
@@ -130,29 +129,38 @@ namespace SISTEMAACTUALIZADO.Modals
                 dgv.Columns.Add("Costo", "Costo Neto Unit.");
                 dgv.Columns.Add("Subtotal", "Subtotal Neto");
 
+                var estiloMonedaCL = new DataGridViewCellStyle 
+                { 
+                    FormatProvider = new System.Globalization.CultureInfo("es-CL"), 
+                    Format = "$ #,##0", 
+                    Alignment = DataGridViewContentAlignment.MiddleRight 
+                };
+
                 dgv.Columns["Cant"].Width = 85;
                 dgv.Columns["Cant"].DefaultCellStyle.Alignment = DataGridViewContentAlignment.MiddleCenter;
                 dgv.Columns["Cant"].DefaultCellStyle.Font = new Font("Segoe UI", 8.5F, FontStyle.Bold);
 
                 dgv.Columns["Costo"].Width = 130;
-                dgv.Columns["Costo"].DefaultCellStyle.Alignment = DataGridViewContentAlignment.MiddleRight;
-                dgv.Columns["Costo"].DefaultCellStyle.Format = "$#,##0";
+                dgv.Columns["Costo"].DefaultCellStyle = estiloMonedaCL;
 
                 dgv.Columns["Subtotal"].Width = 130;
-                dgv.Columns["Subtotal"].DefaultCellStyle.Alignment = DataGridViewContentAlignment.MiddleRight;
-                dgv.Columns["Subtotal"].DefaultCellStyle.Format = "$#,##0";
-                dgv.Columns["Subtotal"].DefaultCellStyle.Font = new Font("Segoe UI", 8.5F, FontStyle.Bold);
+                dgv.Columns["Subtotal"].DefaultCellStyle = new DataGridViewCellStyle 
+                { 
+                    FormatProvider = new System.Globalization.CultureInfo("es-CL"), 
+                    Format = "$ #,##0", 
+                    Alignment = DataGridViewContentAlignment.MiddleRight,
+                    Font = new Font("Segoe UI", 8.5F, FontStyle.Bold)
+                };
 
                 foreach (var d in detalles)
                 {
                     dgv.Rows.Add(d.NombreProducto, d.Cantidad, d.PrecioCostoUnitario, d.Subtotal);
                 }
 
-                // Panel Totales Inferior
                 Panel pnlBottom = new Panel { Dock = DockStyle.Bottom, Height = 50, Padding = new Padding(0, 10, 0, 0) };
                 Label lblTotales = new Label
                 {
-                    Text = $"Neto: ${compra.MontoNeto:N0}   |   IVA (19%): ${compra.MontoIva:N0}   |   TOTAL: ${compra.MontoTotal:N0}",
+                    Text = $"Neto: {MonedaHelper.Formatear(compra.MontoNeto, conSigno: true)}   |   IVA (19%): {MonedaHelper.Formatear(compra.MontoIva, conSigno: true)}   |   TOTAL: {MonedaHelper.Formatear(compra.MontoTotal, conSigno: true)}",
                     Dock = DockStyle.Right,
                     Font = new Font("Segoe UI", 10F, FontStyle.Bold),
                     ForeColor = Color.FromArgb(16, 185, 129),

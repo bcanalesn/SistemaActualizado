@@ -4,6 +4,7 @@ using System.Drawing;
 using System.Linq;
 using System.Windows.Forms;
 using SISTEMAACTUALIZADO.Data;
+using SISTEMAACTUALIZADO.Helpers;
 using SISTEMAACTUALIZADO.Models;
 
 namespace SISTEMAACTUALIZADO.Modals
@@ -48,7 +49,6 @@ namespace SISTEMAACTUALIZADO.Modals
                 AutoSize = true
             };
 
-            // Formulario superior para nuevo precio
             GroupBox gbNuevo = new GroupBox
             {
                 Text = " Asignar Nuevo Precio Especial Temporal ",
@@ -68,10 +68,9 @@ namespace SISTEMAACTUALIZADO.Modals
             };
             cbProductos.SelectedIndexChanged += (s, e) => ActualizarReferenciaCosto();
 
-            // Etiqueta para mostrar Costo Neto y Precio Normal de referencia
             lblCostoReferencia = new Label
             {
-                Text = "Costo Neto: $0  |  P. Venta Normal: $0",
+                Text = "Costo Neto: $ 0  |  P. Venta Normal: $ 0",
                 Location = new Point(14, 72),
                 AutoSize = true,
                 Font = new Font("Segoe UI", 8F, FontStyle.Bold),
@@ -81,6 +80,7 @@ namespace SISTEMAACTUALIZADO.Modals
             Label lblPrecio = new Label { Text = "Precio Especial ($):", Location = new Point(320, 22), AutoSize = true };
             txtPrecioEspecial = new TextBox { Location = new Point(320, 42), Size = new Size(130, 26), Font = new Font("Segoe UI", 9.5F, FontStyle.Bold) };
             txtPrecioEspecial.KeyPress += (s, e) => { if (!char.IsDigit(e.KeyChar) && !char.IsControl(e.KeyChar)) e.Handled = true; };
+            txtPrecioEspecial.TextChanged += (s, e) => MonedaHelper.AplicarMascaraEnVivo(txtPrecioEspecial);
 
             Label lblIni = new Label { Text = "Vigencia Desde:", Location = new Point(14, 100), AutoSize = true };
             dtpInicio = new DateTimePicker { Location = new Point(14, 120), Size = new Size(135, 24), Format = DateTimePickerFormat.Short, Value = DateTime.Today };
@@ -104,7 +104,6 @@ namespace SISTEMAACTUALIZADO.Modals
 
             gbNuevo.Controls.AddRange(new Control[] { lblProd, cbProductos, lblCostoReferencia, lblPrecio, txtPrecioEspecial, lblIni, dtpInicio, lblFin, dtpFin, btnGuardar });
 
-            // Grilla de precios vigentes/históricos
             dgvPrecios = new DataGridView
             {
                 Location = new Point(16, 212),
@@ -142,7 +141,7 @@ namespace SISTEMAACTUALIZADO.Modals
         {
             if (cbProductos.SelectedItem is Producto prod)
             {
-                lblCostoReferencia.Text = $"🏷️ Costo Neto: ${prod.PrecioCosto:N0}   |   P. Normal (L1): ${prod.PrecioUnitario:N0}";
+                lblCostoReferencia.Text = $"🏷️ Costo Neto: {MonedaHelper.Formatear(prod.PrecioCosto, conSigno: true)}   |   P. Normal (L1): {MonedaHelper.Formatear(prod.PrecioUnitario, conSigno: true)}";
             }
         }
 
@@ -164,21 +163,28 @@ namespace SISTEMAACTUALIZADO.Modals
                              Desde = pe.FechaInicio,
                              Hasta = pe.FechaFin,
                              EstadoVigencia = (pe.FechaInicio <= hoy && pe.FechaFin >= hoy) ? "🟢 VIGENTE" : (pe.FechaFin < hoy ? "🔴 EXPIRADO" : "🟡 PROGRAMADO")
-                         }).Take(10) // <-- Limita a los 10 registros más recientes
+                         }).Take(10)
                          .ToList();
 
             dgvPrecios.DataSource = datos;
+
+            var estiloMoneda = new DataGridViewCellStyle
+            {
+                FormatProvider = new System.Globalization.CultureInfo("es-CL"),
+                Format = "$ #,##0",
+                Alignment = DataGridViewContentAlignment.MiddleRight
+            };
 
             if (dgvPrecios.Columns["IdEspecial"] != null) dgvPrecios.Columns["IdEspecial"].Visible = false;
             if (dgvPrecios.Columns["CostoBase"] != null)
             {
                 dgvPrecios.Columns["CostoBase"].HeaderText = "COSTO NETO";
-                dgvPrecios.Columns["CostoBase"].DefaultCellStyle.Format = "$#,##0";
+                dgvPrecios.Columns["CostoBase"].DefaultCellStyle = estiloMoneda;
             }
             if (dgvPrecios.Columns["PrecioEspecial"] != null)
             {
                 dgvPrecios.Columns["PrecioEspecial"].HeaderText = "PRECIO PACTADO";
-                dgvPrecios.Columns["PrecioEspecial"].DefaultCellStyle.Format = "$#,##0";
+                dgvPrecios.Columns["PrecioEspecial"].DefaultCellStyle = estiloMoneda;
             }
             if (dgvPrecios.Columns["Desde"] != null) dgvPrecios.Columns["Desde"].DefaultCellStyle.Format = "dd/MM/yyyy";
             if (dgvPrecios.Columns["Hasta"] != null) dgvPrecios.Columns["Hasta"].DefaultCellStyle.Format = "dd/MM/yyyy";
@@ -187,7 +193,8 @@ namespace SISTEMAACTUALIZADO.Modals
 
         private void BtnGuardar_Click(object? sender, EventArgs e)
         {
-            if (cbProductos.SelectedItem is not Producto prod || !decimal.TryParse(txtPrecioEspecial.Text.Trim(), out decimal precio) || precio <= 0)
+            decimal precio = MonedaHelper.Limpiar(txtPrecioEspecial.Text);
+            if (cbProductos.SelectedItem is not Producto prod || precio <= 0)
             {
                 MessageBox.Show("Seleccione un producto y digite un precio especial válido.", "Validación", MessageBoxButtons.OK, MessageBoxIcon.Warning);
                 return;
@@ -199,11 +206,10 @@ namespace SISTEMAACTUALIZADO.Modals
                 return;
             }
 
-            // Advertencia si el precio pactado es menor al costo neto
             if (precio < prod.PrecioCosto)
             {
                 var confirmMargenNegativo = MessageBox.Show(
-                    $"⚠️ ADVERTENCIA DE MARGEN NEGATIVO\n\nEl precio pactado (${precio:N0}) es MENOR que el costo neto del producto (${prod.PrecioCosto:N0}).\n\n¿Desea registrarlo de todas formas?",
+                    $"⚠️ ADVERTENCIA DE MARGEN NEGATIVO\n\nEl precio pactado ({MonedaHelper.Formatear(precio, conSigno: true)}) es MENOR que el costo neto del producto ({MonedaHelper.Formatear(prod.PrecioCosto, conSigno: true)}).\n\n¿Desea registrarlo de todas formas?",
                     "Confirmar Precio Bajo Costo",
                     MessageBoxButtons.YesNo,
                     MessageBoxIcon.Warning

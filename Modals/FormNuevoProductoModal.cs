@@ -7,6 +7,7 @@ using System.Linq;
 using System.Runtime.InteropServices;
 using System.Windows.Forms;
 using SISTEMAACTUALIZADO.Data;
+using SISTEMAACTUALIZADO.Helpers;
 using SISTEMAACTUALIZADO.Models;
 using SISTEMAACTUALIZADO.Services;
 
@@ -78,7 +79,6 @@ namespace SISTEMAACTUALIZADO.Modals
                 ControlPaint.DrawBorder(e.Graphics, pnlBorde.ClientRectangle, Color.FromArgb(226, 232, 240), ButtonBorderStyle.Solid);
             };
 
-            // Header
             Panel pnlHeader = new Panel { Dock = DockStyle.Top, Height = 44, BackColor = Color.Transparent };
             pnlHeader.MouseDown += (s, e) => { ReleaseCapture(); SendMessage(this.Handle, 0x112, 0xf012, 0); };
 
@@ -109,7 +109,6 @@ namespace SISTEMAACTUALIZADO.Modals
             pnlHeader.Controls.Add(lblTitulo);
             pnlHeader.Controls.Add(btnCerrar);
 
-            // FlowLayout Principal
             FlowLayoutPanel flow = new FlowLayoutPanel
             {
                 Dock = DockStyle.Fill,
@@ -119,34 +118,34 @@ namespace SISTEMAACTUALIZADO.Modals
                 AutoScroll = true
             };
 
-            // 1. Fila Código y Nombre
             txtCodigoBarra = new TextBox { Width = 295, Font = new Font("Segoe UI", 10F) };
             txtNombre = new TextBox { Width = 295, Font = new Font("Segoe UI", 10F) };
             Panel pnlFila1 = new Panel { Size = new Size(610, 56) };
             pnlFila1.Controls.Add(CrearCampo("|||||| Código de Barra / SKU", txtCodigoBarra, 0, 295));
             pnlFila1.Controls.Add(CrearCampo("📦 Nombre del Producto", txtNombre, 315, 295));
 
-            // 2. Fila Categoría y Familia
             cbCategoria = new ComboBox { Width = 295, Font = new Font("Segoe UI", 9.5F), DropDownStyle = ComboBoxStyle.DropDown };
             cbFamilia = new ComboBox { Width = 295, Font = new Font("Segoe UI", 9.5F), DropDownStyle = ComboBoxStyle.DropDown };
             Panel pnlFila2 = new Panel { Size = new Size(610, 56) };
             pnlFila2.Controls.Add(CrearCampo("Categoría", cbCategoria, 0, 295));
             pnlFila2.Controls.Add(CrearCampo("Familia de Producto", cbFamilia, 315, 295));
 
-            // 3. Tarjeta Costo Neto
             Panel pnlCardCosto = CrearCardPanel(610, 68);
             Label lblIconCosto = new Label { Text = "$", Font = new Font("Segoe UI", 11F, FontStyle.Bold), ForeColor = Color.FromArgb(71, 85, 105), Location = new Point(14, 14), Size = new Size(24, 24), TextAlign = ContentAlignment.MiddleCenter, BackColor = Color.FromArgb(241, 245, 249) };
             Label lblTitCosto = new Label { Text = "Costo Neto Base ($)", Font = new Font("Segoe UI", 8.5F, FontStyle.Bold), ForeColor = Color.FromArgb(51, 65, 85), Location = new Point(46, 10), AutoSize = true };
             Label lblSubCosto = new Label { Text = "Costo en pesos sin IVA.", Font = new Font("Segoe UI", 7.5F), ForeColor = Color.FromArgb(148, 163, 184), Location = new Point(46, 46), AutoSize = true };
             txtPrecioCosto = new TextBox { Location = new Point(46, 26), Width = 540, Font = new Font("Segoe UI", 9.5F, FontStyle.Bold), Text = "0" };
-            txtPrecioCosto.TextChanged += (s, e) => RecalcularPrecioSegunLista();
+            txtPrecioCosto.KeyPress += (s, e) => { if (!char.IsControl(e.KeyChar) && !char.IsDigit(e.KeyChar)) e.Handled = true; };
+            txtPrecioCosto.TextChanged += (s, e) => 
+            { 
+                MonedaHelper.AplicarMascaraEnVivo(txtPrecioCosto);
+                RecalcularPrecioSegunLista(); 
+            };
             pnlCardCosto.Controls.AddRange(new Control[] { lblIconCosto, lblTitCosto, txtPrecioCosto, lblSubCosto });
 
-            // 4. Modalidad de Precio POS
             Panel pnlCardModalidad = CrearCardPanel(610, 165);
             Label lblTitMod = new Label { Text = "🏷️ Modalidad de Precio en Punto de Venta (POS)", Font = new Font("Segoe UI", 9.5F, FontStyle.Bold), ForeColor = Color.FromArgb(30, 41, 59), Location = new Point(14, 10), AutoSize = true };
 
-            // SubCard Izquierda: Lista Fija
             pnlCardListaFija = new Panel { Location = new Point(14, 34), Size = new Size(280, 118), BackColor = Color.FromArgb(248, 250, 252), BorderStyle = BorderStyle.FixedSingle, Cursor = Cursors.Hand };
             rbModoListaFija = new RadioButton { Text = "Lista Fija", Location = new Point(12, 10), AutoSize = true, Font = new Font("Segoe UI", 9F, FontStyle.Bold), Checked = true };
             Label lblDescFija = new Label { Text = "El producto se vende siempre en la misma\nlista de precios.", Location = new Point(32, 32), Size = new Size(235, 30), Font = new Font("Segoe UI", 7.5F), ForeColor = Color.FromArgb(100, 116, 139) };
@@ -156,7 +155,6 @@ namespace SISTEMAACTUALIZADO.Modals
             cbListaPrecioPOS.SelectedIndexChanged += (s, e) => RecalcularPrecioSegunLista();
             pnlCardListaFija.Controls.AddRange(new Control[] { rbModoListaFija, lblDescFija, cbListaPrecioPOS });
 
-            // SubCard Derecha: Rango de Cantidades
             pnlCardEscala = new Panel { Location = new Point(306, 34), Size = new Size(290, 118), BackColor = Color.White, BorderStyle = BorderStyle.FixedSingle, Cursor = Cursors.Hand };
             rbModoEscala = new RadioButton { Text = "Venta por Escala / Rango de Cantidades", Location = new Point(12, 10), AutoSize = true, Font = new Font("Segoe UI", 9F, FontStyle.Bold) };
             Label lblDescEsc = new Label { Text = "El precio cambia según la cantidad comprada.", Location = new Point(32, 32), Size = new Size(245, 16), Font = new Font("Segoe UI", 7.5F), ForeColor = Color.FromArgb(100, 116, 139) };
@@ -169,13 +167,11 @@ namespace SISTEMAACTUALIZADO.Modals
 
             pnlCardModalidad.Controls.AddRange(new Control[] { lblTitMod, pnlCardListaFija, pnlCardEscala });
 
-            // Exclusión mutua garantizada al hacer clic en RadioButtons o en sus Cards
             rbModoListaFija.Click += (s, e) => SeleccionarModo(escala: false);
             rbModoEscala.Click += (s, e) => SeleccionarModo(escala: true);
             pnlCardListaFija.Click += (s, e) => SeleccionarModo(escala: false);
             pnlCardEscala.Click += (s, e) => SeleccionarModo(escala: true);
 
-            // 5. Sección Configurar Tramos Dinámicos
             pnlSeccionTramos = CrearCardPanel(610, 205);
             Label lblTitSecTr = new Label { Text = "📊 Configurar Tramos de Cantidad y Lista de Precios", Font = new Font("Segoe UI", 9F, FontStyle.Bold), ForeColor = Color.FromArgb(30, 41, 59), Location = new Point(14, 10), AutoSize = true };
 
@@ -196,17 +192,21 @@ namespace SISTEMAACTUALIZADO.Modals
 
             pnlSeccionTramos.Controls.AddRange(new Control[] { lblTitSecTr, pnlHeaderGrid, flpFilasTramos });
 
-            // 6. Fila Precios y Stocks (Stock Actual Editable)
             Panel pnlFilaPrecios = new Panel { Size = new Size(610, 60) };
             txtPrecioUnitario = new TextBox { Width = 230, Font = new Font("Segoe UI", 10F, FontStyle.Bold), Text = "0" };
+            txtPrecioUnitario.KeyPress += (s, e) => { if (!char.IsControl(e.KeyChar) && !char.IsDigit(e.KeyChar)) e.Handled = true; };
+            txtPrecioUnitario.TextChanged += (s, e) => MonedaHelper.AplicarMascaraEnVivo(txtPrecioUnitario);
+
             txtStockActual = new TextBox { Width = 150, Font = new Font("Segoe UI", 10F, FontStyle.Bold), Text = "0" };
+            txtStockActual.KeyPress += (s, e) => { if (!char.IsControl(e.KeyChar) && !char.IsDigit(e.KeyChar)) e.Handled = true; };
+
             txtStockMinimo = new TextBox { Width = 150, Font = new Font("Segoe UI", 10F), Text = "5" };
+            txtStockMinimo.KeyPress += (s, e) => { if (!char.IsControl(e.KeyChar) && !char.IsDigit(e.KeyChar)) e.Handled = true; };
 
             pnlFilaPrecios.Controls.Add(CrearCampo("💲 Precio Venta Base POS (IVA Inc.)", txtPrecioUnitario, 0, 230));
             pnlFilaPrecios.Controls.Add(CrearCampo("📦 Stock Actual (Editable)", txtStockActual, 245, 150));
             pnlFilaPrecios.Controls.Add(CrearCampo("🔔 Stock Mínimo Alerta", txtStockMinimo, 410, 150));
 
-            // 7. Sección Foto
             Panel pnlCardFoto = CrearCardPanel(610, 74);
             Label lblTitFoto = new Label { Text = "🖼️ Foto del Producto", Font = new Font("Segoe UI", 8.5F, FontStyle.Bold), ForeColor = Color.FromArgb(71, 85, 105), Location = new Point(14, 6), AutoSize = true };
             pbFoto = new PictureBox { Location = new Point(14, 24), Size = new Size(42, 42), BorderStyle = BorderStyle.FixedSingle, SizeMode = PictureBoxSizeMode.Zoom, BackColor = Color.FromArgb(248, 250, 252) };
@@ -221,10 +221,8 @@ namespace SISTEMAACTUALIZADO.Modals
             Label lblFormatos = new Label { Text = "Formatos permitidos: JPG, PNG. Máx. 2MB.", Location = new Point(310, 36), AutoSize = true, Font = new Font("Segoe UI", 7.5F), ForeColor = Color.FromArgb(148, 163, 184) };
             pnlCardFoto.Controls.AddRange(new Control[] { lblTitFoto, pbFoto, btnCargarFoto, btnQuitarFoto, lblFormatos });
 
-            // Agregar todo al Flow
             flow.Controls.AddRange(new Control[] { pnlFila1, pnlFila2, pnlCardCosto, pnlCardModalidad, pnlSeccionTramos, pnlFilaPrecios, pnlCardFoto });
 
-            // Botonera Inferior
             Panel pnlBotones = new Panel { Dock = DockStyle.Bottom, Height = 52, BackColor = Color.Transparent };
             Button btnGuardar = new Button
             {
@@ -374,12 +372,12 @@ namespace SISTEMAACTUALIZADO.Modals
                 txtNombre.Text = _productoAEditar.Nombre;
                 cbCategoria.Text = !string.IsNullOrWhiteSpace(_productoAEditar.Categoria) ? _productoAEditar.Categoria : "General";
                 cbFamilia.Text = !string.IsNullOrWhiteSpace(_productoAEditar.NFamilia) ? _productoAEditar.NFamilia : cbCategoria.Text;
-                txtPrecioCosto.Text = _productoAEditar.PrecioCosto.ToString("0");
+                txtPrecioCosto.Text = MonedaHelper.Formatear(_productoAEditar.PrecioCosto);
 
                 int listaIdx = Math.Max(1, Math.Min(10, _productoAEditar.ListaDefectoPOS)) - 1;
                 cbListaPrecioPOS.SelectedIndex = listaIdx;
 
-                txtPrecioUnitario.Text = _productoAEditar.PrecioUnitario.ToString("0");
+                txtPrecioUnitario.Text = MonedaHelper.Formatear(_productoAEditar.PrecioUnitario);
                 txtStockActual.Text = _productoAEditar.Stock.ToString();
                 txtStockMinimo.Text = _productoAEditar.StockMinimo.ToString();
 
@@ -404,7 +402,6 @@ namespace SISTEMAACTUALIZADO.Modals
             try
             {
                 using var db = new AppDbContext();
-                // Cargar todas las reglas del producto, incluso si están en Bloqueo = 1
                 var reglas = db.PreciosQ
                     .Where(pq => pq.IdProducto == productoId)
                     .OrderBy(pq => pq.Qini)
@@ -412,7 +409,6 @@ namespace SISTEMAACTUALIZADO.Modals
 
                 if (reglas.Count >= 2)
                 {
-                    // Si al menos una regla no está bloqueada, marcamos Modo Escala; si están bloqueadas, Lista Fija
                     bool estaActivo = reglas.Any(r => r.Bloqueo == 0);
                     SeleccionarModo(escala: estaActivo);
 
@@ -448,11 +444,12 @@ namespace SISTEMAACTUALIZADO.Modals
 
         private void RecalcularPrecioSegunLista()
         {
-            if (!decimal.TryParse(txtPrecioCosto.Text.Trim(), out decimal costo) || costo <= 0) return;
+            decimal costo = MonedaHelper.Limpiar(txtPrecioCosto.Text);
+            if (costo <= 0) return;
 
             var margenes = ProductoService.ObtenerMargenesConfigurados();
             decimal precioL1 = ProductoService.CalcularPrecioVenta(costo, margenes[0]);
-            txtPrecioUnitario.Text = precioL1.ToString("0");
+            txtPrecioUnitario.Text = MonedaHelper.Formatear(precioL1);
         }
 
         private decimal ObtenerPrecioPorListaNumero(Producto p, int nroLista)
@@ -498,8 +495,8 @@ namespace SISTEMAACTUALIZADO.Modals
                 return;
             }
 
-            decimal.TryParse(txtPrecioCosto.Text.Trim(), out decimal costo);
-            decimal.TryParse(txtPrecioUnitario.Text.Trim(), out decimal pvp);
+            decimal costo = MonedaHelper.Limpiar(txtPrecioCosto.Text);
+            decimal pvp = MonedaHelper.Limpiar(txtPrecioUnitario.Text);
             int.TryParse(txtStockActual.Text.Trim(), out int stockActual);
             int.TryParse(txtStockMinimo.Text.Trim(), out int stockMin);
 
@@ -544,6 +541,7 @@ namespace SISTEMAACTUALIZADO.Modals
                         prodBd.NFamilia = cbFamilia.Text.Trim();
                         prodBd.PrecioCosto = costo;
                         prodBd.ListaDefectoPOS = listaSeleccionada;
+                        prodBd.PrecioUnitario = pvp;
                         prodBd.Stock = stockActual;
                         prodBd.StockMinimo = stockMin;
                         prodBd.ImagenPath = _rutaImagenSeleccionada;
@@ -569,13 +567,10 @@ namespace SISTEMAACTUALIZADO.Modals
         private void GuardarReglasEscalaBD(AppDbContext db, int productoId, string nombreProducto)
         {
             var existentes = db.PreciosQ.Where(pq => pq.IdProducto == productoId).ToList();
-
-            // Determinar el estado de bloqueo: si está en Escala se activa (0), si está en Lista Fija se suspende (1)
             int bloqueoEstado = rbModoEscala.Checked ? 0 : 1;
 
             if (_filasTramos.Count >= 2)
             {
-                // Limpiar para actualizar la configuración completa sin perderla
                 if (existentes.Count > 0)
                 {
                     db.PreciosQ.RemoveRange(existentes);
@@ -599,7 +594,7 @@ namespace SISTEMAACTUALIZADO.Modals
                         Qfin = qFin,
                         NPrecio = precioValor,
                         IdPrecio = nroLista.ToString(),
-                        Bloqueo = bloqueoEstado, // 0 = Activo en POS | 1 = Guardado pero suspendido
+                        Bloqueo = bloqueoEstado,
                         FchMod = DateTime.Now,
                         HoraMod = DateTime.Now.ToString("HH:mm:ss")
                     });
@@ -607,7 +602,6 @@ namespace SISTEMAACTUALIZADO.Modals
             }
         }
 
-        // ================= CLASE AUXILIAR PARA CADA FILA DE TRAMO =================
         private class FilaTramoUI
         {
             public Panel Contenedor { get; }
@@ -627,7 +621,6 @@ namespace SISTEMAACTUALIZADO.Modals
 
                 Contenedor = new Panel { Size = new Size(560, 32), Margin = new Padding(0, 0, 0, 4) };
 
-                // Badge N° Tramo
                 Label lblBadge = new Label
                 {
                     Text = nroTramo.ToString(),
@@ -639,7 +632,6 @@ namespace SISTEMAACTUALIZADO.Modals
                     TextAlign = ContentAlignment.MiddleCenter
                 };
 
-                // Desde (unidades)
                 NumDesde = new NumericUpDown
                 {
                     Location = new Point(50, 4),
@@ -654,7 +646,6 @@ namespace SISTEMAACTUALIZADO.Modals
 
                 Label lblFlecha = new Label { Text = "➔", Location = new Point(160, 6), Size = new Size(20, 20), Font = new Font("Segoe UI", 10F, FontStyle.Bold), ForeColor = Color.FromArgb(148, 163, 184) };
 
-                // Hasta (unidades) o Símbolo Infinito
                 Control ctrlHasta;
                 if (!esUltimo)
                 {
@@ -685,7 +676,6 @@ namespace SISTEMAACTUALIZADO.Modals
                     };
                 }
 
-                // Combo Lista de Precios
                 CbLista = new ComboBox
                 {
                     Location = new Point(310, 4),

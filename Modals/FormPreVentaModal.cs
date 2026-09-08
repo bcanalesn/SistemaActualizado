@@ -4,6 +4,7 @@ using System.Drawing;
 using System.Drawing.Drawing2D;
 using System.Runtime.InteropServices;
 using System.Windows.Forms;
+using SISTEMAACTUALIZADO.Helpers;
 using SISTEMAACTUALIZADO.Models;
 using SISTEMAACTUALIZADO.Services;
 
@@ -22,7 +23,6 @@ namespace SISTEMAACTUALIZADO.Modals
         {
             InitializeComponent(nroTicket, vendedor, cliente, total, items);
 
-            // IMPRESIÓN AUTOMÁTICA AL ABRIR LA VENTANA
             if (autoImprimir)
             {
                 this.Shown += (s, e) =>
@@ -45,7 +45,6 @@ namespace SISTEMAACTUALIZADO.Modals
             Panel pnlMain = new Panel { Dock = DockStyle.Fill, Padding = new Padding(20) };
             pnlMain.MouseDown += (s, e) => { ReleaseCapture(); SendMessage(this.Handle, 0x112, 0xf012, 0); };
 
-            // Encabezado Check Verde
             Panel circleCheck = new Panel { Location = new Point(20, 15), Size = new Size(46, 46), BackColor = Color.FromArgb(220, 252, 231) };
             circleCheck.Paint += (s, e) =>
             {
@@ -77,12 +76,12 @@ namespace SISTEMAACTUALIZADO.Modals
             Label lblTicketNum = new Label { Text = $"#{nroTicket:D6}", Location = new Point(60, 26), Font = new Font("Segoe UI", 18F, FontStyle.Bold), ForeColor = Color.FromArgb(6, 78, 59), AutoSize = true };
             pnlTicketCard.Controls.AddRange(new Control[] { pnlIconTicket, lblT1, lblTicketNum });
 
-            // 2. Tarjeta Datos
+            // 2. Tarjeta Datos con MonedaHelper
             Panel pnlDetallesCard = CrearTarjetaRedondeada(20, 152, 400, 120, Color.White, Color.FromArgb(226, 232, 240));
             int yFila = 12;
             CrearFilaDetalle(pnlDetallesCard, "Vendedor:", vendedor, ref yFila);
             CrearFilaDetalle(pnlDetallesCard, "Cliente:", string.IsNullOrWhiteSpace(cliente) ? "Consumidor Final" : cliente, ref yFila);
-            CrearFilaDetalle(pnlDetallesCard, "Total a pagar en Caja:", $"${total:N0}", ref yFila, esBold: true, colorVal: Color.FromArgb(6, 78, 59));
+            CrearFilaDetalle(pnlDetallesCard, "Total a pagar en Caja:", MonedaHelper.Formatear(total, conSigno: true), ref yFila, esBold: true, colorVal: Color.FromArgb(6, 78, 59));
 
             // 3. Tarjeta Indicación Azul
             Panel pnlInstrucCard = CrearTarjetaRedondeada(20, 282, 400, 52, Color.FromArgb(239, 246, 255), Color.FromArgb(191, 219, 254));
@@ -100,7 +99,7 @@ namespace SISTEMAACTUALIZADO.Modals
             Label lblInstrucText = new Label { Text = $"Entregue el ticket impreso al cliente para pagar en CAJA\ncon el número #{nroTicket:D6}.", Location = new Point(48, 8), Font = new Font("Segoe UI", 8.5F, FontStyle.Bold), ForeColor = Color.FromArgb(30, 58, 138), AutoSize = true };
             pnlInstrucCard.Controls.AddRange(new Control[] { pnlIconInfo, lblInstrucText });
 
-            // 4. BOTONES: REIMPRIMIR Y ENTENDIDO
+            // 4. Botones
             Button btnReimprimir = new Button
             {
                 Text = "🖨️  REIMPRIMIR",

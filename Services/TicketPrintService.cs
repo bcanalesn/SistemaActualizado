@@ -5,6 +5,7 @@ using System.Drawing.Printing;
 using System.Linq;
 using System.Windows.Forms;
 using SISTEMAACTUALIZADO.Data;
+using SISTEMAACTUALIZADO.Helpers;
 using SISTEMAACTUALIZADO.Models;
 
 namespace SISTEMAACTUALIZADO.Services
@@ -52,7 +53,7 @@ namespace SISTEMAACTUALIZADO.Services
             int width = anchoContenedor;
             StringFormat centerFormat = new StringFormat { Alignment = StringAlignment.Center };
 
-            // Encabezado obtenido 100% desde la base de datos
+            // Encabezado obtenido desde la base de datos
             g.DrawString(emp.RazonSocial, fontTitle, brushText, new RectangleF(0, y, width, 25), centerFormat);
             y += 24;
             g.DrawString($"R.U.T.: {emp.Rut}", fontBold, brushText, new RectangleF(0, y, width, 20), centerFormat);
@@ -105,7 +106,8 @@ namespace SISTEMAACTUALIZADO.Services
             g.DrawString($"Atendido por : {nombreVendedor}", fontSub, brushText, 15, y); 
             y += 18;
 
-            if (!string.IsNullOrEmpty(venta.RuT))
+            // Si es Consumidor Final sin RUT, no se imprime un RUT inventado
+            if (!string.IsNullOrWhiteSpace(venta.RuT) && !venta.RuT.Contains("66.666.666"))
             {
                 g.DrawString($"RUT Cliente   : {venta.RuT}", fontBold, brushText, 15, y); 
                 y += 18;
@@ -129,7 +131,7 @@ namespace SISTEMAACTUALIZADO.Services
             {
                 string desc = item.Nombre.Length > 22 ? item.Nombre.Substring(0, 22) : item.Nombre;
                 g.DrawString($"{item.Cantidad,2} x   {desc}", fontSub, brushText, 15, y);
-                g.DrawString($"${item.Subtotal,8:N0}", fontSub, brushText, width - 85, y);
+                g.DrawString(MonedaHelper.Formatear(item.Subtotal, conSigno: true), fontSub, brushText, width - 85, y);
                 y += 18;
             }
 
@@ -137,23 +139,23 @@ namespace SISTEMAACTUALIZADO.Services
             y += 12;
 
             g.DrawString("MONTO NETO:", fontSub, brushText, 120, y);
-            g.DrawString($"${venta.Neto,10:N0}", fontSub, brushText, width - 95, y); 
+            g.DrawString(MonedaHelper.Formatear(venta.Neto, conSigno: true), fontSub, brushText, width - 95, y); 
             y += 18;
 
             g.DrawString("I.V.A. (19%):", fontSub, brushText, 120, y);
-            g.DrawString($"${venta.IvA,10:N0}", fontSub, brushText, width - 95, y); 
+            g.DrawString(MonedaHelper.Formatear(venta.IvA, conSigno: true), fontSub, brushText, width - 95, y); 
             y += 22;
 
             g.DrawString("TOTAL A PAGAR:", fontTitle, brushText, 90, y);
-            g.DrawString($"${venta.Total,10:N0}", fontTitle, brushText, width - 110, y); 
+            g.DrawString(MonedaHelper.Formatear(venta.Total, conSigno: true), fontTitle, brushText, width - 110, y); 
             y += 28;
 
             if (pagoCon > 0)
             {
                 g.DrawLine(penDash, 15, y, width - 15, y); 
                 y += 10;
-                g.DrawString($"Paga Con: ${pagoCon:N0}", fontSub, brushText, 15, y);
-                g.DrawString($"Vuelto: ${vuelto:N0}", fontBold, Brushes.Green, 200, y); 
+                g.DrawString($"Paga Con: {MonedaHelper.Formatear(pagoCon, conSigno: true)}", fontSub, brushText, 15, y);
+                g.DrawString($"Vuelto: {MonedaHelper.Formatear(vuelto, conSigno: true)}", fontBold, Brushes.Green, 200, y); 
                 y += 22;
             }
 
@@ -233,7 +235,7 @@ namespace SISTEMAACTUALIZADO.Services
                     {
                         string nom = item.Nombre.Length > 20 ? item.Nombre.Substring(0, 18) + ".." : item.Nombre;
                         g.DrawString($"{item.Cantidad}x  {nom}", fontRegular, Brushes.Black, 5, y);
-                        g.DrawString($"${item.Subtotal:N0}", fontRegular, Brushes.Black, new RectangleF(0, y, width - 5, 20), sfRight);
+                        g.DrawString(MonedaHelper.Formatear(item.Subtotal, conSigno: true), fontRegular, Brushes.Black, new RectangleF(0, y, width - 5, 20), sfRight);
                         y += 16;
                     }
 
@@ -241,7 +243,7 @@ namespace SISTEMAACTUALIZADO.Services
                     y += 15;
 
                     g.DrawString("TOTAL A PAGAR:", fontBold, Brushes.Black, 5, y);
-                    g.DrawString($"${total:N0}", fontBoldBig, Brushes.Black, new RectangleF(0, y - 2, width - 5, 25), sfRight);
+                    g.DrawString(MonedaHelper.Formatear(total, conSigno: true), fontBoldBig, Brushes.Black, new RectangleF(0, y - 2, width - 5, 25), sfRight);
                     y += 28;
 
                     g.DrawString("--------------------------------------------------", fontRegular, Brushes.Black, 0, y);

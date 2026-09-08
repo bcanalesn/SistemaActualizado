@@ -3,6 +3,7 @@ using System.Drawing;
 using System.Linq;
 using System.Windows.Forms;
 using SISTEMAACTUALIZADO.Data;
+using SISTEMAACTUALIZADO.Helpers;
 using SISTEMAACTUALIZADO.Models;
 
 namespace SISTEMAACTUALIZADO
@@ -237,7 +238,7 @@ namespace SISTEMAACTUALIZADO
             try
             {
                 var ventasList = _db.TVE2607
-                    .Where(v => v.FecDoc >= desde && v.FecDoc <= hasta)
+                    .Where(v => v.FecDoc >= desde && v.FecDoc <= hasta && v.status != "Anulado")
                     .OrderByDescending(v => v.FecDoc)
                     .ToList();
 
@@ -245,18 +246,30 @@ namespace SISTEMAACTUALIZADO
                 int cantidadVentas = ventasList.Count;
                 decimal ticketPromedio = cantidadVentas > 0 ? totalRecaudado / cantidadVentas : 0;
 
-                lblMontoTotal.Text = $"$ {totalRecaudado:N0}";
+                // Formato chileno en KPIs
+                lblMontoTotal.Text = MonedaHelper.Formatear(totalRecaudado, conSigno: true);
                 lblCantVentas.Text = $"{cantidadVentas} {(cantidadVentas == 1 ? "venta" : "ventas")}";
-                lblTicketPromedio.Text = $"$ {ticketPromedio:N0}";
+                lblTicketPromedio.Text = MonedaHelper.Formatear(ticketPromedio, conSigno: true);
 
                 dgvVentas.DataSource = ventasList;
 
                 if (dgvVentas.Columns["nroDTE"] != null) dgvVentas.Columns["nroDTE"].HeaderText = "N° Folio DTE";
                 if (dgvVentas.Columns["FecDoc"] != null) { dgvVentas.Columns["FecDoc"].HeaderText = "Fecha y Hora"; dgvVentas.Columns["FecDoc"].DefaultCellStyle.Format = "dd/MM/yyyy HH:mm"; }
                 if (dgvVentas.Columns["Documento"] != null) dgvVentas.Columns["Documento"].HeaderText = "Tipo Documento";
-                if (dgvVentas.Columns["Total"] != null) { dgvVentas.Columns["Total"].HeaderText = "Total Venta"; dgvVentas.Columns["Total"].DefaultCellStyle.Format = "$#,##0"; }
+                if (dgvVentas.Columns["Total"] != null) 
+                { 
+                    dgvVentas.Columns["Total"].HeaderText = "Total Venta"; 
+                    dgvVentas.Columns["Total"].DefaultCellStyle = new DataGridViewCellStyle
+                    {
+                        FormatProvider = new System.Globalization.CultureInfo("es-CL"),
+                        Format = "$ #,##0",
+                        Alignment = DataGridViewContentAlignment.MiddleRight,
+                        Font = new Font("Segoe UI", 9.5F, FontStyle.Bold),
+                        ForeColor = Color.FromArgb(16, 185, 129)
+                    };
+                }
 
-                string[] ocultar = new string[] { "idTve", "idLocal", "nmbLocal", "iddocDTE", "nroInT", "SubTotal", "Descuento", "Neto", "Impto1", "Impto2", "Impto3", "IvA", "UserDTE", "Vendedor", "nroZ", "Url", "nPAX", "Idcliente", "DNI", "RuT", "dv", "RazonSocial", "Giro", "Direccion", "idcomuna", "nComuna", "idCiudad", "nCiudad", "Fono1", "Fono2", "email", "status", "idREF", "nroREF", "codigoREF", "FechaREF", "HoraDoc", "Detalles" };
+                string[] ocultar = new string[] { "idTve", "idLocal", "nmbLocal", "iddocDTE", "nroInT", "SubTotal", "Descuento", "Neto", "Impto1", "Impto2", "Impto3", "IvA", "UserDTE", "Vendedor", "nroZ", "Url", "nPAX", "Idcliente", "DNI", "RuT", "dv", "RazonSocial", "Giro", "Direccion", "idcomuna", "nComuna", "idCiudad", "nCiudad", "Fono1", "Fono2", "email", "status", "idREF", "nroREF", "codigoREF", "FechaREF", "HoraDoc", "Detalles", "CajaTurnoID", "MedioPago", "Vuelto" };
                 foreach (var col in ocultar)
                 {
                     if (dgvVentas.Columns[col] != null) dgvVentas.Columns[col].Visible = false;

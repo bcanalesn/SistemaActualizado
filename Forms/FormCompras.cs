@@ -4,6 +4,7 @@ using System.Drawing;
 using System.Linq;
 using System.Windows.Forms;
 using SISTEMAACTUALIZADO.Data;
+using SISTEMAACTUALIZADO.Helpers;
 using SISTEMAACTUALIZADO.Models;
 using SISTEMAACTUALIZADO.Services;
 using SISTEMAACTUALIZADO.Modals;
@@ -86,16 +87,10 @@ namespace SISTEMAACTUALIZADO
             this.Font = new Font("Segoe UI", 9F, FontStyle.Regular, GraphicsUnit.Point);
             this.Dock = DockStyle.Fill;
             this.FormBorderStyle = FormBorderStyle.None;
-            // Recomendado en el shell principal (Program.cs / Form contenedor):
-            // Application.SetHighDpiMode(HighDpiMode.PerMonitorV2) + this.AutoScaleMode = AutoScaleMode.Dpi;
-            // para que el escalado de Windows (125%/150%) no desalinee los controles.
 
             Panel pnlMain = new Panel { Dock = DockStyle.Fill, Padding = new Padding(20, 10, 20, 16), AutoScroll = true };
 
-            // Panel Lateral de Totales y Confirmación
             Panel pnlDerecha = CrearPanelResumenLateral();
-
-            // Panel Izquierdo
             Panel pnlIzquierda = new Panel { Dock = DockStyle.Fill, Padding = new Padding(0, 0, 16, 0) };
 
             Panel pnlModos = CrearBarraSelectoresModo();
@@ -112,10 +107,6 @@ namespace SISTEMAACTUALIZADO
             pnlMain.Controls.Add(pnlIzquierda);
             pnlMain.Controls.Add(pnlDerecha);
 
-            // Listas Predictivas Flotantes.
-            // Ya NO se posicionan con Point fijo: ahora se ubican dinámicamente
-            // justo debajo del cuadro de búsqueda real (ver PosicionarListaSugerencias),
-            // porque con layout responsivo el cuadro puede estar en cualquier X/Y.
             lstSugerenciasProveedores = new ListBox { Size = new Size(320, 130), Font = new Font("Segoe UI", 9F), Visible = false, BorderStyle = BorderStyle.FixedSingle };
             lstSugerenciasProveedores.Click += LstSugerenciasProveedores_Click;
 
@@ -129,9 +120,6 @@ namespace SISTEMAACTUALIZADO
             this.ResumeLayout(false);
         }
 
-        // ==========================================
-        // BARRA DE SELECTORES DE MODO (RESPONSIVA)
-        // ==========================================
         private Panel CrearBarraSelectoresModo()
         {
             Panel pnl = new Panel 
@@ -215,9 +203,6 @@ namespace SISTEMAACTUALIZADO
             }
         }
 
-        // ==========================================
-        // PASO 1: DOCUMENTO (RESPONSIVO)
-        // ==========================================
         private Panel CrearPaso1Documento()
         {
             Panel pnl = new Panel 
@@ -242,14 +227,13 @@ namespace SISTEMAACTUALIZADO
             };
 
             TableLayoutPanel tabla = new TableLayoutPanel { Dock = DockStyle.Fill, ColumnCount = 5, RowCount = 1 };
-            tabla.ColumnStyles.Add(new ColumnStyle(SizeType.Percent, 38F)); // Proveedor
-            tabla.ColumnStyles.Add(new ColumnStyle(SizeType.Percent, 16F)); // Tipo Doc
-            tabla.ColumnStyles.Add(new ColumnStyle(SizeType.Percent, 14F)); // N° Documento
-            tabla.ColumnStyles.Add(new ColumnStyle(SizeType.Percent, 15F)); // Fecha
-            tabla.ColumnStyles.Add(new ColumnStyle(SizeType.Percent, 17F)); // Botón Lista Proveedores
+            tabla.ColumnStyles.Add(new ColumnStyle(SizeType.Percent, 38F));
+            tabla.ColumnStyles.Add(new ColumnStyle(SizeType.Percent, 16F));
+            tabla.ColumnStyles.Add(new ColumnStyle(SizeType.Percent, 14F));
+            tabla.ColumnStyles.Add(new ColumnStyle(SizeType.Percent, 15F));
+            tabla.ColumnStyles.Add(new ColumnStyle(SizeType.Percent, 17F));
             tabla.RowStyles.Add(new RowStyle(SizeType.Percent, 100F));
 
-            // Columna 1: Proveedor
             Panel pnlProv = new Panel { Dock = DockStyle.Fill, Padding = new Padding(0, 0, 6, 0) };
             Label lp = new Label { Text = "1. PROVEEDOR (RUT O NOMBRE)", Dock = DockStyle.Top, AutoSize = true, Font = new Font("Segoe UI", 7.5F, FontStyle.Bold), ForeColor = Color.FromArgb(100, 116, 139) };
             
@@ -268,7 +252,6 @@ namespace SISTEMAACTUALIZADO
             pnlProv.Controls.Add(pnlProvFila);
             pnlProv.Controls.Add(lp);
 
-            // Columnas 2 a 4
             cbTipoDocumento = new ComboBox { DropDownStyle = ComboBoxStyle.DropDownList };
             cbTipoDocumento.Items.AddRange(new string[] { "Factura de Compra", "Factura Exenta", "Boleta de Compra", "Guía de Recepción" });
             cbTipoDocumento.SelectedIndex = 0;
@@ -281,7 +264,6 @@ namespace SISTEMAACTUALIZADO
             dtpFechaEmision = new DateTimePicker { Format = DateTimePickerFormat.Short, Value = DateTime.Today };
             Panel pnlFecha = EnvolverConLabel("4. FECHA EMISIÓN", dtpFechaEmision);
 
-            // Columna 5: Botón Lista Proveedores
             Panel pnlBtnLista = new Panel { Dock = DockStyle.Fill, Padding = new Padding(6, 0, 0, 0) };
             Label lblEspacioBtn = new Label { Text = " ", Dock = DockStyle.Top, AutoSize = true, Font = new Font("Segoe UI", 7.5F) };
             Button btnListaProv = new Button { Text = "📖 Lista Proveedores", Dock = DockStyle.Top, Height = 26, BackColor = Color.FromArgb(15, 23, 42), ForeColor = Color.White, FlatStyle = FlatStyle.Flat, Font = new Font("Segoe UI", 8F, FontStyle.Bold), Cursor = Cursors.Hand };
@@ -301,7 +283,6 @@ namespace SISTEMAACTUALIZADO
             return pnl;
         }
 
-        /// <summary>Envuelve un control con su label superior, ambos dockeados (patrón reutilizado en todo el formulario).</summary>
         private Panel EnvolverConLabel(string texto, Control control)
         {
             Panel p = new Panel { Dock = DockStyle.Fill, Padding = new Padding(6, 0, 6, 0) };
@@ -313,12 +294,8 @@ namespace SISTEMAACTUALIZADO
             return p;
         }
 
-        // ==========================================
-        // PASO 2: DETALLE (RESPONSIVO)
-        // ==========================================
         private void CrearPaso2Detalle()
         {
-            // ---------- Mercadería ----------
             pnlPaso2Mercaderia = new Panel 
             { 
                 Dock = DockStyle.Top, 
@@ -330,14 +307,13 @@ namespace SISTEMAACTUALIZADO
             pnlPaso2Mercaderia.Paint += (s, e) => ControlPaint.DrawBorder(e.Graphics, pnlPaso2Mercaderia.ClientRectangle, Color.FromArgb(226, 232, 240), ButtonBorderStyle.Solid);
 
             TableLayoutPanel tablaM = new TableLayoutPanel { Dock = DockStyle.Fill, ColumnCount = 5, RowCount = 1 };
-            tablaM.ColumnStyles.Add(new ColumnStyle(SizeType.Percent, 34F)); // Producto
-            tablaM.ColumnStyles.Add(new ColumnStyle(SizeType.Percent, 13F)); // Cantidad
-            tablaM.ColumnStyles.Add(new ColumnStyle(SizeType.Percent, 18F)); // Costo Neto
-            tablaM.ColumnStyles.Add(new ColumnStyle(SizeType.Percent, 20F)); // Precio Venta
-            tablaM.ColumnStyles.Add(new ColumnStyle(SizeType.Percent, 15F)); // Botón
+            tablaM.ColumnStyles.Add(new ColumnStyle(SizeType.Percent, 34F));
+            tablaM.ColumnStyles.Add(new ColumnStyle(SizeType.Percent, 13F));
+            tablaM.ColumnStyles.Add(new ColumnStyle(SizeType.Percent, 18F));
+            tablaM.ColumnStyles.Add(new ColumnStyle(SizeType.Percent, 20F));
+            tablaM.ColumnStyles.Add(new ColumnStyle(SizeType.Percent, 15F));
             tablaM.RowStyles.Add(new RowStyle(SizeType.Percent, 100F));
 
-            // Columna Producto
             Panel pnlProd = new Panel { Dock = DockStyle.Fill, Padding = new Padding(0, 0, 6, 0) };
             Label lpr = new Label { Text = "SELECCIONAR PRODUCTO (CÓDIGO O NOMBRE)", Dock = DockStyle.Top, AutoSize = true, Font = new Font("Segoe UI", 7.5F, FontStyle.Bold), ForeColor = Color.FromArgb(100, 116, 139) };
             
@@ -363,8 +339,13 @@ namespace SISTEMAACTUALIZADO
             Panel pnlCosto = new Panel { Dock = DockStyle.Fill, Padding = new Padding(6, 0, 6, 0) };
             Label lcost = new Label { Text = "COSTO NETO ($)", Dock = DockStyle.Top, AutoSize = true, Font = new Font("Segoe UI", 7.5F, FontStyle.Bold), ForeColor = Color.FromArgb(100, 116, 139) };
             txtPrecioCosto = new TextBox { Text = "0", Font = new Font("Segoe UI", 9F, FontStyle.Bold), Dock = DockStyle.Top, Height = 24 };
-            txtPrecioCosto.TextChanged += (s, e) => CalcularPreviewPrecioVenta();
-            lblCostoAnterior = new Label { Text = "Costo Ant: $0", Dock = DockStyle.Top, AutoSize = true, Font = new Font("Segoe UI", 7F, FontStyle.Bold), ForeColor = Color.FromArgb(100, 116, 139) };
+            txtPrecioCosto.KeyPress += (s, e) => { if (!char.IsControl(e.KeyChar) && !char.IsDigit(e.KeyChar)) e.Handled = true; };
+            txtPrecioCosto.TextChanged += (s, e) => 
+            { 
+                MonedaHelper.AplicarMascaraEnVivo(txtPrecioCosto);
+                CalcularPreviewPrecioVenta(); 
+            };
+            lblCostoAnterior = new Label { Text = "Costo Ant: $ 0", Dock = DockStyle.Top, AutoSize = true, Font = new Font("Segoe UI", 7F, FontStyle.Bold), ForeColor = Color.FromArgb(100, 116, 139) };
             pnlCosto.Controls.Add(lblCostoAnterior);
             pnlCosto.Controls.Add(txtPrecioCosto);
             pnlCosto.Controls.Add(lcost);
@@ -388,7 +369,6 @@ namespace SISTEMAACTUALIZADO
 
             pnlPaso2Mercaderia.Controls.Add(tablaM);
 
-            // ---------- Gasto Interno ----------
             pnlPaso2Gasto = new Panel 
             { 
                 Dock = DockStyle.Top, 
@@ -401,10 +381,10 @@ namespace SISTEMAACTUALIZADO
             pnlPaso2Gasto.Paint += (s, e) => ControlPaint.DrawBorder(e.Graphics, pnlPaso2Gasto.ClientRectangle, Color.FromArgb(226, 232, 240), ButtonBorderStyle.Solid);
 
             TableLayoutPanel tablaG = new TableLayoutPanel { Dock = DockStyle.Fill, ColumnCount = 4, RowCount = 2 };
-            tablaG.ColumnStyles.Add(new ColumnStyle(SizeType.Percent, 38F)); // Descripción
-            tablaG.ColumnStyles.Add(new ColumnStyle(SizeType.Percent, 27F)); // Categoría
-            tablaG.ColumnStyles.Add(new ColumnStyle(SizeType.Percent, 17F)); // Monto
-            tablaG.ColumnStyles.Add(new ColumnStyle(SizeType.Percent, 18F)); // Botón
+            tablaG.ColumnStyles.Add(new ColumnStyle(SizeType.Percent, 38F));
+            tablaG.ColumnStyles.Add(new ColumnStyle(SizeType.Percent, 27F));
+            tablaG.ColumnStyles.Add(new ColumnStyle(SizeType.Percent, 17F));
+            tablaG.ColumnStyles.Add(new ColumnStyle(SizeType.Percent, 18F));
             tablaG.RowStyles.Add(new RowStyle(SizeType.Absolute, 52F));
             tablaG.RowStyles.Add(new RowStyle(SizeType.Absolute, 34F));
 
@@ -417,6 +397,8 @@ namespace SISTEMAACTUALIZADO
             Panel pnlCat = EnvolverConLabel("CATEGORÍA / CUENTA CONTABLE", cbCategoriaGasto);
 
             txtMontoNetoGasto = new TextBox { Text = "0", Font = new Font("Segoe UI", 9F, FontStyle.Bold) };
+            txtMontoNetoGasto.KeyPress += (s, e) => { if (!char.IsControl(e.KeyChar) && !char.IsDigit(e.KeyChar)) e.Handled = true; };
+            txtMontoNetoGasto.TextChanged += (s, e) => MonedaHelper.AplicarMascaraEnVivo(txtMontoNetoGasto);
             Panel pnlMonto = EnvolverConLabel("MONTO NETO ($)", txtMontoNetoGasto);
 
             Panel pnlBtnAddG = new Panel { Dock = DockStyle.Fill, Padding = new Padding(6, 0, 0, 0) };
@@ -443,6 +425,7 @@ namespace SISTEMAACTUALIZADO
 
             pnlPaso2Gasto.Controls.Add(tablaG);
         }
+
         private Panel CrearBloqueGrilla()
         {
             Panel pnl = new Panel 
@@ -454,7 +437,6 @@ namespace SISTEMAACTUALIZADO
             };
             pnl.Paint += (s, e) => ControlPaint.DrawBorder(e.Graphics, pnl.ClientRectangle, Color.FromArgb(226, 232, 240), ButtonBorderStyle.Solid);
 
-            // Barra Superior de la Grilla (Título + Contador + Botón Quitar)
             Panel pnlHead = new Panel { Dock = DockStyle.Top, Height = 32, Padding = new Padding(0, 0, 0, 4) };
             lblTituloGrilla = new Label { Text = "Productos en esta recepción", Font = new Font("Segoe UI", 9.5F, FontStyle.Bold), ForeColor = Color.FromArgb(15, 23, 42), Location = new Point(0, 4), AutoSize = true };
             lblContadorLineas = new Label { Text = "0 líneas", Font = new Font("Segoe UI", 8F), ForeColor = Color.FromArgb(100, 116, 139), BackColor = Color.FromArgb(241, 245, 249), Location = new Point(220, 5), AutoSize = true, Padding = new Padding(4, 2, 4, 2) };
@@ -483,7 +465,6 @@ namespace SISTEMAACTUALIZADO
 
             pnlHead.Controls.AddRange(new Control[] { lblTituloGrilla, lblContadorLineas, btnQuitarItem });
 
-            // DataGridView Estilo Catálogo Oficial
             dgvDetalle = new DataGridView
             {
                 Dock = DockStyle.Fill,
@@ -499,16 +480,14 @@ namespace SISTEMAACTUALIZADO
                 GridColor = Color.FromArgb(241, 245, 249)
             };
 
-            // Estilo de Encabezados (Oscuro #0F172A fijo que no cambia al hacer clic)
             dgvDetalle.EnableHeadersVisualStyles = false;
             dgvDetalle.ColumnHeadersHeight = 34;
             dgvDetalle.ColumnHeadersDefaultCellStyle.BackColor = Color.FromArgb(15, 23, 42);
             dgvDetalle.ColumnHeadersDefaultCellStyle.ForeColor = Color.White;
-            dgvDetalle.ColumnHeadersDefaultCellStyle.SelectionBackColor = Color.FromArgb(15, 23, 42); // Evita el fondo azul al seleccionar
+            dgvDetalle.ColumnHeadersDefaultCellStyle.SelectionBackColor = Color.FromArgb(15, 23, 42);
             dgvDetalle.ColumnHeadersDefaultCellStyle.SelectionForeColor = Color.White;
             dgvDetalle.ColumnHeadersDefaultCellStyle.Font = new Font("Segoe UI", 8.5F, FontStyle.Bold);
 
-            // Estilo de Filas Seleccionadas (Celeste Suave #E0F2FE con texto visible #0F172A)
             dgvDetalle.DefaultCellStyle.SelectionBackColor = Color.FromArgb(224, 242, 254);
             dgvDetalle.DefaultCellStyle.SelectionForeColor = Color.FromArgb(15, 23, 42);
             dgvDetalle.DefaultCellStyle.Font = new Font("Segoe UI", 8.5F);
@@ -625,25 +604,32 @@ namespace SISTEMAACTUALIZADO
             dgvDetalle.Columns.Add("PvpSugerido", "Precio Venta (PVP)");
             dgvDetalle.Columns.Add("Subtotal", "Subtotal Neto");
 
-            // Alineaciones y anchos
+            var estiloMonedaCL = new DataGridViewCellStyle 
+            { 
+                FormatProvider = new System.Globalization.CultureInfo("es-CL"), 
+                Format = "$ #,##0", 
+                Alignment = DataGridViewContentAlignment.MiddleRight 
+            };
+
             dgvDetalle.Columns["Cant"].Width = 80;
             dgvDetalle.Columns["Cant"].DefaultCellStyle.Alignment = DataGridViewContentAlignment.MiddleCenter;
             dgvDetalle.Columns["Cant"].DefaultCellStyle.Font = new Font("Segoe UI", 8.5F, FontStyle.Bold);
 
             dgvDetalle.Columns["CostoNeto"].Width = 110;
-            dgvDetalle.Columns["CostoNeto"].DefaultCellStyle.Alignment = DataGridViewContentAlignment.MiddleRight;
-            dgvDetalle.Columns["CostoNeto"].DefaultCellStyle.Format = "$#,##0";
+            dgvDetalle.Columns["CostoNeto"].DefaultCellStyle = estiloMonedaCL;
 
-            // Precio de venta destacado en verde (como en el catálogo)
             dgvDetalle.Columns["PvpSugerido"].Width = 130;
-            dgvDetalle.Columns["PvpSugerido"].DefaultCellStyle.Alignment = DataGridViewContentAlignment.MiddleRight;
-            dgvDetalle.Columns["PvpSugerido"].DefaultCellStyle.Format = "$#,##0";
-            dgvDetalle.Columns["PvpSugerido"].DefaultCellStyle.ForeColor = Color.FromArgb(22, 163, 74);
-            dgvDetalle.Columns["PvpSugerido"].DefaultCellStyle.Font = new Font("Segoe UI", 8.5F, FontStyle.Bold);
+            dgvDetalle.Columns["PvpSugerido"].DefaultCellStyle = new DataGridViewCellStyle 
+            { 
+                FormatProvider = new System.Globalization.CultureInfo("es-CL"), 
+                Format = "$ #,##0", 
+                Alignment = DataGridViewContentAlignment.MiddleRight,
+                ForeColor = Color.FromArgb(22, 163, 74),
+                Font = new Font("Segoe UI", 8.5F, FontStyle.Bold)
+            };
 
             dgvDetalle.Columns["Subtotal"].Width = 110;
-            dgvDetalle.Columns["Subtotal"].DefaultCellStyle.Alignment = DataGridViewContentAlignment.MiddleRight;
-            dgvDetalle.Columns["Subtotal"].DefaultCellStyle.Format = "$#,##0";
+            dgvDetalle.Columns["Subtotal"].DefaultCellStyle = estiloMonedaCL;
         }
 
         private void ConfigurarColumnasGrillaGasto()
@@ -655,9 +641,13 @@ namespace SISTEMAACTUALIZADO
 
             dgvDetalle.Columns["Categoria"].Width = 180;
             dgvDetalle.Columns["MontoNeto"].Width = 130;
-            dgvDetalle.Columns["MontoNeto"].DefaultCellStyle.Alignment = DataGridViewContentAlignment.MiddleRight;
-            dgvDetalle.Columns["MontoNeto"].DefaultCellStyle.Format = "$#,##0";
-            dgvDetalle.Columns["MontoNeto"].DefaultCellStyle.Font = new Font("Segoe UI", 8.5F, FontStyle.Bold);
+            dgvDetalle.Columns["MontoNeto"].DefaultCellStyle = new DataGridViewCellStyle 
+            { 
+                FormatProvider = new System.Globalization.CultureInfo("es-CL"), 
+                Format = "$ #,##0", 
+                Alignment = DataGridViewContentAlignment.MiddleRight,
+                Font = new Font("Segoe UI", 8.5F, FontStyle.Bold)
+            };
         }
 
         private void RefrescarGrilla()
@@ -683,11 +673,10 @@ namespace SISTEMAACTUALIZADO
             decimal iva = Math.Round(neto * 0.19m);
             decimal total = neto + iva;
 
-            lblTotalNeto.Text = $"$ {neto:N0}";
-            lblIvaCredito.Text = $"$ {iva:N0}";
-            lblTotalBruto.Text = $"$ {total:N0}";
+            lblTotalNeto.Text = MonedaHelper.Formatear(neto, conSigno: true);
+            lblIvaCredito.Text = MonedaHelper.Formatear(iva, conSigno: true);
+            lblTotalBruto.Text = MonedaHelper.Formatear(total, conSigno: true);
         }
-
 
         private void BtnAgregarMercaderia_Click(object? sender, EventArgs e)
         {
@@ -698,13 +687,14 @@ namespace SISTEMAACTUALIZADO
                 return;
             }
 
-            if (!int.TryParse(txtCantidadRecibida.Text.Trim(), out int cant) || cant <= 0 || !decimal.TryParse(txtPrecioCosto.Text.Trim(), out decimal costo) || costo <= 0)
+            decimal costo = MonedaHelper.Limpiar(txtPrecioCosto.Text);
+            if (!int.TryParse(txtCantidadRecibida.Text.Trim(), out int cant) || cant <= 0 || costo <= 0)
             {
                 MessageBox.Show("Ingrese una cantidad y costo válidos.", "Validación", MessageBoxButtons.OK, MessageBoxIcon.Warning);
                 return;
             }
 
-            decimal.TryParse(txtPvpSugerido.Text.Trim(), out decimal pvp);
+            decimal pvp = MonedaHelper.Limpiar(txtPvpSugerido.Text);
 
             _detalleFactura.Add(new DetalleCompra
             {
@@ -727,7 +717,9 @@ namespace SISTEMAACTUALIZADO
         private void BtnAgregarGasto_Click(object? sender, EventArgs e)
         {
             string desc = txtDescripcionGasto.Text.Trim();
-            if (string.IsNullOrEmpty(desc) || !decimal.TryParse(txtMontoNetoGasto.Text.Trim(), out decimal monto) || monto <= 0)
+            decimal monto = MonedaHelper.Limpiar(txtMontoNetoGasto.Text);
+
+            if (string.IsNullOrEmpty(desc) || monto <= 0)
             {
                 MessageBox.Show("Indique una descripción y monto neto válido.", "Validación", MessageBoxButtons.OK, MessageBoxIcon.Warning);
                 return;
@@ -816,9 +808,6 @@ namespace SISTEMAACTUALIZADO
             }
         }
 
-        // ==========================================
-        // HELPERS Y BÚSQUEDAS
-        // ==========================================
         private void CargarDatosIniciales()
         {
             using var db = new AppDbContext();
@@ -826,11 +815,6 @@ namespace SISTEMAACTUALIZADO
             _productosCache = db.Productos.Where(p => p.Estado).OrderBy(p => p.Nombre).ToList();
         }
 
-        /// <summary>
-        /// Ubica una lista de sugerencias flotante justo debajo del cuadro de búsqueda real,
-        /// convirtiendo coordenadas de pantalla a coordenadas del contenedor de la lista.
-        /// Reemplaza el Point fijo original, que dejaba de coincidir apenas el layout se volvió responsivo.
-        /// </summary>
         private void PosicionarListaSugerencias(ListBox lista, Control referenciaCampo)
         {
             if (lista.Parent == null || referenciaCampo.Parent == null) return;
@@ -910,7 +894,7 @@ namespace SISTEMAACTUALIZADO
             txtBuscarProducto.ForeColor = Color.FromArgb(148, 163, 184);
             lstSugerenciasProductos.Visible = false;
             txtPrecioCosto.Text = "0";
-            lblCostoAnterior.Text = "Costo Ant: $0";
+            lblCostoAnterior.Text = "Costo Ant: $ 0";
             txtPvpSugerido.Text = "0";
         }
 
@@ -924,8 +908,8 @@ namespace SISTEMAACTUALIZADO
                 txtBuscarProducto.ForeColor = Color.FromArgb(37, 99, 235);
                 lstSugerenciasProductos.Visible = false;
 
-                lblCostoAnterior.Text = $"Costo Ant: ${p.PrecioCosto:N0}";
-                txtPrecioCosto.Text = p.PrecioCosto.ToString("0");
+                lblCostoAnterior.Text = $"Costo Ant: {MonedaHelper.Formatear(p.PrecioCosto, conSigno: true)}";
+                txtPrecioCosto.Text = MonedaHelper.Formatear(p.PrecioCosto);
                 CalcularPreviewPrecioVenta();
 
                 txtCantidadRecibida.Focus();
@@ -937,12 +921,13 @@ namespace SISTEMAACTUALIZADO
         {
             if (_productoSeleccionado == null) return;
 
-            if (decimal.TryParse(txtPrecioCosto.Text.Trim(), out decimal costo) && costo > 0)
+            decimal costo = MonedaHelper.Limpiar(txtPrecioCosto.Text);
+            if (costo > 0)
             {
                 var margenes = ProductoService.ObtenerMargenesConfigurados();
                 decimal margenL1 = _productoSeleccionado.MargenGanancia > 0 ? _productoSeleccionado.MargenGanancia : margenes[0];
                 decimal precioVentaL1 = ProductoService.CalcularPrecioVenta(costo, margenL1);
-                txtPvpSugerido.Text = precioVentaL1.ToString("0");
+                txtPvpSugerido.Text = MonedaHelper.Formatear(precioVentaL1);
             }
             else
             {
@@ -981,7 +966,7 @@ namespace SISTEMAACTUALIZADO
             {
                 _productoSeleccionado = modal.ProductoResultado;
                 txtBuscarProducto.Text = $"{modal.ProductoResultado.Nombre} (Nuevo)";
-                txtPrecioCosto.Text = modal.ProductoResultado.PrecioCosto.ToString("0");
+                txtPrecioCosto.Text = MonedaHelper.Formatear(modal.ProductoResultado.PrecioCosto);
                 CalcularPreviewPrecioVenta();
                 txtCantidadRecibida.Text = modal.CantidadFactura.ToString();
             }
@@ -996,7 +981,7 @@ namespace SISTEMAACTUALIZADO
                 CargarDatosIniciales();
                 _productoSeleccionado = modal.ProductoResultado;
                 txtBuscarProducto.Text = $"{modal.ProductoResultado.Nombre}";
-                txtPrecioCosto.Text = modal.ProductoResultado.PrecioCosto.ToString("0");
+                txtPrecioCosto.Text = MonedaHelper.Formatear(modal.ProductoResultado.PrecioCosto);
                 CalcularPreviewPrecioVenta();
             }
         }

@@ -3,6 +3,7 @@ using System.Collections.Generic;
 using System.Drawing;
 using System.Linq;
 using System.Windows.Forms;
+using SISTEMAACTUALIZADO.Helpers;
 using SISTEMAACTUALIZADO.Modals;
 using SISTEMAACTUALIZADO.Models;
 using SISTEMAACTUALIZADO.Services;
@@ -25,7 +26,7 @@ namespace SISTEMAACTUALIZADO
         private ComboBox cbFiltroTipo = null!;
         private Button btnLimpiarFiltros = null!;
 
-        // Botones de Acción (Estilo Productos)
+        // Botones de Acción
         private Button btnNuevo = null!;
         private Button btnEditar = null!;
         private Button btnEliminar = null!;
@@ -56,7 +57,7 @@ namespace SISTEMAACTUALIZADO
                 AutoScroll = true
             };
 
-            // ================= 1. HEADER DE TÍTULO Y BOTONERA =================
+            // 1. Header
             Panel pnlHeader = new Panel { Dock = DockStyle.Top, Height = 56, BackColor = Color.Transparent };
 
             Label lblTitulo = new Label
@@ -77,7 +78,6 @@ namespace SISTEMAACTUALIZADO
                 AutoSize = true
             };
 
-            // Contenedor FlowLayout que organiza automáticamente los botones a la derecha sin superponerlos
             FlowLayoutPanel pnlBotonesAccion = new FlowLayoutPanel
             {
                 Dock = DockStyle.Right,
@@ -89,7 +89,6 @@ namespace SISTEMAACTUALIZADO
                 Padding = new Padding(0, 4, 0, 0)
             };
 
-            // Botón Precios Especiales (Morado #7C3AED)
             btnPreciosEspeciales = new Button
             {
                 Text = "💲 Precios Especiales",
@@ -114,10 +113,6 @@ namespace SISTEMAACTUALIZADO
                 }
             };
 
-            // Agregar todos los botones al panel
-            pnlBotonesAccion.Controls.AddRange(new Control[] { btnNuevo, btnEditar, btnEliminar, btnPreciosEspeciales, btnEstado });
-
-            // 1. + Nuevo Cliente (Verde Esmeralda)
             btnNuevo = new Button
             {
                 Text = "➕ Nuevo Cliente",
@@ -134,7 +129,6 @@ namespace SISTEMAACTUALIZADO
             btnNuevo.FlatAppearance.BorderSize = 0;
             btnNuevo.Click += BtnNuevo_Click;
 
-            // 2. Editar (Azul Cielo)
             btnEditar = new Button
             {
                 Text = "✏️ Editar",
@@ -152,7 +146,6 @@ namespace SISTEMAACTUALIZADO
             btnEditar.FlatAppearance.BorderSize = 0;
             btnEditar.Click += BtnEditar_Click;
 
-            // 3. Eliminar (Rojo)
             btnEliminar = new Button
             {
                 Text = "🗑️ Eliminar",
@@ -170,7 +163,6 @@ namespace SISTEMAACTUALIZADO
             btnEliminar.FlatAppearance.BorderSize = 0;
             btnEliminar.Click += BtnEliminar_Click;
 
-            // 4. Activar / Desactivar (Ámbar)
             btnEstado = new Button
             {
                 Text = "🔄 Activar / Desactivar",
@@ -188,12 +180,10 @@ namespace SISTEMAACTUALIZADO
             btnEstado.FlatAppearance.BorderSize = 0;
             btnEstado.Click += BtnEstado_Click;
 
-            // Al agregarlos con FlowDirection RightToLeft, el orden visible de derecha a izquierda será:
-            // [Activar / Desactivar] [Eliminar] [Editar] [+ Nuevo Cliente]
-            pnlBotonesAccion.Controls.AddRange(new Control[] {  btnEliminar, btnEstado, btnEditar, btnNuevo, });
-
+            pnlBotonesAccion.Controls.AddRange(new Control[] { btnEliminar, btnEstado, btnPreciosEspeciales, btnEditar, btnNuevo });
             pnlHeader.Controls.AddRange(new Control[] { lblTitulo, lblSubtitulo, pnlBotonesAccion });
-            // ================= 2. DASHBOARD KPI CARDS =================
+
+            // 2. Dashboard KPI Cards
             Panel pnlDashboard = new Panel { Dock = DockStyle.Top, Height = 88, BackColor = Color.Transparent, Margin = new Padding(0, 6, 0, 8) };
 
             Panel cardTotal = CrearCardKPI(
@@ -222,7 +212,7 @@ namespace SISTEMAACTUALIZADO
 
             pnlDashboard.Controls.AddRange(new Control[] { cardTotal, cardNuevos });
 
-            // ================= 3. FILTROS Y BÚSQUEDA =================
+            // 3. Filtros y Búsqueda
             Panel pnlFiltrosBar = new Panel
             {
                 Dock = DockStyle.Top,
@@ -289,7 +279,7 @@ namespace SISTEMAACTUALIZADO
 
             pnlFiltrosBar.Controls.AddRange(new Control[] { lblIconBuscar, txtBuscar, lblFiltroEst, cbFiltroEstado, lblFiltroTip, cbFiltroTipo, btnLimpiarFiltros });
 
-            // ================= 4. GRILLA (ESTILO PRODUCTOS) =================
+            // 4. Grilla
             Panel pnlCardGrilla = new Panel
             {
                 Dock = DockStyle.Fill,
@@ -319,13 +309,12 @@ namespace SISTEMAACTUALIZADO
 
             dgvClientes.CellDoubleClick += (s, e) =>
             {
-                if (e.RowIndex >= 0) // Evita que se dispare si se hace doble clic en el encabezado
+                if (e.RowIndex >= 0)
                 {
                     BtnEditar_Click(s, e);
                 }
             };
 
-            // Footer
             Panel pnlFooter = new Panel { Dock = DockStyle.Bottom, Height = 30, BackColor = Color.FromArgb(248, 250, 252) };
             pnlFooter.Paint += (s, e) => ControlPaint.DrawBorder(e.Graphics, pnlFooter.ClientRectangle, Color.FromArgb(226, 232, 240), ButtonBorderStyle.Solid);
 
@@ -406,8 +395,6 @@ namespace SISTEMAACTUALIZADO
         private void ConfigurarEstiloTabla(DataGridView dgv)
         {
             dgv.EnableHeadersVisualStyles = false;
-
-            // Encabezados con el estilo exacto de Productos (#0F172A / Navy Oscuro)
             dgv.ColumnHeadersDefaultCellStyle.BackColor = Color.FromArgb(15, 23, 42);
             dgv.ColumnHeadersDefaultCellStyle.ForeColor = Color.White;
             dgv.ColumnHeadersDefaultCellStyle.SelectionBackColor = Color.FromArgb(15, 23, 42);
@@ -415,22 +402,17 @@ namespace SISTEMAACTUALIZADO
             dgv.ColumnHeadersDefaultCellStyle.Font = new Font("Segoe UI", 8.5F, FontStyle.Bold);
             dgv.ColumnHeadersHeight = 36;
 
-            // Filas y Celdas
             dgv.DefaultCellStyle.Font = new Font("Segoe UI", 8.5F);
             dgv.DefaultCellStyle.ForeColor = Color.FromArgb(15, 23, 42);
             dgv.DefaultCellStyle.SelectionBackColor = Color.FromArgb(224, 242, 254);
             dgv.DefaultCellStyle.SelectionForeColor = Color.FromArgb(15, 23, 42);
             dgv.RowTemplate.Height = 34;
 
-            // Filas alternadas suaves
             dgv.AlternatingRowsDefaultCellStyle.BackColor = Color.FromArgb(248, 250, 252);
-
-            // Borde y separación de celdas
             dgv.GridColor = Color.FromArgb(226, 232, 240);
 
             dgv.Columns.Clear();
 
-            // Columnas fijas con anchos definidos para scroll horizontal
             dgv.Columns.Add(new DataGridViewTextBoxColumn { Name = "IdCliente", HeaderText = "ID", DataPropertyName = "IdCliente", Width = 55, DefaultCellStyle = { Alignment = DataGridViewContentAlignment.MiddleCenter } });
             dgv.Columns.Add(new DataGridViewTextBoxColumn { Name = "Rut", HeaderText = "RUT", DataPropertyName = "Rut", Width = 110 });
             dgv.Columns.Add(new DataGridViewTextBoxColumn { Name = "RazonSocial", HeaderText = "Razón Social / Nombre", DataPropertyName = "RazonSocial", Width = 230 });
@@ -443,10 +425,23 @@ namespace SISTEMAACTUALIZADO
             dgv.Columns.Add(new DataGridViewTextBoxColumn { Name = "CategoriaCliente", HeaderText = "Tipo / Categoría", DataPropertyName = "CategoriaCliente", Width = 130 });
             dgv.Columns.Add(new DataGridViewTextBoxColumn { Name = "FormaPago", HeaderText = "Forma Pago", DataPropertyName = "FormaPago", Width = 110 });
             dgv.Columns.Add(new DataGridViewTextBoxColumn { Name = "DiasCredito", HeaderText = "Días Crédito", DataPropertyName = "DiasCredito", Width = 90, DefaultCellStyle = { Alignment = DataGridViewContentAlignment.MiddleCenter } });
-            dgv.Columns.Add(new DataGridViewTextBoxColumn { Name = "CupoCredito", HeaderText = "Cupo Crédito", DataPropertyName = "CupoCredito", Width = 110, DefaultCellStyle = { Alignment = DataGridViewContentAlignment.MiddleRight, Format = "$#,##0", ForeColor = Color.FromArgb(16, 185, 129), Font = new Font("Segoe UI", 8.5F, FontStyle.Bold) } });
+            
+            dgv.Columns.Add(new DataGridViewTextBoxColumn { 
+                Name = "CupoCredito", 
+                HeaderText = "Cupo Crédito", 
+                DataPropertyName = "CupoCredito", 
+                Width = 110, 
+                DefaultCellStyle = new DataGridViewCellStyle 
+                { 
+                    FormatProvider = new System.Globalization.CultureInfo("es-CL"),
+                    Format = "$ #,##0", 
+                    Alignment = DataGridViewContentAlignment.MiddleRight, 
+                    ForeColor = Color.FromArgb(16, 185, 129), 
+                    Font = new Font("Segoe UI", 8.5F, FontStyle.Bold) 
+                } 
+            });
+            
             dgv.Columns.Add(new DataGridViewTextBoxColumn { Name = "ListaPrecioDefecto", HeaderText = "Lista POS", DataPropertyName = "ListaPrecioDefecto", Width = 85, DefaultCellStyle = { Alignment = DataGridViewContentAlignment.MiddleCenter, ForeColor = Color.FromArgb(2, 132, 199), Font = new Font("Segoe UI", 8.5F, FontStyle.Bold) } });
-
-            // Columna CheckBox Activo
             dgv.Columns.Add(new DataGridViewCheckBoxColumn { Name = "Estado", HeaderText = "Activo", DataPropertyName = "Estado", Width = 65 });
         }
 
@@ -457,7 +452,7 @@ namespace SISTEMAACTUALIZADO
                 _listaCompletaClientes = _clienteService.ObtenerClientes();
 
                 int totalActivos = _listaCompletaClientes.Count(c => c.Estado);
-                lblTotalClientesVal.Text = totalActivos.ToString("N0");
+                lblTotalClientesVal.Text = totalActivos.ToString("N0", new System.Globalization.CultureInfo("es-CL"));
                 lblNuevosMesVal.Text = _listaCompletaClientes.Count(c => c.IdCliente >= (_listaCompletaClientes.Count - 15)).ToString();
 
                 AplicarFiltros();
@@ -505,7 +500,7 @@ namespace SISTEMAACTUALIZADO
                 _clienteSeleccionado = cliente;
                 btnEditar.Enabled = true;
                 btnEliminar.Enabled = true;
-                btnPreciosEspeciales.Enabled = true; // <-- Habilitar
+                btnPreciosEspeciales.Enabled = true;
                 btnEstado.Enabled = true;
             }
             else
@@ -513,14 +508,12 @@ namespace SISTEMAACTUALIZADO
                 _clienteSeleccionado = null;
                 btnEditar.Enabled = false;
                 btnEliminar.Enabled = false;
-                btnPreciosEspeciales.Enabled = false; // <-- Deshabilitar
+                btnPreciosEspeciales.Enabled = false;
                 btnEstado.Enabled = false;
             }
         }
-        private void BtnNuevo_Click(object? sender, EventArgs e)
-        {
-            MostrarFormularioModal(null);
-        }
+
+        private void BtnNuevo_Click(object? sender, EventArgs e) => MostrarFormularioModal(null);
 
         private void BtnEditar_Click(object? sender, EventArgs e)
         {

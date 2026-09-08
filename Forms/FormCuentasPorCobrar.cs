@@ -140,7 +140,6 @@ namespace SISTEMAACTUALIZADO.Forms
 
             flp1.Controls.AddRange(new Control[] { pnlB, pnlEst, pnlD, pnlH, btnBuscar, btnLimpiar });
 
-            // Fila 2: Botonera de Acciones
             Panel pnlFila2 = new Panel { Dock = DockStyle.Bottom, Height = 34 };
             FlowLayoutPanel flpAcciones = new FlowLayoutPanel { Dock = DockStyle.Right, AutoSize = true, WrapContents = false };
 
@@ -206,6 +205,13 @@ namespace SISTEMAACTUALIZADO.Forms
             dgvCxC.DefaultCellStyle.SelectionBackColor = Color.FromArgb(224, 242, 254);
             dgvCxC.DefaultCellStyle.SelectionForeColor = Color.FromArgb(15, 23, 42);
 
+            var estiloMoneda = new DataGridViewCellStyle
+            {
+                FormatProvider = new System.Globalization.CultureInfo("es-CL"),
+                Format = "$ #,##0",
+                Alignment = DataGridViewContentAlignment.MiddleRight
+            };
+
             dgvCxC.Columns.Clear();
             dgvCxC.Columns.Add(new DataGridViewTextBoxColumn { Name = "CxCID", HeaderText = "ID", Visible = false });
             dgvCxC.Columns.Add(new DataGridViewTextBoxColumn { Name = "Doc", HeaderText = "DOCUMENTO", FillWeight = 16 });
@@ -214,9 +220,21 @@ namespace SISTEMAACTUALIZADO.Forms
             dgvCxC.Columns.Add(new DataGridViewTextBoxColumn { Name = "Emision", HeaderText = "EMISIÓN", FillWeight = 12 });
             dgvCxC.Columns.Add(new DataGridViewTextBoxColumn { Name = "Vencimiento", HeaderText = "VENCIMIENTO", FillWeight = 13 });
             dgvCxC.Columns.Add(new DataGridViewTextBoxColumn { Name = "Mora", HeaderText = "MORA", FillWeight = 12 });
-            dgvCxC.Columns.Add(new DataGridViewTextBoxColumn { Name = "Total", HeaderText = "TOTAL ORIGINAL", FillWeight = 15, DefaultCellStyle = new DataGridViewCellStyle { Format = "$#,##0" } });
-            dgvCxC.Columns.Add(new DataGridViewTextBoxColumn { Name = "Abonado", HeaderText = "ABONADO", FillWeight = 14, DefaultCellStyle = new DataGridViewCellStyle { Format = "$#,##0" } });
-            dgvCxC.Columns.Add(new DataGridViewTextBoxColumn { Name = "Saldo", HeaderText = "SALDO PENDIENTE", FillWeight = 16, DefaultCellStyle = new DataGridViewCellStyle { Format = "$#,##0", Font = new Font("Segoe UI", 8.5F, FontStyle.Bold), ForeColor = Color.FromArgb(220, 38, 38) } });
+            dgvCxC.Columns.Add(new DataGridViewTextBoxColumn { Name = "Total", HeaderText = "TOTAL ORIGINAL", FillWeight = 15, DefaultCellStyle = estiloMoneda });
+            dgvCxC.Columns.Add(new DataGridViewTextBoxColumn { Name = "Abonado", HeaderText = "ABONADO", FillWeight = 14, DefaultCellStyle = estiloMoneda });
+            dgvCxC.Columns.Add(new DataGridViewTextBoxColumn { 
+                Name = "Saldo", 
+                HeaderText = "SALDO PENDIENTE", 
+                FillWeight = 16, 
+                DefaultCellStyle = new DataGridViewCellStyle 
+                { 
+                    FormatProvider = new System.Globalization.CultureInfo("es-CL"),
+                    Format = "$ #,##0", 
+                    Font = new Font("Segoe UI", 8.5F, FontStyle.Bold), 
+                    ForeColor = Color.FromArgb(220, 38, 38),
+                    Alignment = DataGridViewContentAlignment.MiddleRight
+                } 
+            });
             dgvCxC.Columns.Add(new DataGridViewTextBoxColumn { Name = "Estado", HeaderText = "ESTADO", FillWeight = 13 });
         }
 
@@ -285,10 +303,10 @@ namespace SISTEMAACTUALIZADO.Forms
                 int docsPendientes = db.CuentasPorCobrar.Count(c => c.Estado != "PAGADA" && c.Estado != "ANULADA");
                 int clientesMora = db.Clientes.Count(c => c.EstadoCrediticio == "MOROSO" || c.EstadoCrediticio == "BLOQUEADO");
 
-                lblKpiTotalDeuda.Text = $"$ {totalDeuda:N0}";
-                lblKpiDeudaVencida.Text = $"$ {deudaVencida:N0}";
-                lblKpiDocsPendientes.Text = docsPendientes.ToString("N0");
-                lblKpiClientesMora.Text = clientesMora.ToString("N0");
+                lblKpiTotalDeuda.Text = MonedaHelper.Formatear(totalDeuda, conSigno: true);
+                lblKpiDeudaVencida.Text = MonedaHelper.Formatear(deudaVencida, conSigno: true);
+                lblKpiDocsPendientes.Text = docsPendientes.ToString("N0", new System.Globalization.CultureInfo("es-CL"));
+                lblKpiClientesMora.Text = clientesMora.ToString("N0", new System.Globalization.CultureInfo("es-CL"));
 
                 lblFooterStatus.Text = $"Mostrando {_cxcCargadas.Count} documento(s) por cobrar.";
             }
@@ -327,10 +345,12 @@ namespace SISTEMAACTUALIZADO.Forms
                 BackColor = Color.White
             };
 
-            Label lblTit = new Label { Text = $"Documento: {(item.TipoDTE == 33 ? "Factura" : "Boleta")} #{item.FolioDoc}\nSaldo Pendiente: ${item.SaldoPendiente:N0}", Location = new Point(20, 15), Size = new Size(320, 38), Font = new Font("Segoe UI", 9.5F, FontStyle.Bold), ForeColor = Color.FromArgb(15, 23, 42) };
+            Label lblTit = new Label { Text = $"Documento: {(item.TipoDTE == 33 ? "Factura" : "Boleta")} #{item.FolioDoc}\nSaldo Pendiente: {MonedaHelper.Formatear(item.SaldoPendiente, conSigno: true)}", Location = new Point(20, 15), Size = new Size(320, 38), Font = new Font("Segoe UI", 9.5F, FontStyle.Bold), ForeColor = Color.FromArgb(15, 23, 42) };
             
             Label lblM = new Label { Text = "Monto a Abonar ($):", Location = new Point(20, 65), AutoSize = true, Font = new Font("Segoe UI", 8.5F, FontStyle.Bold) };
-            TextBox txtM = new TextBox { Text = item.SaldoPendiente.ToString("0"), Location = new Point(20, 85), Size = new Size(320, 26), Font = new Font("Segoe UI", 10.5F, FontStyle.Bold) };
+            TextBox txtM = new TextBox { Text = MonedaHelper.Formatear(item.SaldoPendiente), Location = new Point(20, 85), Size = new Size(320, 26), Font = new Font("Segoe UI", 10.5F, FontStyle.Bold) };
+            txtM.KeyPress += (s, e) => { if (!char.IsControl(e.KeyChar) && !char.IsDigit(e.KeyChar)) e.Handled = true; };
+            txtM.TextChanged += (s, e) => MonedaHelper.AplicarMascaraEnVivo(txtM);
 
             Label lblMed = new Label { Text = "Medio de Pago:", Location = new Point(20, 120), AutoSize = true, Font = new Font("Segoe UI", 8.5F, FontStyle.Bold) };
             ComboBox cbMed = new ComboBox { Location = new Point(20, 140), Size = new Size(320, 26), DropDownStyle = ComboBoxStyle.DropDownList, Font = new Font("Segoe UI", 9.5F) };
@@ -344,7 +364,8 @@ namespace SISTEMAACTUALIZADO.Forms
             btnGuardar.FlatAppearance.BorderSize = 0;
             btnGuardar.Click += (sa, ea) =>
             {
-                if (!decimal.TryParse(txtM.Text.Trim(), out decimal montoAbono) || montoAbono <= 0)
+                decimal montoAbono = MonedaHelper.Limpiar(txtM.Text);
+                if (montoAbono <= 0)
                 {
                     MessageBox.Show("Ingrese un monto válido a abonar.", "Monto Inválido", MessageBoxButtons.OK, MessageBoxIcon.Warning);
                     return;
@@ -387,7 +408,12 @@ namespace SISTEMAACTUALIZADO.Forms
             dgv.Columns.Add("Comprobante", "COMPROBANTE");
             dgv.Columns.Add("Usuario", "COBRADOR");
 
-            dgv.Columns["Monto"].DefaultCellStyle.Format = "$#,##0";
+            dgv.Columns["Monto"].DefaultCellStyle = new DataGridViewCellStyle
+            {
+                FormatProvider = new System.Globalization.CultureInfo("es-CL"),
+                Format = "$ #,##0",
+                Alignment = DataGridViewContentAlignment.MiddleRight
+            };
 
             foreach (var p in pagos)
             {
@@ -454,8 +480,8 @@ namespace SISTEMAACTUALIZADO.Forms
             {
                 Text = $"• Estado Crediticio Actual: [ {cliente.EstadoCrediticio} ]\n" +
                        $"• Facturas Vencidas: {facturasVencidas.Count} documento(s)\n" +
-                       $"• Monto Vencido: ${deudaVencidaTotal:N0}\n" +
-                       $"• Cupo Total: ${cliente.CupoCredito:N0}",
+                       $"• Monto Vencido: {MonedaHelper.Formatear(deudaVencidaTotal, conSigno: true)}\n" +
+                       $"• Cupo Total: {MonedaHelper.Formatear(cliente.CupoCredito, conSigno: true)}",
                 Font = new Font("Segoe UI", 8.5F),
                 ForeColor = cliente.EstadoCrediticio == "ACTIVO" ? Color.FromArgb(22, 163, 74) : Color.FromArgb(220, 38, 38),
                 Dock = DockStyle.Fill
