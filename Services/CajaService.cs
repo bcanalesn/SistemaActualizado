@@ -162,12 +162,12 @@ namespace SISTEMAACTUALIZADO.Services
 
                 // Boleta a consumidor final genérico
                 ticketBd.Idcliente = 0;
-                ticketBd.RuT = string.IsNullOrWhiteSpace(ticket.RuT) ? "66.666.666-6" : ticket.RuT;
-                ticketBd.RazonSocial = string.IsNullOrWhiteSpace(ticket.RazonSocial) ? "Consumidor Final" : ticket.RazonSocial;
+                ticketBd.RuT = "";
+                ticketBd.RazonSocial = "Consumidor Final";
                 ticketBd.Giro = "PARTICULAR";
                 ticketBd.Direccion = "";
-                ticketBd.nComuna = "SANTIAGO";
-                ticketBd.nCiudad = "SANTIAGO";
+                ticketBd.nComuna = "";
+                ticketBd.nCiudad = "";
             }
 
             // 3. Sincronizar también las líneas de detalle
@@ -248,10 +248,12 @@ namespace SISTEMAACTUALIZADO.Services
                     }
                     else if (medio.StartsWith("Múltiple", StringComparison.OrdinalIgnoreCase))
                     {
-                        var matchEfec = Regex.Match(medio, @"Efec:\s*\$?([\d\.,]+)");
-                        if (matchEfec.Success && decimal.TryParse(matchEfec.Groups[1].Value.Replace(".", "").Replace(",", ""), out decimal efecMonto))
+                        // Tolerancia a espacios antes y después del signo $
+                        var matchEfec = Regex.Match(medio, @"Efec:\s*\$?\s*([\d\.,]+)");
+                        if (matchEfec.Success)
                         {
-                            totalEfectivo += efecMonto - v.Vuelto;
+                            decimal efecMonto = MonedaHelper.Limpiar(matchEfec.Groups[1].Value);
+                            totalEfectivo += (efecMonto - v.Vuelto);
                         }
                     }
                 }
@@ -321,14 +323,14 @@ namespace SISTEMAACTUALIZADO.Services
                     }
                     else if (medio.StartsWith("Múltiple", StringComparison.OrdinalIgnoreCase))
                     {
-                        var matchEfec = Regex.Match(medio, @"Efec:\s*\$?([\d\.,]+)");
-                        var matchTarj = Regex.Match(medio, @"Tarj:\s*\$?([\d\.,]+)");
-                        var matchTransf = Regex.Match(medio, @"Transf:\s*\$?([\d\.,]+)");
+                        // Regex flexible con \s* antes y después de \$
+                        var matchEfec = Regex.Match(medio, @"Efec:\s*\$?\s*([\d\.,]+)");
+                        var matchTarj = Regex.Match(medio, @"Tarj:\s*\$?\s*([\d\.,]+)");
+                        var matchTransf = Regex.Match(medio, @"Transf:\s*\$?\s*([\d\.,]+)");
 
-                        decimal ef = 0, tar = 0, tr = 0;
-                        if (matchEfec.Success) decimal.TryParse(matchEfec.Groups[1].Value.Replace(".", "").Replace(",", ""), out ef);
-                        if (matchTarj.Success) decimal.TryParse(matchTarj.Groups[1].Value.Replace(".", "").Replace(",", ""), out tar);
-                        if (matchTransf.Success) decimal.TryParse(matchTransf.Groups[1].Value.Replace(".", "").Replace(",", ""), out tr);
+                        decimal ef = matchEfec.Success ? MonedaHelper.Limpiar(matchEfec.Groups[1].Value) : 0;
+                        decimal tar = matchTarj.Success ? MonedaHelper.Limpiar(matchTarj.Groups[1].Value) : 0;
+                        decimal tr = matchTransf.Success ? MonedaHelper.Limpiar(matchTransf.Groups[1].Value) : 0;
 
                         mEfectivo += (ef - v.Vuelto);
                         mDebito += tar;

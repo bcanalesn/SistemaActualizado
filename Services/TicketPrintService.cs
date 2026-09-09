@@ -53,7 +53,7 @@ namespace SISTEMAACTUALIZADO.Services
             int width = anchoContenedor;
             StringFormat centerFormat = new StringFormat { Alignment = StringAlignment.Center };
 
-            // Encabezado obtenido desde la base de datos
+            // Encabezado del Emisor (Datos fiscales reales desde la BD)
             g.DrawString(emp.RazonSocial, fontTitle, brushText, new RectangleF(0, y, width, 25), centerFormat);
             y += 24;
             g.DrawString($"R.U.T.: {emp.Rut}", fontBold, brushText, new RectangleF(0, y, width, 20), centerFormat);
@@ -61,13 +61,32 @@ namespace SISTEMAACTUALIZADO.Services
             g.DrawString($"Giro: {emp.Giro}", fontSub, brushText, new RectangleF(0, y, width, 18), centerFormat);
             y += 16;
             
-            string ubicacion = !string.IsNullOrEmpty(emp.Comuna) ? $"{emp.Direccion}, {emp.Comuna}" : emp.Direccion;
+            // Ubicación con Comuna y Ciudad
+            List<string> partesUbicacion = new List<string>();
+            if (!string.IsNullOrWhiteSpace(emp.Direccion)) partesUbicacion.Add(emp.Direccion);
+
+            string comunaCiudadEmpresa = !string.IsNullOrWhiteSpace(emp.Comuna)
+                ? (!string.IsNullOrWhiteSpace(emp.Ciudad) && !emp.Ciudad.Equals(emp.Comuna, StringComparison.OrdinalIgnoreCase) 
+                    ? $"{emp.Comuna} - {emp.Ciudad}" 
+                    : emp.Comuna)
+                : (emp.Ciudad ?? "");
+
+            if (!string.IsNullOrWhiteSpace(comunaCiudadEmpresa)) partesUbicacion.Add(comunaCiudadEmpresa);
+
+            string ubicacion = string.Join(", ", partesUbicacion);
             g.DrawString($"Casa Matriz: {ubicacion}", fontSub, brushText, new RectangleF(0, y, width, 18), centerFormat);
             y += 16;
             
             if (!string.IsNullOrWhiteSpace(emp.Telefono))
             {
                 g.DrawString($"Teléfono: {emp.Telefono}", fontSub, brushText, new RectangleF(0, y, width, 18), centerFormat);
+                y += 18;
+            }
+            y += 6;
+
+            if (!string.IsNullOrWhiteSpace(emp.Email))
+            {
+                g.DrawString($"Email: {emp.Email}", fontSub, brushText, new RectangleF(0, y, width, 18), centerFormat);
                 y += 18;
             }
             y += 6;
@@ -99,23 +118,62 @@ namespace SISTEMAACTUALIZADO.Services
             g.DrawLine(penDash, 15, y, width - 15, y);
             y += 10;
 
-            g.DrawString($"Fecha Emisión: {venta.FecDoc:dd/MM/yyyy HH:mm:ss}", fontSub, brushText, 15, y); 
+            g.DrawString($"Fecha Emisión : {venta.FecDoc:dd/MM/yyyy HH:mm:ss}", fontSub, brushText, 15, y); 
+            y += 18;
+
+            string formaPagoStr = !string.IsNullOrWhiteSpace(venta.MedioPago) ? venta.MedioPago : "CONTADO";
+            g.DrawString($"Forma de Pago : {formaPagoStr}", fontBold, brushText, 15, y);
             y += 18;
             
             string nombreVendedor = !string.IsNullOrEmpty(venta.Vendedor) ? venta.Vendedor : (!string.IsNullOrEmpty(venta.UserDTE) ? venta.UserDTE : "Cajero");
-            g.DrawString($"Atendido por : {nombreVendedor}", fontSub, brushText, 15, y); 
+            g.DrawString($"Atendido por  : {nombreVendedor}", fontSub, brushText, 15, y); 
             y += 18;
 
-            // Si es Consumidor Final sin RUT, no se imprime un RUT inventado
-            if (!string.IsNullOrWhiteSpace(venta.RuT) && !venta.RuT.Contains("66.666.666"))
+            // Datos del Receptor / Cliente
+            if (!string.IsNullOrWhiteSpace(venta.RazonSocial))
             {
-                g.DrawString($"RUT Cliente   : {venta.RuT}", fontBold, brushText, 15, y); 
+                g.DrawString($"SEÑOR(ES)    : {venta.RazonSocial}", fontBold, brushText, 15, y); 
                 y += 18;
             }
-            if (!string.IsNullOrEmpty(venta.RazonSocial))
+
+            if (!string.IsNullOrWhiteSpace(venta.RuT) && !venta.RuT.Contains("66.666.666"))
             {
-                g.DrawString($"Razón Social : {venta.RazonSocial}", fontSub, brushText, 15, y); 
+                g.DrawString($"R.U.T.        : {venta.RuT}", fontBold, brushText, 15, y); 
                 y += 18;
+            }
+
+            // Desglose fiscal exclusivo para Facturas Electrónicas (iddocDTE == 33)
+            if (venta.iddocDTE == 33)
+            {
+                if (!string.IsNullOrWhiteSpace(venta.Giro))
+                {
+                    g.DrawString($"GIRO          : {venta.Giro}", fontSub, brushText, 15, y);
+                    y += 18;
+                }
+
+                if (!string.IsNullOrWhiteSpace(venta.Direccion))
+                {
+                    g.DrawString($"DIRECCIÓN     : {venta.Direccion}", fontSub, brushText, 15, y);
+                    y += 18;
+                }
+
+                string comunaCiudadCliente = !string.IsNullOrWhiteSpace(venta.nComuna) 
+                    ? (!string.IsNullOrWhiteSpace(venta.nCiudad) && !venta.nCiudad.Equals(venta.nComuna, StringComparison.OrdinalIgnoreCase) 
+                        ? $"{venta.nComuna} - {venta.nCiudad}" 
+                        : venta.nComuna)
+                    : (venta.nCiudad ?? "");
+
+                if (!string.IsNullOrWhiteSpace(comunaCiudadCliente))
+                {
+                    g.DrawString($"COMUNA/CIUDAD : {comunaCiudadCliente}", fontSub, brushText, 15, y);
+                    y += 18;
+                }
+
+                if (!string.IsNullOrWhiteSpace(venta.email))
+                {
+                    g.DrawString($"CONTACTO      : {venta.email}", fontSub, brushText, 15, y);
+                    y += 18;
+                }
             }
 
             g.DrawLine(penDash, 15, y, width - 15, y);
