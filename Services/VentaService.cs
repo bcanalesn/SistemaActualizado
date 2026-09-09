@@ -1,6 +1,7 @@
 using System;
 using System.Collections.Generic;
 using System.Linq;
+using Microsoft.EntityFrameworkCore;
 using SISTEMAACTUALIZADO.Data;
 using SISTEMAACTUALIZADO.Models;
 using SISTEMAACTUALIZADO.Helpers;
@@ -88,5 +89,71 @@ namespace SISTEMAACTUALIZADO.Services
                 return nroTicketAtencion;
             }
         }
+
+        // =========================================================================
+        // CONSULTA READ-ONLY PARA HISTORIAL DE TICKETS POR VENDEDOR
+        // =========================================================================
+        public List<TicketVendedorDTO> ObtenerMisTickets(string nombreVendedor, DateTime fecha, string? filtroEstado = null, string? busqueda = null)
+        {
+            using var db = new AppDbContext();
+            DateTime inicio = fecha.Date;
+            DateTime fin = fecha.Date.AddDays(1).AddTicks(-1);
+
+            // Consulta desacoplada y rápida (AsNoTracking)
+            var query = db.TVE2607
+                .AsNoTracking()
+                .Where(v => v.FecDoc >= inicio && v.FecDoc <= fin);
+
+            // Filtrar por el vendedor seleccionado
+            if (!string.IsNullOrWhiteSpace(nombreVendedor) && nombreVendedor != "Todos")
+            {
+                string vLower = nombreVendedor.Trim().ToLower();
+                query = query.Where(v => (v.Vendedor != null && v.Vendedor.ToLower() == vLower) ||
+                                        (v.UserDTE != null && v.UserDTE.ToLower() == vLower));
+            }
+
+            // Filtro por estado
+            if (!string.IsNullOrWhiteSpace(filtroEstado) && filtroEstado != "Todos")
+            {
+                if (filtroEstado == "Enviado a caja") query = query.Where(v => v.status == "Pendiente");
+                else if (filtroEstado == "Pagado") query = query.Where(v => v.status == "Emitido");
+                else if (filtroEstado == "Anulado") query = query.Where(v => v.status == "Anulado");
+            }
+
+            // Buscador por N° Ticket, Cliente o RUT
+            if (!string.IsNullOrWhiteSpace(busqueda))
+            {
+                string q = busqueda.Trim().ToLower();
+                query = query.Where(v => v.nroDTE.ToString().Contains(q) ||
+                                        (v.RazonSocial != null && v.RazonSocial.ToLower().Contains(q)) ||
+                                        (v.RuT != null && v.RuT.ToLower().Contains(q)));
+            }
+
+            return query
+                .OrderByDescending(v => v.FecDoc)
+                .Select(v => new TicketVendedorDTO
+                {
+                    IdTve = v.idTve,
+                    NroTicket = v.nroDTE,
+                    FechaHora = v.FecDoc,
+                    Cliente = string.IsNullOrWhiteSpace(v.RazonSocial) ? "Consumidor Final" : v.RazonSocial,
+                    Total = v.Total,
+                    EstadoBD = v.status ?? "",
+                    EstadoVisual = v.status == "Emitido" ? "🟢 Pagado" :
+                                   v.status == "Pendiente" ? "🟡 Enviado a caja" : "🔴 Anulado"
+                })
+                .ToList();
+        }
+    }
+
+    public class TicketVendedorDTO
+    {
+        public int IdTve { get; set; }
+        public int NroTicket { get; set; }
+        public DateTime FechaHora { get; set; }
+        public string Cliente { get; set; } = string.Empty;
+        public decimal Total { get; set; }
+        public string EstadoBD { get; set; } = string.Empty;
+        public string EstadoVisual { get; set; } = string.Empty;
     }
 }

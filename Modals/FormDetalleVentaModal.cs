@@ -108,7 +108,7 @@ namespace SISTEMAACTUALIZADO.Modals
             };
             Label lblStatusValue = new Label
             {
-                Text = isAnulado ? "Anulado con Nota de Crédito" : "Emitido / Pagado",
+                Text = isAnulado ? "Anulado" : "Emitido / Pagado",
                 Font = new Font("Segoe UI", 9F, FontStyle.Bold),
                 ForeColor = isAnulado ? Color.FromArgb(185, 28, 28) : Color.FromArgb(22, 101, 52),
                 Location = new Point(38, 20),

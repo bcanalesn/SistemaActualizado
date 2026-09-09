@@ -276,13 +276,14 @@ namespace SISTEMAACTUALIZADO
                 Margin = new Padding(0, 0, 0, 4) 
             };
 
-            Panel pnlVendedor = new Panel { Dock = DockStyle.Right, Width = 220, Height = 38, BackColor = Color.Transparent };
-            Label lblVendIcon = new Label { Text = "👤", Location = new Point(2, 7), AutoSize = true, Font = new Font("Segoe UI", 11F) };
+            // MODIFICACIÓN AQUÍ: Aumentamos el ancho de 220 a 345 para que quepan el combo y el botón
+            Panel pnlVendedor = new Panel { Dock = DockStyle.Right, Width = 345, Height = 38, BackColor = Color.Transparent };
+            Label lblVendIcon = new Label { Text = "👤", Location = new Point(4, 7), Size = new Size(18, 20), Font = new Font("Segoe UI", 9.5F) };
 
             cbVendedor = new ComboBox
             {
-                Location = new Point(32, 5),
-                Size = new Size(180, 28),
+                Location = new Point(26, 5),
+                Size = new Size(160, 28),
                 DropDownStyle = ComboBoxStyle.DropDownList,
                 Font = new Font("Segoe UI", 9.5F, FontStyle.Bold)
             };
@@ -291,7 +292,31 @@ namespace SISTEMAACTUALIZADO
             cbVendedor.SelectedItem = cbVendedor.Items.Contains(_vendedorActualNombre) ? _vendedorActualNombre : "Bárbara";
             cbVendedor.SelectedIndexChanged += CbVendedor_SelectedIndexChanged;
 
-            pnlVendedor.Controls.AddRange(new Control[] { lblVendIcon, cbVendedor });
+            // BOTÓN NUEVO: VER TICKETS DEL VENDEDOR SELECCIONADO
+            Button btnVerMisTickets = new Button
+            {
+                Text = "📋 Ver Tickets",
+                Location = new Point(194, 4),
+                Size = new Size(140, 30),
+                BackColor = Color.White,
+                ForeColor = Color.FromArgb(37, 99, 235),
+                FlatStyle = FlatStyle.Flat,
+                Font = new Font("Segoe UI", 8.5F, FontStyle.Bold),
+                Cursor = Cursors.Hand
+            };
+            btnVerMisTickets.FlatAppearance.BorderColor = Color.FromArgb(191, 219, 254);
+            btnVerMisTickets.Click += (s, e) =>
+            {
+                string vendedor = cbVendedor.SelectedItem?.ToString() ?? _vendedorActualNombre;
+                var listaVend = cbVendedor.Items.Cast<string>().ToList();
+
+                using var modalHistorial = new FormHistorialTicketsModal(vendedor, listaVend);
+                modalHistorial.ShowDialog(this);
+            };
+
+            pnlVendedor.Controls.AddRange(new Control[] { lblVendIcon, cbVendedor, btnVerMisTickets });
+
+            
 
             Panel pnlBusquedaBox = new Panel
             {
