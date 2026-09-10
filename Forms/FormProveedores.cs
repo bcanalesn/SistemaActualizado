@@ -1,16 +1,16 @@
 using System;
 using System.Collections.Generic;
 using System.Drawing;
-using System.Linq;
 using System.Windows.Forms;
-using SISTEMAACTUALIZADO.Data;
 using SISTEMAACTUALIZADO.Models;
+using SISTEMAACTUALIZADO.Modals;
+using SISTEMAACTUALIZADO.Services;
 
 namespace SISTEMAACTUALIZADO
 {
     public class FormProveedores : Form
     {
-        private AppDbContext _db = new AppDbContext();
+        private readonly ProveedorService _proveedorService = new ProveedorService();
 
         private TextBox txtBuscar = null!;
         private Button btnBuscar = null!;
@@ -22,7 +22,6 @@ namespace SISTEMAACTUALIZADO
 
         private DataGridView dgvProveedores = null!;
         private Proveedor? _proveedorSeleccionado = null;
-        private List<Proveedor> _listaMemoria = new List<Proveedor>();
 
         public FormProveedores()
         {
@@ -216,50 +215,25 @@ namespace SISTEMAACTUALIZADO
 
         private void CargarProveedores(string filtro = "")
         {
-            List<Proveedor> listaFinal = new List<Proveedor>();
-
             try
             {
-                var dbSetProperty = _db.GetType().GetProperty("Proveedores");
-                if (dbSetProperty != null && dbSetProperty.GetValue(_db) is IQueryable<Proveedor> query)
-                {
-                    if (!string.IsNullOrWhiteSpace(filtro))
-                    {
-                        query = query.Where(p => p.RazonSocial.Contains(filtro) || p.Rut.Contains(filtro) || p.Giro.Contains(filtro));
-                    }
-                    listaFinal = query.OrderBy(p => p.RazonSocial).ToList();
-                }
-                else
-                {
-                    listaFinal = FiltrarMemoria(filtro);
-                }
+                var listaFinal = _proveedorService.ObtenerProveedores(filtro);
+                dgvProveedores.DataSource = null;
+                dgvProveedores.DataSource = listaFinal;
+
+                if (dgvProveedores.Columns["ProveedorID"] != null) dgvProveedores.Columns["ProveedorID"].HeaderText = "ID";
+                if (dgvProveedores.Columns["Rut"] != null) dgvProveedores.Columns["Rut"].HeaderText = "RUT Empresa";
+                if (dgvProveedores.Columns["RazonSocial"] != null) dgvProveedores.Columns["RazonSocial"].HeaderText = "Razón Social";
+                if (dgvProveedores.Columns["Giro"] != null) dgvProveedores.Columns["Giro"].HeaderText = "Giro Comercial";
+                if (dgvProveedores.Columns["Telefono"] != null) dgvProveedores.Columns["Telefono"].HeaderText = "Teléfono";
+                if (dgvProveedores.Columns["Email"] != null) dgvProveedores.Columns["Email"].HeaderText = "Correo Electrónico";
+                if (dgvProveedores.Columns["Direccion"] != null) dgvProveedores.Columns["Direccion"].HeaderText = "Dirección";
+                if (dgvProveedores.Columns["Estado"] != null) dgvProveedores.Columns["Estado"].HeaderText = "Estado";
             }
-            catch
+            catch (Exception ex)
             {
-                listaFinal = FiltrarMemoria(filtro);
+                MessageBox.Show($"Error al cargar proveedores: {ex.Message}", "Error", MessageBoxButtons.OK, MessageBoxIcon.Error);
             }
-
-            dgvProveedores.DataSource = null;
-            dgvProveedores.DataSource = listaFinal;
-
-            if (dgvProveedores.Columns["ProveedorID"] != null) dgvProveedores.Columns["ProveedorID"].HeaderText = "ID";
-            if (dgvProveedores.Columns["Rut"] != null) dgvProveedores.Columns["Rut"].HeaderText = "RUT Empresa";
-            if (dgvProveedores.Columns["RazonSocial"] != null) dgvProveedores.Columns["RazonSocial"].HeaderText = "Razón Social";
-            if (dgvProveedores.Columns["Giro"] != null) dgvProveedores.Columns["Giro"].HeaderText = "Giro Comercial";
-            if (dgvProveedores.Columns["Telefono"] != null) dgvProveedores.Columns["Telefono"].HeaderText = "Teléfono";
-            if (dgvProveedores.Columns["Email"] != null) dgvProveedores.Columns["Email"].HeaderText = "Correo Electrónico";
-            if (dgvProveedores.Columns["Direccion"] != null) dgvProveedores.Columns["Direccion"].HeaderText = "Dirección";
-            if (dgvProveedores.Columns["Estado"] != null) dgvProveedores.Columns["Estado"].HeaderText = "Estado";
-        }
-
-        private List<Proveedor> FiltrarMemoria(string filtro)
-        {
-            if (string.IsNullOrWhiteSpace(filtro)) return _listaMemoria.OrderBy(p => p.RazonSocial).ToList();
-
-            string f = filtro.ToLower();
-            return _listaMemoria.Where(p => p.RazonSocial.ToLower().Contains(f) ||
-                                           p.Rut.ToLower().Contains(f) ||
-                                           p.Giro.ToLower().Contains(f)).OrderBy(p => p.RazonSocial).ToList();
         }
 
         private void DgvProveedores_SelectionChanged(object? sender, EventArgs e)
@@ -280,36 +254,44 @@ namespace SISTEMAACTUALIZADO
 
         private void BtnDemo_Click(object? sender, EventArgs e)
         {
-            var demos = new List<Proveedor>
+            try
             {
-                new Proveedor { ProveedorID = 1, Rut = "76.888.999-1", RazonSocial = "DISTRIBUIDORA LÁCTEOS SUR S.A.", Giro = "DISTRIBUCION DE PRODUCTOS LACTEOS Y PERECIBLES", Telefono = "+56 9 8888 1111", Email = "ventas@lacteossur.cl", Direccion = "Av. Industrial #450, Santiago", Estado = true },
-                new Proveedor { ProveedorID = 2, Rut = "96.543.210-5", RazonSocial = "COMERCIALIZADORA DE ABARROTES CENTRAL LTA", Giro = "IMPORTADORA Y DISTRIBUIDORA DE ABARROTES", Telefono = "+56 2 2333 4444", Email = "contacto@abarrotescentral.cl", Direccion = "Calle El Roble #1200, Quilicura", Estado = true },
-                new Proveedor { ProveedorID = 3, Rut = "77.111.222-3", RazonSocial = "EMBUTIDOS Y CECINAS DEL VALLE SPALTD", Giro = "ELABORACION Y DISTRIBUCION DE CECINAS Y CARNES", Telefono = "+56 9 7777 3333", Email = "pedidos@cecinasdelvalle.cl", Direccion = "Ruta 5 Sur Km 210, Talca", Estado = true }
-            };
-
-            int agregados = 0;
-            foreach (var p in demos)
-            {
-                if (!_listaMemoria.Any(x => x.Rut == p.Rut))
+                int agregados = _proveedorService.CargarProveedoresDemo();
+                if (agregados > 0)
                 {
-                    _listaMemoria.Add(p);
-                    agregados++;
+                    MessageBox.Show($"¡Se agregaron {agregados} proveedores de prueba exitosamente!", "Éxito Demo", MessageBoxButtons.OK, MessageBoxIcon.Information);
+                    CargarProveedores();
+                }
+                else
+                {
+                    MessageBox.Show("Los proveedores de prueba ya se encontraban registrados en la base de datos.", "Aviso", MessageBoxButtons.OK, MessageBoxIcon.Information);
                 }
             }
-
-            if (agregados > 0)
+            catch (Exception ex)
             {
-                MessageBox.Show($"¡Se agregaron {agregados} proveedores de prueba exitosamente!", "Éxito Demo", MessageBoxButtons.OK, MessageBoxIcon.Information);
-                CargarProveedores();
-            }
-            else
-            {
-                MessageBox.Show("Los proveedores de prueba ya se encontraban cargados.", "Aviso", MessageBoxButtons.OK, MessageBoxIcon.Information);
+                MessageBox.Show($"Error al cargar datos demo: {ex.Message}", "Error", MessageBoxButtons.OK, MessageBoxIcon.Error);
             }
         }
 
-        private void BtnNuevo_Click(object? sender, EventArgs e) => MostrarModalProveedor(null);
-        private void BtnEditar_Click(object? sender, EventArgs e) { if (_proveedorSeleccionado != null) MostrarModalProveedor(_proveedorSeleccionado); }
+        private void BtnNuevo_Click(object? sender, EventArgs e)
+        {
+            using var modal = new FormNuevoProveedorModal();
+            if (modal.ShowDialog(this) == DialogResult.OK)
+            {
+                CargarProveedores(txtBuscar.Text.Trim());
+            }
+        }
+
+        private void BtnEditar_Click(object? sender, EventArgs e)
+        {
+            if (_proveedorSeleccionado == null) return;
+
+            using var modal = new FormNuevoProveedorModal(_proveedorSeleccionado);
+            if (modal.ShowDialog(this) == DialogResult.OK)
+            {
+                CargarProveedores(txtBuscar.Text.Trim());
+            }
+        }
 
         private void BtnEstado_Click(object? sender, EventArgs e)
         {
@@ -320,88 +302,16 @@ namespace SISTEMAACTUALIZADO
 
             if (result == DialogResult.Yes)
             {
-                _proveedorSeleccionado.Estado = !_proveedorSeleccionado.Estado;
-                CargarProveedores(txtBuscar.Text.Trim());
+                try
+                {
+                    _proveedorService.AlternarEstado(_proveedorSeleccionado.ProveedorID);
+                    CargarProveedores(txtBuscar.Text.Trim());
+                }
+                catch (Exception ex)
+                {
+                    MessageBox.Show($"Error al cambiar estado: {ex.Message}", "Error", MessageBoxButtons.OK, MessageBoxIcon.Error);
+                }
             }
-        }
-
-        private void MostrarModalProveedor(Proveedor? proveedor)
-        {
-            bool esNuevo = (proveedor == null);
-            Proveedor p = proveedor ?? new Proveedor();
-
-            Form modal = new Form
-            {
-                Text = esNuevo ? "Registrar Nuevo Proveedor" : "Editar Datos de Proveedor",
-                Size = new Size(420, 520),
-                StartPosition = FormStartPosition.CenterParent,
-                FormBorderStyle = FormBorderStyle.FixedDialog,
-                MaximizeBox = false,
-                MinimizeBox = false,
-                BackColor = Color.White
-            };
-
-            Label lblTitle = new Label { Text = esNuevo ? "🚚 Nuevo Proveedor" : "✏️ Editar Proveedor", Location = new Point(25, 18), Font = new Font("Segoe UI", 12F, FontStyle.Bold), AutoSize = true, ForeColor = Color.FromArgb(15, 23, 42) };
-
-            Label lblRut = new Label { Text = "RUT Empresa:", Location = new Point(25, 55), AutoSize = true, Font = new Font("Segoe UI", 9F, FontStyle.Bold) };
-            TextBox txtRut = new TextBox { Text = p.Rut, Location = new Point(25, 75), Size = new Size(350, 28), Font = new Font("Segoe UI", 9.5F) };
-
-            Label lblRazon = new Label { Text = "Razón Social / Nombre Empresa:", Location = new Point(25, 110), AutoSize = true, Font = new Font("Segoe UI", 9F, FontStyle.Bold) };
-            TextBox txtRazon = new TextBox { Text = p.RazonSocial, Location = new Point(25, 130), Size = new Size(350, 28), Font = new Font("Segoe UI", 9.5F) };
-
-            Label lblGiro = new Label { Text = "Giro Comercial:", Location = new Point(25, 165), AutoSize = true, Font = new Font("Segoe UI", 9F, FontStyle.Bold) };
-            TextBox txtGiro = new TextBox { Text = p.Giro, Location = new Point(25, 185), Size = new Size(350, 28), Font = new Font("Segoe UI", 9.5F) };
-
-            Label lblTel = new Label { Text = "Teléfono de Contacto:", Location = new Point(25, 220), AutoSize = true, Font = new Font("Segoe UI", 9F, FontStyle.Bold) };
-            TextBox txtTel = new TextBox { Text = p.Telefono, Location = new Point(25, 240), Size = new Size(350, 28), Font = new Font("Segoe UI", 9.5F) };
-
-            Label lblEmail = new Label { Text = "Correo Electrónico:", Location = new Point(25, 275), AutoSize = true, Font = new Font("Segoe UI", 9F, FontStyle.Bold) };
-            TextBox txtEmail = new TextBox { Text = p.Email, Location = new Point(25, 295), Size = new Size(350, 28), Font = new Font("Segoe UI", 9.5F) };
-
-            Label lblDir = new Label { Text = "Dirección Comercial:", Location = new Point(25, 330), AutoSize = true, Font = new Font("Segoe UI", 9F, FontStyle.Bold) };
-            TextBox txtDir = new TextBox { Text = p.Direccion, Location = new Point(25, 350), Size = new Size(350, 28), Font = new Font("Segoe UI", 9.5F) };
-
-            Button btnGuardar = new Button
-            {
-                Text = esNuevo ? "💾 Guardar Proveedor" : "💾 Guardar Cambios",
-                Location = new Point(25, 405),
-                Size = new Size(350, 42),
-                BackColor = Color.FromArgb(0, 102, 255),
-                ForeColor = Color.White,
-                FlatStyle = FlatStyle.Flat,
-                Font = new Font("Segoe UI", 9.5F, FontStyle.Bold),
-                Cursor = Cursors.Hand
-            };
-            btnGuardar.FlatAppearance.BorderSize = 0;
-
-            btnGuardar.Click += (s, e) =>
-            {
-                if (string.IsNullOrWhiteSpace(txtRut.Text) || string.IsNullOrWhiteSpace(txtRazon.Text))
-                {
-                    MessageBox.Show("El RUT y la Razón Social del proveedor son obligatorios.", "Validación", MessageBoxButtons.OK, MessageBoxIcon.Warning);
-                    return;
-                }
-
-                p.Rut = txtRut.Text.Trim();
-                p.RazonSocial = txtRazon.Text.Trim();
-                p.Giro = txtGiro.Text.Trim();
-                p.Telefono = txtTel.Text.Trim();
-                p.Email = txtEmail.Text.Trim();
-                p.Direccion = txtDir.Text.Trim();
-
-                if (esNuevo && !_listaMemoria.Contains(p))
-                {
-                    p.ProveedorID = _listaMemoria.Count + 1;
-                    _listaMemoria.Add(p);
-                }
-
-                MessageBox.Show("Proveedor guardado correctamente.", "Éxito", MessageBoxButtons.OK, MessageBoxIcon.Information);
-                modal.Close();
-                CargarProveedores(txtBuscar.Text.Trim());
-            };
-
-            modal.Controls.AddRange(new Control[] { lblTitle, lblRut, txtRut, lblRazon, txtRazon, lblGiro, txtGiro, lblTel, txtTel, lblEmail, txtEmail, lblDir, txtDir, btnGuardar });
-            modal.ShowDialog();
         }
     }
 }

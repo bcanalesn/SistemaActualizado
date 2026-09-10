@@ -1,15 +1,15 @@
 using System;
 using System.Collections.Generic;
 using System.Drawing;
-using System.Linq;
 using System.Windows.Forms;
-using SISTEMAACTUALIZADO.Data;
-using SISTEMAACTUALIZADO.Models;
+using SISTEMAACTUALIZADO.Services;
 
 namespace SISTEMAACTUALIZADO.Modals
 {
     public class FormConfigurarMargenesModal : Form
     {
+        private readonly ProductoService _productoService = new ProductoService();
+
         private RadioButton rbTodo = null!;
         private RadioButton rbCategoria = null!;
         private ComboBox cbCategorias = null!;
@@ -29,22 +29,17 @@ namespace SISTEMAACTUALIZADO.Modals
         {
             try
             {
-                using var db = new AppDbContext();
-                var margenesBD = db.ConfiguracionMargenes.OrderBy(m => m.NumeroLista).ToList();
+                decimal[] margenes = ProductoService.ObtenerMargenesConfigurados();
 
                 for (int i = 0; i < 10; i++)
                 {
-                    int nro = i + 1;
-                    var item = margenesBD.FirstOrDefault(m => m.NumeroLista == nro);
-                    decimal porcentaje = item != null ? item.PorcentajeMargen : 0m;
-                    
-                    _margenesOriginales[i] = porcentaje; // Guarda el valor previo en memoria
-                    if (numMargenes[i] != null) numMargenes[i].Value = porcentaje;
+                    _margenesOriginales[i] = margenes[i];
+                    if (numMargenes[i] != null) numMargenes[i].Value = margenes[i];
                 }
             }
             catch (Exception ex)
             {
-                MessageBox.Show($"Error al cargar configuración de márgenes: {ex.Message}", "Error DB", MessageBoxButtons.OK, MessageBoxIcon.Warning);
+                MessageBox.Show($"Error al cargar configuración de márgenes: {ex.Message}", "Error", MessageBoxButtons.OK, MessageBoxIcon.Warning);
             }
         }
 
@@ -84,7 +79,6 @@ namespace SISTEMAACTUALIZADO.Modals
             };
             pnlHeader.Controls.AddRange(new Control[] { lblTitulo, lblSub });
 
-            // Ámbito
             GroupBox gbAmbito = new GroupBox
             {
                 Text = "Aplicar a:",
@@ -111,7 +105,6 @@ namespace SISTEMAACTUALIZADO.Modals
             rbCategoria.CheckedChanged += (s, e) => cbCategorias.Enabled = rbCategoria.Checked;
             gbAmbito.Controls.AddRange(new Control[] { rbTodo, rbCategoria, cbCategorias });
 
-            // Panel de Listas
             Panel pnlListas = new Panel
             {
                 Location = new Point(16, 142),
@@ -162,7 +155,6 @@ namespace SISTEMAACTUALIZADO.Modals
                 yPos += 30;
             }
 
-            // Opciones y Botones
             chkRedondear = new CheckBox
             {
                 Text = "Redondear precios calculados a la decena más cercana (ej: $1.426 ➔ $1.430)",
@@ -211,76 +203,30 @@ namespace SISTEMAACTUALIZADO.Modals
 
             try
             {
-                using var db = new AppDbContext();
-
-                // 1. Guardar los porcentajes reales exactos en la tabla configuracion_margenes
+                decimal[] nuevosMargenes = new decimal[10];
                 for (int i = 0; i < 10; i++)
                 {
-                    int nroLista = i + 1;
-                    decimal nuevoPorcentaje = numMargenes[i].Value;
-
-                    // Solo si el usuario cambió el número de ESTA lista específica
-                    if (nuevoPorcentaje != _margenesOriginales[i])
-                    {
-                        var config = db.ConfiguracionMargenes.FirstOrDefault(m => m.NumeroLista == nroLista);
-                        if (config != null)
-                        {
-                            config.PorcentajeMargen = nuevoPorcentaje;
-                            config.UltimaModificacion = DateTime.Now; // <-- Se actualiza SOLO esta lista
-                        }
-                    }
-                }
-                db.SaveChanges(); // Persiste en MySQL Workbench de forma definitiva
-
-                // 2. Recalcular los productos según el ámbito seleccionado
-                IQueryable<Producto> query = db.Productos.Where(p => p.Estado);
-
-                if (rbCategoria.Checked && cbCategorias.SelectedItem != null)
-                {
-                    string cat = cbCategorias.SelectedItem.ToString()!;
-                    query = query.Where(p => p.Categoria == cat);
+                    nuevosMargenes[i] = numMargenes[i].Value;
                 }
 
-                var productos = query.ToList();
-                bool redondear = chkRedondear.Checked;
+                string? categoriaFiltro = (rbCategoria.Checked && cbCategorias.SelectedItem != null) 
+                    ? cbCategorias.SelectedItem.ToString() 
+                    : null;
 
-                foreach (var prod in productos)
-                {
-                    if (prod.PrecioCosto <= 0) continue;
-                    decimal costo = prod.PrecioCosto;
+                int totalRecalculados = _productoService.AplicarMargenesYRecalcularPrecios(
+                    nuevosMargenes, 
+                    _margenesOriginales, 
+                    chkRedondear.Checked, 
+                    categoriaFiltro
+                );
 
-                    prod.MargenGanancia = numMargenes[0].Value;
-                    prod.PrecioUnitario = CalcularPrecio(costo, numMargenes[0].Value, redondear);
-                    prod.Precio2 = CalcularPrecio(costo, numMargenes[1].Value, redondear);
-                    prod.Precio3 = CalcularPrecio(costo, numMargenes[2].Value, redondear);
-                    prod.Precio4 = CalcularPrecio(costo, numMargenes[3].Value, redondear);
-                    prod.Precio5 = CalcularPrecio(costo, numMargenes[4].Value, redondear);
-                    prod.Precio6 = CalcularPrecio(costo, numMargenes[5].Value, redondear);
-                    prod.Precio7 = CalcularPrecio(costo, numMargenes[6].Value, redondear);
-                    prod.Precio8 = CalcularPrecio(costo, numMargenes[7].Value, redondear);
-                    prod.Precio9 = CalcularPrecio(costo, numMargenes[8].Value, redondear);
-                    prod.Precio10 = CalcularPrecio(costo, numMargenes[9].Value, redondear);
-
-                    prod.FchUpd = DateTime.Now;
-                    prod.Sincro = 0;
-                }
-
-                db.SaveChanges();
-                MessageBox.Show($"Márgenes guardados en BD y precios recalculados para {productos.Count} producto(s).", "Éxito", MessageBoxButtons.OK, MessageBoxIcon.Information);
+                MessageBox.Show($"Márgenes guardados en BD y precios recalculados para {totalRecalculados} producto(s).", "Éxito", MessageBoxButtons.OK, MessageBoxIcon.Information);
                 this.DialogResult = DialogResult.OK;
             }
             catch (Exception ex)
             {
-                MessageBox.Show($"Error al guardar márgenes:\n{ex.Message}", "Error DB", MessageBoxButtons.OK, MessageBoxIcon.Error);
+                MessageBox.Show($"Error al guardar márgenes:\n{ex.Message}", "Error", MessageBoxButtons.OK, MessageBoxIcon.Error);
             }
-        }
-
-        private decimal CalcularPrecio(decimal costo, decimal margen, bool redondear)
-        {
-            if (costo <= 0 || margen <= 0) return 0;
-            decimal neto = costo * (1m + (margen / 100m));
-            decimal bruto = neto * 1.19m;
-            return redondear ? Math.Round(bruto / 10m, MidpointRounding.AwayFromZero) * 10m : Math.Round(bruto, 0);
         }
     }
 }

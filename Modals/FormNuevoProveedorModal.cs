@@ -1,10 +1,9 @@
 using System;
 using System.Drawing;
-using System.Drawing.Drawing2D;
 using System.Runtime.InteropServices;
 using System.Windows.Forms;
-using SISTEMAACTUALIZADO.Data;
 using SISTEMAACTUALIZADO.Models;
+using SISTEMAACTUALIZADO.Services;
 
 namespace SISTEMAACTUALIZADO.Modals
 {
@@ -14,6 +13,8 @@ namespace SISTEMAACTUALIZADO.Modals
         private extern static void ReleaseCapture();
         [DllImport("user32.DLL", EntryPoint = "SendMessage")]
         private extern static void SendMessage(IntPtr hWnd, int wMsg, int wParam, int lParam);
+
+        private readonly ProveedorService _proveedorService = new ProveedorService();
 
         private TextBox txtRut = null!;
         private TextBox txtRazonSocial = null!;
@@ -47,7 +48,6 @@ namespace SISTEMAACTUALIZADO.Modals
             };
             pnlBorde.Paint += (s, e) =>
             {
-                e.Graphics.SmoothingMode = SmoothingMode.AntiAlias;
                 ControlPaint.DrawBorder(e.Graphics, pnlBorde.ClientRectangle, Color.FromArgb(203, 213, 225), ButtonBorderStyle.Solid);
             };
 
@@ -180,49 +180,22 @@ namespace SISTEMAACTUALIZADO.Modals
 
             try
             {
-                using var db = new AppDbContext();
+                var p = _proveedorAEditar ?? new Proveedor();
+                p.Rut = rut;
+                p.RazonSocial = razonSocial;
+                p.Giro = txtGiro.Text.Trim();
+                p.Telefono = txtTelefono.Text.Trim();
+                p.Email = txtEmail.Text.Trim();
+                p.Direccion = txtDireccion.Text.Trim();
 
-                if (_proveedorAEditar == null)
-                {
-                    // Crear Nuevo
-                    var nuevo = new Proveedor
-                    {
-                        Rut = rut,
-                        RazonSocial = razonSocial,
-                        Giro = txtGiro.Text.Trim(),
-                        Telefono = txtTelefono.Text.Trim(),
-                        Email = txtEmail.Text.Trim(),
-                        Direccion = txtDireccion.Text.Trim(),
-                        Estado = true
-                    };
-
-                    db.Proveedores.Add(nuevo);
-                    db.SaveChanges();
-                    ProveedorResultado = nuevo;
-                }
-                else
-                {
-                    // Editar Existente
-                    var provBd = db.Proveedores.Find(_proveedorAEditar.ProveedorID);
-                    if (provBd != null)
-                    {
-                        provBd.Rut = rut;
-                        provBd.RazonSocial = razonSocial;
-                        provBd.Giro = txtGiro.Text.Trim();
-                        provBd.Telefono = txtTelefono.Text.Trim();
-                        provBd.Email = txtEmail.Text.Trim();
-                        provBd.Direccion = txtDireccion.Text.Trim();
-                        db.SaveChanges();
-                        ProveedorResultado = provBd;
-                    }
-                }
+                ProveedorResultado = _proveedorService.GuardarProveedor(p);
 
                 this.DialogResult = DialogResult.OK;
                 this.Close();
             }
             catch (Exception ex)
             {
-                MessageBox.Show($"Error al guardar el proveedor:\n{ex.Message}", "Error DB", MessageBoxButtons.OK, MessageBoxIcon.Error);
+                MessageBox.Show($"Error al guardar el proveedor:\n{ex.Message}", "Error", MessageBoxButtons.OK, MessageBoxIcon.Error);
             }
         }
     }

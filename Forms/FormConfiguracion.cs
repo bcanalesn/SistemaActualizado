@@ -1,14 +1,15 @@
 using System;
 using System.Drawing;
-using System.Linq;
 using System.Windows.Forms;
-using SISTEMAACTUALIZADO.Data;
 using SISTEMAACTUALIZADO.Models;
+using SISTEMAACTUALIZADO.Services;
 
 namespace SISTEMAACTUALIZADO.Forms
 {
     public class FormConfiguracion : Form
     {
+        private readonly ConfiguracionService _configService = new ConfiguracionService();
+
         private TextBox txtRut = null!;
         private TextBox txtRazonSocial = null!;
         private TextBox txtGiro = null!;
@@ -122,10 +123,9 @@ namespace SISTEMAACTUALIZADO.Forms
 
         private void CargarDatos()
         {
-            using var db = new AppDbContext();
-            var emp = db.ConfiguracionEmpresa.FirstOrDefault(e => e.EmpresaID == 1);
-            if (emp != null)
+            try
             {
+                var emp = _configService.ObtenerDatosEmpresa();
                 txtRut.Text = emp.Rut;
                 txtRazonSocial.Text = emp.RazonSocial;
                 txtGiro.Text = emp.Giro;
@@ -138,39 +138,39 @@ namespace SISTEMAACTUALIZADO.Forms
                 txtResolucionSII.Text = emp.ResolucionSII;
                 txtTextoPie.Text = emp.TextoPieTicket;
             }
+            catch (Exception ex)
+            {
+                MessageBox.Show($"Error al cargar configuración: {ex.Message}", "Error", MessageBoxButtons.OK, MessageBoxIcon.Error);
+            }
         }
 
         private void BtnGuardar_Click(object? sender, EventArgs e)
         {
             try
             {
-                using var db = new AppDbContext();
-                var emp = db.ConfiguracionEmpresa.FirstOrDefault(e => e.EmpresaID == 1);
-                if (emp == null)
+                var datos = new ConfiguracionEmpresa
                 {
-                    emp = new ConfiguracionEmpresa { EmpresaID = 1 };
-                    db.ConfiguracionEmpresa.Add(emp);
-                }
+                    EmpresaID = 1,
+                    Rut = txtRut.Text.Trim(),
+                    RazonSocial = txtRazonSocial.Text.Trim(),
+                    Giro = txtGiro.Text.Trim(),
+                    Direccion = txtDireccion.Text.Trim(),
+                    Comuna = txtComuna.Text.Trim(),
+                    Ciudad = txtCiudad.Text.Trim(),
+                    Telefono = txtTelefono.Text.Trim(),
+                    Email = txtEmail.Text.Trim(),
+                    UnidadSII = txtUnidadSII.Text.Trim(),
+                    ResolucionSII = txtResolucionSII.Text.Trim(),
+                    TextoPieTicket = txtTextoPie.Text.Trim()
+                };
 
-                emp.Rut = txtRut.Text.Trim();
-                emp.RazonSocial = txtRazonSocial.Text.Trim();
-                emp.Giro = txtGiro.Text.Trim();
-                emp.Direccion = txtDireccion.Text.Trim();
-                emp.Comuna = txtComuna.Text.Trim();
-                emp.Ciudad = txtCiudad.Text.Trim();
-                emp.Telefono = txtTelefono.Text.Trim();
-                emp.Email = txtEmail.Text.Trim();
-                emp.UnidadSII = txtUnidadSII.Text.Trim();
-                emp.ResolucionSII = txtResolucionSII.Text.Trim();
-                emp.TextoPieTicket = txtTextoPie.Text.Trim();
-
-                db.SaveChanges();
+                _configService.GuardarDatosEmpresa(datos);
                 MessageBox.Show("Datos de la empresa guardados correctamente.\nLos nuevos tickets saldrán con esta información.", "Éxito", MessageBoxButtons.OK, MessageBoxIcon.Information);
                 CargarDatos();
             }
             catch (Exception ex)
             {
-                MessageBox.Show($"Error al guardar: {ex.Message}", "Error DB", MessageBoxButtons.OK, MessageBoxIcon.Error);
+                MessageBox.Show($"Error al guardar configuración: {ex.Message}", "Error", MessageBoxButtons.OK, MessageBoxIcon.Error);
             }
         }
     }

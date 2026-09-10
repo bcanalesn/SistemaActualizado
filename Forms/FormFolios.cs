@@ -5,18 +5,18 @@ using System.Linq;
 using System.Windows.Forms;
 using SISTEMAACTUALIZADO.Data;
 using SISTEMAACTUALIZADO.Models;
+using SISTEMAACTUALIZADO.Services;
 
 namespace SISTEMAACTUALIZADO
 {
     public class FormFolios : Form
     {
-        private AppDbContext _db = new AppDbContext();
+        private readonly FolioService _folioService = new FolioService();
 
         private DataGridView dgvFolios = null!;
         private Button btnNuevo = null!;
         private Button btnEditar = null!;
         private Button btnRefrescar = null!;
-
         private Folio? _folioSeleccionado = null;
 
         public FormFolios()
@@ -157,8 +157,7 @@ namespace SISTEMAACTUALIZADO
         {
             try
             {
-                var lista = _db.Folios.OrderBy(f => f.TipoDocumento).ToList();
-                dgvFolios.DataSource = lista;
+                dgvFolios.DataSource = _folioService.ObtenerFolios();
 
                 if (dgvFolios.Columns["FolioID"] != null) dgvFolios.Columns["FolioID"].HeaderText = "ID";
                 if (dgvFolios.Columns["TipoDocumento"] != null) dgvFolios.Columns["TipoDocumento"].HeaderText = "Tipo Documento (DTE)";
@@ -171,7 +170,7 @@ namespace SISTEMAACTUALIZADO
             }
             catch (Exception ex)
             {
-                MessageBox.Show($"Error al cargar folios: {ex.Message}", "Error DB", MessageBoxButtons.OK, MessageBoxIcon.Error);
+                MessageBox.Show($"Error al cargar folios: {ex.Message}", "Error", MessageBoxButtons.OK, MessageBoxIcon.Error);
             }
         }
 
@@ -258,8 +257,7 @@ namespace SISTEMAACTUALIZADO
 
                 try
                 {
-                    if (esNuevo) _db.Folios.Add(f);
-                    _db.SaveChanges();
+                    _folioService.GuardarFolio(f, esNuevo);
 
                     MessageBox.Show("Rango de folios guardado exitosamente.", "Éxito", MessageBoxButtons.OK, MessageBoxIcon.Information);
                     modal.Close();

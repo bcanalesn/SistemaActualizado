@@ -19,7 +19,6 @@ namespace SISTEMAACTUALIZADO.Services
 
                 int nroTicketAtencion = (int)(DateTime.Now.Ticks % 1000000);
 
-                // Buscar datos del cliente si no es consumidor final
                 string rutLimpio = RutHelper.Limpiar(clienteRut ?? "");
                 var clienteDb = db.Clientes.FirstOrDefault(c => !string.IsNullOrEmpty(rutLimpio) && (c.Rut == rutLimpio || c.Rut == clienteRut));
 
@@ -90,21 +89,22 @@ namespace SISTEMAACTUALIZADO.Services
             }
         }
 
-        // =========================================================================
-        // CONSULTA READ-ONLY PARA HISTORIAL DE TICKETS POR VENDEDOR
-        // =========================================================================
+        public List<TVD2607> ObtenerDetallesVenta(int idTve)
+        {
+            using var db = new AppDbContext();
+            return db.TVD2607.AsNoTracking().Where(d => d.idTve == idTve).ToList();
+        }
+
         public List<TicketVendedorDTO> ObtenerMisTickets(string nombreVendedor, DateTime fecha, string? filtroEstado = null, string? busqueda = null)
         {
             using var db = new AppDbContext();
             DateTime inicio = fecha.Date;
             DateTime fin = fecha.Date.AddDays(1).AddTicks(-1);
 
-            // Consulta desacoplada y rápida (AsNoTracking)
             var query = db.TVE2607
                 .AsNoTracking()
                 .Where(v => v.FecDoc >= inicio && v.FecDoc <= fin);
 
-            // Filtrar por el vendedor seleccionado
             if (!string.IsNullOrWhiteSpace(nombreVendedor) && nombreVendedor != "Todos")
             {
                 string vLower = nombreVendedor.Trim().ToLower();
@@ -112,7 +112,6 @@ namespace SISTEMAACTUALIZADO.Services
                                         (v.UserDTE != null && v.UserDTE.ToLower() == vLower));
             }
 
-            // Filtro por estado
             if (!string.IsNullOrWhiteSpace(filtroEstado) && filtroEstado != "Todos")
             {
                 if (filtroEstado == "Enviado a caja") query = query.Where(v => v.status == "Pendiente");
@@ -120,7 +119,6 @@ namespace SISTEMAACTUALIZADO.Services
                 else if (filtroEstado == "Anulado") query = query.Where(v => v.status == "Anulado");
             }
 
-            // Buscador por N° Ticket, Cliente o RUT
             if (!string.IsNullOrWhiteSpace(busqueda))
             {
                 string q = busqueda.Trim().ToLower();
@@ -143,6 +141,12 @@ namespace SISTEMAACTUALIZADO.Services
                                    v.status == "Pendiente" ? "🟡 Enviado a caja" : "🔴 Anulado"
                 })
                 .ToList();
+        }
+
+        public TVE2607? ObtenerVentaPorId(int idTve)
+        {
+            using var db = new AppDbContext();
+            return db.TVE2607.AsNoTracking().FirstOrDefault(v => v.idTve == idTve);
         }
     }
 

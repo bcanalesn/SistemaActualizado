@@ -1,12 +1,11 @@
 using System;
 using System.Drawing;
 using System.Drawing.Drawing2D;
-using System.Linq;
 using System.Runtime.InteropServices;
 using System.Windows.Forms;
-using SISTEMAACTUALIZADO.Data;
 using SISTEMAACTUALIZADO.Helpers;
 using SISTEMAACTUALIZADO.Models;
+using SISTEMAACTUALIZADO.Services;
 
 namespace SISTEMAACTUALIZADO.Modals
 {
@@ -17,6 +16,7 @@ namespace SISTEMAACTUALIZADO.Modals
         [DllImport("user32.DLL", EntryPoint = "SendMessage")]
         private extern static void SendMessage(IntPtr hWnd, int wMsg, int wParam, int lParam);
 
+        private readonly CompraService _compraService = new CompraService();
         private readonly int _compraId;
 
         public FormDetalleCompraModal(int compraId)
@@ -53,11 +53,10 @@ namespace SISTEMAACTUALIZADO.Modals
         {
             try
             {
-                using var db = new AppDbContext();
-                var compra = db.Compras.FirstOrDefault(c => c.CompraID == _compraId);
+                var compra = _compraService.ObtenerCompraPorId(_compraId);
                 if (compra == null) return;
 
-                var detalles = db.DetalleCompras.Where(d => d.CompraID == _compraId).ToList();
+                var detalles = _compraService.ObtenerDetallesCompra(_compraId);
 
                 Panel pnlBorde = (Panel)this.Controls[0];
                 pnlBorde.Controls.Clear();

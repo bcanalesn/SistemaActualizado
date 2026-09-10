@@ -15,6 +15,13 @@ namespace SISTEMAACTUALIZADO.Services
             _db = db;
         }
 
+        public static int EmitirNotasCreditoDirecto(IEnumerable<int> idsTveOrigen, string motivo, string codigoREF, bool reponerStock)
+        {
+            using var db = new AppDbContext();
+            var service = new NotaCreditoService(db);
+            return service.EmitirNotasCredito(idsTveOrigen, motivo, codigoREF, reponerStock);
+        }
+
         public bool EmitirNotaCredito(int idTveOrigen, string motivo, string codigoREF, bool reponerStock)
         {
             return EmitirNotasCredito(new[] { idTveOrigen }, motivo, codigoREF, reponerStock) > 0;

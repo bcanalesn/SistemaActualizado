@@ -6,7 +6,6 @@ using System.IO;
 using System.Linq;
 using System.Text;
 using System.Windows.Forms;
-using SISTEMAACTUALIZADO.Data;
 using SISTEMAACTUALIZADO.Models;
 using SISTEMAACTUALIZADO.Modals;
 using SISTEMAACTUALIZADO.Services;
@@ -15,6 +14,8 @@ namespace SISTEMAACTUALIZADO
 {
     public class FormLibroVentas : Form
     {
+        private readonly LibroContableService _libroService = new LibroContableService();
+
         // Tarjetas KPI Superiores
         private Label lblKpiTotalVentas = null!;
         private Label lblKpiCantDocs = null!;
@@ -83,7 +84,6 @@ namespace SISTEMAACTUALIZADO
                 AutoScroll = true
             };
 
-            // 1. SECCIÓN SUPERIOR DE KPIS
             Panel pnlKpiWrapper = new Panel
             {
                 Dock = DockStyle.Top,
@@ -119,7 +119,6 @@ namespace SISTEMAACTUALIZADO
             pnlKpisLayout.Controls.Add(card4, 3, 0);
             pnlKpiWrapper.Controls.Add(pnlKpisLayout);
 
-            // 2. SECCIÓN FILTROS Y ACCIONES
             Panel pnlFiltrosWrapper = new Panel
             {
                 Dock = DockStyle.Top,
@@ -189,7 +188,6 @@ namespace SISTEMAACTUALIZADO
             pnlFiltrosCard.Controls.Add(flowFiltrosFila1);
             pnlFiltrosWrapper.Controls.Add(pnlFiltrosCard);
 
-            // 3. TABLA Y PANEL LATERAL RESUMEN CONTABLE
             TableLayoutPanel pnlGridAndDetail = new TableLayoutPanel { Dock = DockStyle.Top, Height = 480, ColumnCount = 2, RowCount = 1 };
             pnlGridAndDetail.ColumnStyles.Add(new ColumnStyle(SizeType.Percent, 73F));
             pnlGridAndDetail.ColumnStyles.Add(new ColumnStyle(SizeType.Percent, 27F));
@@ -238,7 +236,6 @@ namespace SISTEMAACTUALIZADO
             pnlTableCard.Controls.Add(dgvLibro);
             pnlTableCard.Controls.Add(pnlPaginador);
 
-            // PANEL LATERAL RESUMEN CONTABLE
             Panel pnlDetailCard = CrearTarjetaRedondeada(0, 0, 0, 0, Color.White, Color.FromArgb(226, 232, 240));
             pnlDetailCard.Dock = DockStyle.Fill;
             pnlDetailCard.Padding = new Padding(14);
@@ -300,7 +297,6 @@ namespace SISTEMAACTUALIZADO
             pnl.Padding = new Padding(12);
 
             Label lblIcon = new Label { Text = icon, Font = new Font("Segoe UI", 12F), BackColor = iconBg, Size = new Size(36, 36), TextAlign = ContentAlignment.MiddleCenter, Location = new Point(12, 12) };
-
             Label lblT = new Label { Text = titulo, Font = new Font("Segoe UI", 8F, FontStyle.Bold), ForeColor = Color.FromArgb(100, 116, 139), Location = new Point(56, 10), AutoSize = true };
             lblValor = new Label { Text = valInit, Font = new Font("Segoe UI", 13F, FontStyle.Bold), ForeColor = Color.FromArgb(15, 23, 42), Location = new Point(56, 26), AutoSize = true };
             lblSub = new Label { Text = subInit, Font = new Font("Segoe UI", 7.5F), ForeColor = Color.FromArgb(100, 116, 139), Location = new Point(56, 52), AutoSize = true };
@@ -451,63 +447,29 @@ namespace SISTEMAACTUALIZADO
         {
             try
             {
-                using (var db = new AppDbContext())
-                {
-                    // FILTRADO ESTRICTO: NO SE INCLUYEN TICKETS DE ATENCIÓN EN EL LIBRO DE VENTAS OFICIAL
-                    _ventasCargadas = db.TVE2607
-                        .Where(v => v.FecDoc >= desde && v.FecDoc <= hasta && 
-                                    v.Documento != "Ticket de Atención" && 
-                                    v.iddocDTE != 0)
-                        .OrderByDescending(v => v.FecDoc)
-                        .ToList();
-                }
+                var resumen = _libroService.ObtenerLibroVentas(desde, hasta);
+                _ventasCargadas = resumen.Ventas;
 
-                CalcularMetricas();
+                lblKpiTotalVentas.Text = $"$ {resumen.TotalVentas:N0}";
+                lblKpiCantDocs.Text = $"Con {resumen.CantidadDocumentos} documentos";
+                lblKpiBoletas.Text = resumen.CantidadBoletas.ToString();
+                lblKpiPctBoletas.Text = $"{resumen.PorcentajeBoletas}% del total";
+                lblKpiFacturas.Text = resumen.CantidadFacturas.ToString();
+                lblKpiPctFacturas.Text = $"{resumen.PorcentajeFacturas}% del total";
+                lblKpiDevoluciones.Text = resumen.CantidadNotasCredito.ToString();
+                lblKpiMontoDev.Text = $"$ {resumen.MontoNotasCredito:N0}";
+
+                lblResumenNeto.Text = $"$ {resumen.TotalNeto:N0}";
+                lblResumenIva.Text = $"$ {resumen.DebitoFiscalTotal:N0}";
+                lblResumenNotasCredito.Text = $"$ {resumen.MontoNotasCredito:N0}";
+                lblResumenTotalDebito.Text = $"$ {resumen.DebitoFiscalTotal:N0}";
+
                 FiltrarLocalmente();
             }
             catch (Exception ex)
             {
-                MessageBox.Show($"Error al cargar el Libro de Ventas: {ex.Message}", "Error DB", MessageBoxButtons.OK, MessageBoxIcon.Error);
+                MessageBox.Show($"Error al cargar el Libro de Ventas: {ex.Message}", "Error", MessageBoxButtons.OK, MessageBoxIcon.Error);
             }
-        }
-
-        private void CalcularMetricas()
-        {
-            var validas = _ventasCargadas.Where(v => !v.status.Contains("Anulado")).ToList();
-
-            var boletas = validas.Where(v => v.Documento.Contains("Boleta")).ToList();
-            var facturas = validas.Where(v => v.Documento.Contains("Factura")).ToList();
-            
-            // Solo Notas de Crédito emitidas oficialmente (iddocDTE == 61)
-            var notasCredito = _ventasCargadas.Where(v => v.iddocDTE == 61 || v.Documento.Contains("Crédito")).ToList();
-
-            decimal totalVentas = validas.Where(v => v.iddocDTE != 61).Sum(v => v.Total);
-            int cantDocs = validas.Count;
-
-            decimal netoTotal = validas.Where(v => v.iddocDTE != 61).Sum(v => v.Neto);
-            decimal ivaBoletas = boletas.Sum(v => v.IvA);
-            decimal ivaFacturas = facturas.Sum(v => v.IvA);
-            decimal ivaNotasCredito = notasCredito.Sum(v => v.IvA);
-            decimal debitoFiscalTotal = (ivaFacturas + ivaBoletas) - ivaNotasCredito;
-
-            // KPIs Superiores
-            lblKpiTotalVentas.Text = $"$ {totalVentas:N0}";
-            lblKpiCantDocs.Text = $"Con {cantDocs} documentos";
-
-            lblKpiBoletas.Text = boletas.Count.ToString();
-            lblKpiPctBoletas.Text = cantDocs > 0 ? $"{Math.Round((decimal)boletas.Count / cantDocs * 100, 0)}% del total" : "0% del total";
-
-            lblKpiFacturas.Text = facturas.Count.ToString();
-            lblKpiPctFacturas.Text = cantDocs > 0 ? $"{Math.Round((decimal)facturas.Count / cantDocs * 100, 0)}% del total" : "0% del total";
-
-            lblKpiDevoluciones.Text = notasCredito.Count.ToString();
-            lblKpiMontoDev.Text = $"$ {notasCredito.Sum(d => d.Total):N0}";
-
-            // Panel Lateral F29
-            lblResumenNeto.Text = $"$ {netoTotal:N0}";
-            lblResumenIva.Text = $"$ {debitoFiscalTotal:N0}";
-            lblResumenNotasCredito.Text = $"$ {notasCredito.Sum(d => d.Total):N0}";
-            lblResumenTotalDebito.Text = $"$ {debitoFiscalTotal:N0}";
         }
 
         private void EjcutarBusqueda()
@@ -595,7 +557,6 @@ namespace SISTEMAACTUALIZADO
             return lista;
         }
 
-        // DOBLE CLIC ABRE EL MODAL MODULARIZADO
         private void DgvLibro_CellDoubleClick(object? sender, DataGridViewCellEventArgs e)
         {
             if (e.RowIndex < 0) return;
@@ -603,10 +564,8 @@ namespace SISTEMAACTUALIZADO
             dynamic item = dgvLibro.Rows[e.RowIndex].DataBoundItem;
             TVE2607 venta = item.ObjetoOriginal;
 
-            using (var modal = new FormDetalleVentaModal(venta))
-            {
-                modal.ShowDialog(this);
-            }
+            using var modal = new FormDetalleVentaModal(venta);
+            modal.ShowDialog(this);
         }
 
         private void BtnExportarCSV_Click(object? sender, EventArgs e)
@@ -704,17 +663,13 @@ namespace SISTEMAACTUALIZADO
 
                 try
                 {
-                    using (var db = new AppDbContext())
-                    {
-                        var notaCreditoService = new NotaCreditoService(db);
-                        var idsVentas = ventasParaAnular.Select(v => v.idTve);
-                        int totalEmitidas = notaCreditoService.EmitirNotasCredito(idsVentas, txtMotivo.Text.Trim(), (cbCausa.SelectedIndex + 1).ToString(), chkRestock.Checked);
+                    var idsVentas = ventasParaAnular.Select(v => v.idTve);
+                    int totalEmitidas = NotaCreditoService.EmitirNotasCreditoDirecto(idsVentas, txtMotivo.Text.Trim(), (cbCausa.SelectedIndex + 1).ToString(), chkRestock.Checked);
 
-                        if (totalEmitidas == 0)
-                        {
-                            MessageBox.Show("No se emitieron Notas de Crédito. Verifique que las ventas seleccionadas sean válidas.", "Sin cambios", MessageBoxButtons.OK, MessageBoxIcon.Warning);
-                            return;
-                        }
+                    if (totalEmitidas == 0)
+                    {
+                        MessageBox.Show("No se emitieron Notas de Crédito. Verifique que las ventas seleccionadas sean válidas.", "Sin cambios", MessageBoxButtons.OK, MessageBoxIcon.Warning);
+                        return;
                     }
 
                     MessageBox.Show($"¡Se emitieron las Notas de Crédito exitosamente para {ventasParaAnular.Count} documento(s)!", "Proceso Exitoso", MessageBoxButtons.OK, MessageBoxIcon.Information);
@@ -723,7 +678,7 @@ namespace SISTEMAACTUALIZADO
                 }
                 catch (Exception ex)
                 {
-                    MessageBox.Show($"Error al emitir Notas de Crédito: {ex.Message}", "Error DB", MessageBoxButtons.OK, MessageBoxIcon.Error);
+                    MessageBox.Show($"Error al emitir Notas de Crédito: {ex.Message}", "Error", MessageBoxButtons.OK, MessageBoxIcon.Error);
                 }
             };
 

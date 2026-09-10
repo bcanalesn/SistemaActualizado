@@ -4,7 +4,6 @@ using System.Drawing;
 using System.Drawing.Drawing2D;
 using System.Linq;
 using System.Windows.Forms;
-using SISTEMAACTUALIZADO.Data;
 using SISTEMAACTUALIZADO.Helpers;
 using SISTEMAACTUALIZADO.Models;
 using SISTEMAACTUALIZADO.Services;
@@ -210,8 +209,7 @@ namespace SISTEMAACTUALIZADO.Modals
             {
                 if (dgvTickets.CurrentRow != null && int.TryParse(dgvTickets.CurrentRow.Cells["IdTve"].Value?.ToString(), out int idTve))
                 {
-                    using var db = new AppDbContext();
-                    var venta = db.TVE2607.Find(idTve);
+                    var venta = _ventaService.ObtenerVentaPorId(idTve);
                     if (venta != null)
                     {
                         var modal = new FormDetalleVentaModal(venta);

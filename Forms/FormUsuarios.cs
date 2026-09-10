@@ -4,12 +4,13 @@ using System.Linq;
 using System.Windows.Forms;
 using SISTEMAACTUALIZADO.Data;
 using SISTEMAACTUALIZADO.Models;
+using SISTEMAACTUALIZADO.Services;
 
 namespace SISTEMAACTUALIZADO
 {
     public class FormUsuarios : Form
     {
-        private AppDbContext _db = new AppDbContext();
+        private readonly UsuarioService _usuarioService = new UsuarioService();
 
         private TextBox txtBuscar = null!;
         private Button btnBuscar = null!;
@@ -202,37 +203,19 @@ namespace SISTEMAACTUALIZADO
         {
             try
             {
-                var query = _db.Usuarios.AsQueryable();
-
-                if (!string.IsNullOrWhiteSpace(filtro))
-                {
-                    query = query.Where(u => u.NombreUsuario.Contains(filtro) || u.NombreCompleto.Contains(filtro));
-                }
-
-                var lista = query.OrderBy(u => u.NombreUsuario).ToList();
+                var lista = _usuarioService.ObtenerUsuarios(filtro);
                 dgvUsuarios.DataSource = lista;
 
-                DataGridViewColumn? columnaId = dgvUsuarios.Columns["UsuarioID"];
-                if (columnaId != null) columnaId.HeaderText = "ID";
-
-                DataGridViewColumn? columnaNombreUsuario = dgvUsuarios.Columns["NombreUsuario"];
-                if (columnaNombreUsuario != null) columnaNombreUsuario.HeaderText = "Usuario (Login)";
-
-                DataGridViewColumn? columnaNombreCompleto = dgvUsuarios.Columns["NombreCompleto"];
-                if (columnaNombreCompleto != null) columnaNombreCompleto.HeaderText = "Nombre Completo";
-
-                DataGridViewColumn? columnaRol = dgvUsuarios.Columns["Rol"];
-                if (columnaRol != null) columnaRol.HeaderText = "Rol / Perfil";
-
-                DataGridViewColumn? columnaClave = dgvUsuarios.Columns["Clave"];
-                if (columnaClave != null) columnaClave.Visible = false;
-
-                DataGridViewColumn? columnaEstado = dgvUsuarios.Columns["Estado"];
-                if (columnaEstado != null) columnaEstado.HeaderText = "Activo";
+                if (dgvUsuarios.Columns["UsuarioID"] != null) dgvUsuarios.Columns["UsuarioID"].HeaderText = "ID";
+                if (dgvUsuarios.Columns["NombreUsuario"] != null) dgvUsuarios.Columns["NombreUsuario"].HeaderText = "Usuario (Login)";
+                if (dgvUsuarios.Columns["NombreCompleto"] != null) dgvUsuarios.Columns["NombreCompleto"].HeaderText = "Nombre Completo";
+                if (dgvUsuarios.Columns["Rol"] != null) dgvUsuarios.Columns["Rol"].HeaderText = "Rol / Perfil";
+                if (dgvUsuarios.Columns["Clave"] != null) dgvUsuarios.Columns["Clave"].Visible = false;
+                if (dgvUsuarios.Columns["Estado"] != null) dgvUsuarios.Columns["Estado"].HeaderText = "Activo";
             }
             catch (Exception ex)
             {
-                MessageBox.Show($"Error al cargar usuarios: {ex.Message}", "Error DB", MessageBoxButtons.OK, MessageBoxIcon.Error);
+                MessageBox.Show($"Error al cargar usuarios: {ex.Message}", "Error", MessageBoxButtons.OK, MessageBoxIcon.Error);
             }
         }
 
@@ -270,19 +253,18 @@ namespace SISTEMAACTUALIZADO
             if (_usuarioSeleccionado == null) return;
 
             string accion = _usuarioSeleccionado.Estado ? "desactivar" : "activar";
-            var result = MessageBox.Show($"¿Desea {accion} la cuenta del usuario '{_usuarioSeleccionado.NombreUsuario}'?", "Confirmar estado", MessageBoxButtons.YesNo, MessageBoxIcon.Question);
+            var result = MessageBox.Show($"¿Desea {accion} la cuenta de '{_usuarioSeleccionado.NombreUsuario}'?", "Confirmar estado", MessageBoxButtons.YesNo, MessageBoxIcon.Question);
 
             if (result == DialogResult.Yes)
             {
                 try
                 {
-                    _usuarioSeleccionado.Estado = !_usuarioSeleccionado.Estado;
-                    _db.SaveChanges();
+                    _usuarioService.AlternarEstado(_usuarioSeleccionado.UsuarioID);
                     CargarUsuarios(txtBuscar.Text.Trim());
                 }
                 catch (Exception ex)
                 {
-                    MessageBox.Show($"Error al actualizar estado: {ex.Message}", "Error DB", MessageBoxButtons.OK, MessageBoxIcon.Error);
+                    MessageBox.Show($"Error al actualizar estado: {ex.Message}", "Error", MessageBoxButtons.OK, MessageBoxIcon.Error);
                 }
             }
         }
@@ -346,11 +328,7 @@ namespace SISTEMAACTUALIZADO
 
                 try
                 {
-                    if (esNuevo)
-                    {
-                        _db.Usuarios.Add(u);
-                    }
-                    _db.SaveChanges();
+                    _usuarioService.GuardarUsuario(u, esNuevo);
 
                     MessageBox.Show("Cuenta de usuario guardada con éxito.", "Éxito", MessageBoxButtons.OK, MessageBoxIcon.Information);
                     modal.Close();

@@ -1,6 +1,7 @@
 using System;
 using System.Collections.Generic;
 using System.Linq;
+using Microsoft.EntityFrameworkCore;
 using SISTEMAACTUALIZADO.Data;
 using SISTEMAACTUALIZADO.Models;
 
@@ -11,7 +12,7 @@ namespace SISTEMAACTUALIZADO.Services
         public List<Producto> ObtenerProductosActivos(string filtro = "", string categoria = "Todas", string familia = "Todas")
         {
             using var db = new AppDbContext();
-            var query = db.Productos.Where(p => p.Estado).AsQueryable();
+            var query = db.Productos.AsNoTracking().Where(p => p.Estado).AsQueryable();
 
             if (!string.IsNullOrWhiteSpace(categoria) && categoria != "Todas")
             {
@@ -38,6 +39,7 @@ namespace SISTEMAACTUALIZADO.Services
         {
             using var db = new AppDbContext();
             return db.Productos
+                .AsNoTracking()
                 .Where(p => p.Estado && !string.IsNullOrEmpty(p.Categoria))
                 .Select(p => p.Categoria)
                 .Distinct()
@@ -48,7 +50,7 @@ namespace SISTEMAACTUALIZADO.Services
         public List<string> ObtenerFamiliasPorCategoria(string categoria)
         {
             using var db = new AppDbContext();
-            var query = db.Productos.Where(p => p.Estado);
+            var query = db.Productos.AsNoTracking().Where(p => p.Estado);
 
             if (!string.IsNullOrWhiteSpace(categoria) && categoria != "Todas")
             {
@@ -63,10 +65,176 @@ namespace SISTEMAACTUALIZADO.Services
                 .ToList();
         }
 
+        public List<string> ObtenerTodasLasFamilias()
+        {
+            using var db = new AppDbContext();
+            return db.Productos
+                .AsNoTracking()
+                .Where(p => p.Estado && !string.IsNullOrEmpty(p.NFamilia))
+                .Select(p => p.NFamilia!)
+                .Distinct()
+                .OrderBy(f => f)
+                .ToList();
+        }
+
+        public Producto GuardarProducto(Producto producto, List<TramoEscalaDTO> tramos, bool esModoEscala, int cantidadFacturaInicial = 0)
+        {
+            using var db = new AppDbContext();
+
+            if (producto.ProductoID == 0)
+            {
+                if (cantidadFacturaInicial > 0)
+                {
+                    producto.Stock = cantidadFacturaInicial;
+                }
+                db.Productos.Add(producto);
+                db.SaveChanges();
+
+                GuardarReglasEscalaBD(db, producto.ProductoID, producto.Nombre, tramos, esModoEscala);
+                return producto;
+            }
+            else
+            {
+                var prodBd = db.Productos.Find(producto.ProductoID);
+                if (prodBd != null)
+                {
+                    prodBd.CodigoBarra = producto.CodigoBarra;
+                    prodBd.Nombre = producto.Nombre;
+                    prodBd.Categoria = producto.Categoria;
+                    prodBd.NFamilia = producto.NFamilia;
+                    prodBd.PrecioCosto = producto.PrecioCosto;
+                    prodBd.ListaDefectoPOS = producto.ListaDefectoPOS;
+                    prodBd.PrecioUnitario = producto.PrecioUnitario;
+                    prodBd.Stock = producto.Stock;
+                    prodBd.StockMinimo = producto.StockMinimo;
+                    prodBd.ImagenPath = producto.ImagenPath;
+                    prodBd.FchUpd = DateTime.Now;
+                    prodBd.Sincro = 0;
+
+                    GuardarReglasEscalaBD(db, prodBd.ProductoID, prodBd.Nombre, tramos, esModoEscala);
+                    db.SaveChanges();
+                    return prodBd;
+                }
+                return producto;
+            }
+        }
+
+        private void GuardarReglasEscalaBD(AppDbContext db, int productoId, string nombreProducto, List<TramoEscalaDTO> tramos, bool esModoEscala)
+        {
+            var existentes = db.PreciosQ.Where(pq => pq.IdProducto == productoId).ToList();
+            int bloqueoEstado = esModoEscala ? 0 : 1;
+
+            if (tramos.Count >= 2)
+            {
+                if (existentes.Count > 0)
+                {
+                    db.PreciosQ.RemoveRange(existentes);
+                }
+
+                var prod = db.Productos.Find(productoId);
+
+                foreach (var f in tramos)
+                {
+                    decimal precioValor = prod != null ? ObtenerPrecioPorNumeroLista(prod, f.NumeroLista) : 0m;
+
+                    db.PreciosQ.Add(new PrecioQ
+                    {
+                        IdProducto = productoId,
+                        NProducto = nombreProducto,
+                        Qini = f.Desde,
+                        Qfin = f.Hasta,
+                        NPrecio = precioValor,
+                        IdPrecio = f.NumeroLista.ToString(),
+                        Bloqueo = bloqueoEstado,
+                        FchMod = DateTime.Now,
+                        HoraMod = DateTime.Now.ToString("HH:mm:ss")
+                    });
+                }
+                db.SaveChanges();
+            }
+        }
+
+        public List<PrecioQ> ObtenerReglasEscala(int productoId)
+        {
+            using var db = new AppDbContext();
+            return db.PreciosQ
+                .AsNoTracking()
+                .Where(pq => pq.IdProducto == productoId)
+                .OrderBy(pq => pq.Qini)
+                .ToList();
+        }
+
+        public void EliminarProducto(int productoId)
+        {
+            using var db = new AppDbContext();
+            var prod = db.Productos.Find(productoId);
+            if (prod != null)
+            {
+                prod.Estado = false;
+                db.SaveChanges();
+            }
+        }
+
+        public int AplicarMargenesYRecalcularPrecios(decimal[] nuevosMargenes, decimal[] margenesOriginales, bool redondear, string? categoriaFiltro)
+        {
+            using var db = new AppDbContext();
+
+            for (int i = 0; i < 10; i++)
+            {
+                int nroLista = i + 1;
+                decimal nuevoPorcentaje = nuevosMargenes[i];
+
+                if (nuevoPorcentaje != margenesOriginales[i])
+                {
+                    var config = db.ConfiguracionMargenes.FirstOrDefault(m => m.NumeroLista == nroLista);
+                    if (config != null)
+                    {
+                        config.PorcentajeMargen = nuevoPorcentaje;
+                        config.UltimaModificacion = DateTime.Now;
+                    }
+                }
+            }
+            db.SaveChanges();
+
+            IQueryable<Producto> query = db.Productos.Where(p => p.Estado);
+
+            if (!string.IsNullOrWhiteSpace(categoriaFiltro))
+            {
+                query = query.Where(p => p.Categoria == categoriaFiltro);
+            }
+
+            var productos = query.ToList();
+
+            foreach (var prod in productos)
+            {
+                if (prod.PrecioCosto <= 0) continue;
+                decimal costo = prod.PrecioCosto;
+
+                prod.MargenGanancia = nuevosMargenes[0];
+                prod.PrecioUnitario = CalcularPrecioVenta(costo, nuevosMargenes[0], redondear);
+                prod.Precio2 = CalcularPrecioVenta(costo, nuevosMargenes[1], redondear);
+                prod.Precio3 = CalcularPrecioVenta(costo, nuevosMargenes[2], redondear);
+                prod.Precio4 = CalcularPrecioVenta(costo, nuevosMargenes[3], redondear);
+                prod.Precio5 = CalcularPrecioVenta(costo, nuevosMargenes[4], redondear);
+                prod.Precio6 = CalcularPrecioVenta(costo, nuevosMargenes[5], redondear);
+                prod.Precio7 = CalcularPrecioVenta(costo, nuevosMargenes[6], redondear);
+                prod.Precio8 = CalcularPrecioVenta(costo, nuevosMargenes[7], redondear);
+                prod.Precio9 = CalcularPrecioVenta(costo, nuevosMargenes[8], redondear);
+                prod.Precio10 = CalcularPrecioVenta(costo, nuevosMargenes[9], redondear);
+
+                prod.FchUpd = DateTime.Now;
+                prod.Sincro = 0;
+            }
+
+            db.SaveChanges();
+            return productos.Count;
+        }
+
         public decimal ObtenerPrecioSegunCantidad(int productoId, int cantidad, decimal precioBase)
         {
             using var db = new AppDbContext();
             var escala = db.PreciosQ
+                .AsNoTracking()
                 .FirstOrDefault(pq => pq.IdProducto == productoId && 
                                       pq.Bloqueo == 0 && 
                                       cantidad >= pq.Qini && 
@@ -81,10 +249,10 @@ namespace SISTEMAACTUALIZADO.Services
 
             using var db = new AppDbContext();
 
-            // 1. EVALUAR PRECIO ESPECIAL TEMPORAL VIGENTE PARA EL CLIENTE
             if (clienteId > 0)
             {
                 var especial = db.PreciosEspecialesClientes
+                    .AsNoTracking()
                     .Where(p => p.ClienteId == clienteId && 
                                 p.ProductoId == prod.ProductoID && 
                                 p.Estado && 
@@ -99,11 +267,10 @@ namespace SISTEMAACTUALIZADO.Services
                 }
             }
 
-            // 2. OBTENER PRECIO SEGÚN LA LISTA PREFERENCIAL DEL CLIENTE
             decimal precioCliente = ObtenerPrecioPorNumeroLista(prod, listaCliente);
 
-            // 3. EVALUAR SI CALIFICA A MEJOR TRAMO POR VOLUMEN (PreciosQ)
             var reglaTramo = db.PreciosQ
+                .AsNoTracking()
                 .Where(pq => pq.IdProducto == prod.ProductoID && pq.Bloqueo == 0 && cantidad >= pq.Qini && cantidad <= pq.Qfin)
                 .FirstOrDefault();
 
@@ -128,8 +295,8 @@ namespace SISTEMAACTUALIZADO.Services
             DateTime hoy = DateTime.Today;
             using var db = new AppDbContext();
 
-            var query = from pe in db.PreciosEspecialesClientes
-                        join pr in db.Productos on pe.ProductoId equals pr.ProductoID
+            var query = from pe in db.PreciosEspecialesClientes.AsNoTracking()
+                        join pr in db.Productos.AsNoTracking() on pe.ProductoId equals pr.ProductoID
                         where pe.ClienteId == clienteId && pe.Estado && pe.FechaInicio <= hoy && pe.FechaFin >= hoy
                         select new
                         {
@@ -140,6 +307,34 @@ namespace SISTEMAACTUALIZADO.Services
                         };
 
             return query.ToList().Select(x => (x.Nombre, x.PrecioEspecial, x.FechaInicio, x.FechaFin)).ToList();
+        }
+
+        public List<PrecioEspecialItemDTO> ObtenerPreciosEspecialesCliente(int clienteId)
+        {
+            DateTime hoy = DateTime.Today;
+            using var db = new AppDbContext();
+
+            return (from pe in db.PreciosEspecialesClientes.AsNoTracking()
+                    join pr in db.Productos.AsNoTracking() on pe.ProductoId equals pr.ProductoID
+                    where pe.ClienteId == clienteId && pe.Estado
+                    orderby pe.FechaFin descending
+                    select new PrecioEspecialItemDTO
+                    {
+                        IdEspecial = pe.IdEspecial,
+                        Producto = pr.Nombre,
+                        CostoBase = pr.PrecioCosto,
+                        PrecioEspecial = pe.PrecioEspecial,
+                        Desde = pe.FechaInicio,
+                        Hasta = pe.FechaFin,
+                        EstadoVigencia = (pe.FechaInicio <= hoy && pe.FechaFin >= hoy) ? "🟢 VIGENTE" : (pe.FechaFin < hoy ? "🔴 EXPIRADO" : "🟡 PROGRAMADO")
+                    }).Take(10).ToList();
+        }
+
+        public void GuardarPrecioEspecial(PrecioEspecialCliente precioEspecial)
+        {
+            using var db = new AppDbContext();
+            db.PreciosEspecialesClientes.Add(precioEspecial);
+            db.SaveChanges();
         }
 
         public decimal ObtenerPrecioPorNumeroLista(Producto prod, int nroLista)
@@ -169,14 +364,13 @@ namespace SISTEMAACTUALIZADO.Services
             return 1;
         }
 
-        // Obtiene los márgenes globales vigentes configurados en el sistema
         public static decimal[] ObtenerMargenesConfigurados()
         {
             decimal[] margenes = new decimal[10];
             try
             {
                 using var db = new AppDbContext();
-                var listaMargenes = db.ConfiguracionMargenes.ToList();
+                var listaMargenes = db.ConfiguracionMargenes.AsNoTracking().ToList();
 
                 for (int i = 0; i < 10; i++)
                 {
@@ -187,10 +381,9 @@ namespace SISTEMAACTUALIZADO.Services
             }
             catch { }
 
-            return margenes; // Retorna exactamente lo que tú hayas guardado en el modal
+            return margenes;
         }
 
-        // Calcula el precio bruto final con IVA y redondeo a la decena
         public static decimal CalcularPrecioVenta(decimal costoNeto, decimal margenPorcentaje, bool redondear = true)
         {
             if (costoNeto <= 0 || margenPorcentaje <= 0) return 0m;
@@ -199,7 +392,6 @@ namespace SISTEMAACTUALIZADO.Services
             return redondear ? Math.Round(bruto / 10m, MidpointRounding.AwayFromZero) * 10m : Math.Round(bruto, 0);
         }
 
-        // Aplica el nuevo costo y recalcula todas las listas activas (> 0%)
         public static void AplicarNuevoCostoYRecalcularListas(Producto prod, decimal nuevoCostoNeto, decimal[]? margenes = null)
         {
             if (nuevoCostoNeto <= 0) return;
@@ -219,5 +411,13 @@ namespace SISTEMAACTUALIZADO.Services
             prod.FchUpd = DateTime.Now;
             prod.Sincro = 0;
         }
+    }
+
+    public class TramoEscalaDTO
+    {
+        public int NumeroTramo { get; set; }
+        public decimal Desde { get; set; }
+        public decimal Hasta { get; set; }
+        public int NumeroLista { get; set; }
     }
 }

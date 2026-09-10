@@ -3,7 +3,6 @@ using System.Collections.Generic;
 using System.Drawing;
 using System.Linq;
 using System.Windows.Forms;
-using SISTEMAACTUALIZADO.Data;
 using SISTEMAACTUALIZADO.Helpers;
 using SISTEMAACTUALIZADO.Models;
 using SISTEMAACTUALIZADO.Services;
@@ -14,6 +13,8 @@ namespace SISTEMAACTUALIZADO
     public class FormCompras : Form
     {
         private readonly CompraService _compraService = new CompraService();
+        private readonly ProveedorService _proveedorService = new ProveedorService();
+        private readonly ProductoService _productoService = new ProductoService();
         private List<DetalleCompra> _detalleFactura = new List<DetalleCompra>();
         private List<Producto> _productosCache = new List<Producto>();
         private List<Proveedor> _proveedoresCache = new List<Proveedor>();
@@ -810,9 +811,15 @@ namespace SISTEMAACTUALIZADO
 
         private void CargarDatosIniciales()
         {
-            using var db = new AppDbContext();
-            _proveedoresCache = db.Proveedores.Where(p => p.Estado).OrderBy(p => p.RazonSocial).ToList();
-            _productosCache = db.Productos.Where(p => p.Estado).OrderBy(p => p.Nombre).ToList();
+            try
+            {
+                _proveedoresCache = _proveedorService.ObtenerProveedoresActivos();
+                _productosCache = _productoService.ObtenerProductosActivos();
+            }
+            catch (Exception ex)
+            {
+                MessageBox.Show($"Error al cargar datos iniciales: {ex.Message}", "Error", MessageBoxButtons.OK, MessageBoxIcon.Error);
+            }
         }
 
         private void PosicionarListaSugerencias(ListBox lista, Control referenciaCampo)

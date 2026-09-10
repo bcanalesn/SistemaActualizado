@@ -4,32 +4,30 @@ using System.Drawing;
 using System.Drawing.Drawing2D;
 using System.Linq;
 using System.Windows.Forms;
-using SISTEMAACTUALIZADO.Data;
 using SISTEMAACTUALIZADO.Helpers;
 using SISTEMAACTUALIZADO.Models;
+using SISTEMAACTUALIZADO.Services;
 
 namespace SISTEMAACTUALIZADO.Modals
 {
     public class FormDetalleVentaModal : Form
     {
+        private readonly VentaService _ventaService = new VentaService();
         private readonly TVE2607 _venta;
         private List<TVD2607> _detalles = new List<TVD2607>();
 
         public FormDetalleVentaModal(TVE2607 venta)
         {
             _venta = venta;
-            CargarDetallesDesdeBD();
+            CargarDetallesDesdeServicio();
             InitializeComponent();
         }
 
-        private void CargarDetallesDesdeBD()
+        private void CargarDetallesDesdeServicio()
         {
             try
             {
-                using (var db = new AppDbContext())
-                {
-                    _detalles = db.TVD2607.Where(d => d.idTve == _venta.idTve).ToList();
-                }
+                _detalles = _ventaService.ObtenerDetallesVenta(_venta.idTve);
             }
             catch
             {
@@ -57,7 +55,6 @@ namespace SISTEMAACTUALIZADO.Modals
                 BackColor = Color.White
             };
 
-            // 1. Metadatos
             TableLayoutPanel pnlMetadatos = new TableLayoutPanel
             {
                 Dock = DockStyle.Top,
@@ -82,7 +79,6 @@ namespace SISTEMAACTUALIZADO.Modals
             pnlMetadatos.Controls.Add(CrearMetaItem("👤 Vendedora", vendedoraTexto), 3, 0);
             pnlMetadatos.Controls.Add(CrearMetaItem("🏢 Cliente", clienteTexto), 4, 0);
 
-            // 2. Banner de Estado
             bool isAnulado = _venta.status.Contains("Anulado");
             Panel pnlStatusBanner = CrearTarjetaRedondeada(0, 0, 0, 44,
                 isAnulado ? Color.FromArgb(254, 242, 242) : Color.FromArgb(240, 253, 244),
@@ -116,7 +112,6 @@ namespace SISTEMAACTUALIZADO.Modals
             };
             pnlStatusBanner.Controls.AddRange(new Control[] { lblStatusIcon, lblStatusTitle, lblStatusValue });
 
-            // 3. Grilla y Resumen
             TableLayoutPanel pnlBodyLayout = new TableLayoutPanel
             {
                 Dock = DockStyle.Fill,

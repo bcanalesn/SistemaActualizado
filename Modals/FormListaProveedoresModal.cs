@@ -1,12 +1,11 @@
 using System;
 using System.Collections.Generic;
 using System.Drawing;
-using System.Drawing.Drawing2D;
 using System.Linq;
 using System.Runtime.InteropServices;
 using System.Windows.Forms;
-using SISTEMAACTUALIZADO.Data;
 using SISTEMAACTUALIZADO.Models;
+using SISTEMAACTUALIZADO.Services;
 
 namespace SISTEMAACTUALIZADO.Modals
 {
@@ -17,6 +16,8 @@ namespace SISTEMAACTUALIZADO.Modals
         [DllImport("user32.DLL", EntryPoint = "SendMessage")]
         private extern static void SendMessage(IntPtr hWnd, int wMsg, int wParam, int lParam);
 
+        private readonly ProveedorService _proveedorService = new ProveedorService();
+
         private TextBox txtFiltro = null!;
         private DataGridView dgvProveedores = null!;
         private List<Proveedor> _listaOriginal = new List<Proveedor>();
@@ -26,8 +27,6 @@ namespace SISTEMAACTUALIZADO.Modals
         public FormListaProveedoresModal()
         {
             InitializeComponent();
-            
-            // 🟢 La carga se ejecuta cuando el formulario ya está completamente creado y visible
             this.Shown += (s, e) => CargarProveedores();
         }
 
@@ -46,11 +45,9 @@ namespace SISTEMAACTUALIZADO.Modals
             };
             pnlBorde.Paint += (s, e) =>
             {
-                e.Graphics.SmoothingMode = SmoothingMode.AntiAlias;
                 ControlPaint.DrawBorder(e.Graphics, pnlBorde.ClientRectangle, Color.FromArgb(203, 213, 225), ButtonBorderStyle.Solid);
             };
 
-            // Cabecera arrastrable
             Panel pnlHeader = new Panel { Dock = DockStyle.Top, Height = 40, BackColor = Color.Transparent };
             pnlHeader.MouseDown += (s, e) => { ReleaseCapture(); SendMessage(this.Handle, 0x112, 0xf012, 0); };
 
@@ -81,7 +78,6 @@ namespace SISTEMAACTUALIZADO.Modals
             pnlHeader.Controls.Add(lblTitulo);
             pnlHeader.Controls.Add(btnX);
 
-            // Barra de Búsqueda
             Panel pnlFiltro = new Panel { Dock = DockStyle.Top, Height = 50, Padding = new Padding(0, 8, 0, 8) };
             Label lblBuscar = new Label { Text = "🔍 Filtrar Proveedor:", Font = new Font("Segoe UI", 9F, FontStyle.Bold), Location = new Point(0, 14), AutoSize = true };
 
@@ -96,7 +92,6 @@ namespace SISTEMAACTUALIZADO.Modals
             pnlFiltro.Controls.Add(lblBuscar);
             pnlFiltro.Controls.Add(txtFiltro);
 
-            // DataGridView de Proveedores
             dgvProveedores = new DataGridView
             {
                 Dock = DockStyle.Fill,
@@ -114,7 +109,6 @@ namespace SISTEMAACTUALIZADO.Modals
             dgvProveedores.DoubleClick += (s, e) => SeleccionarYSalir();
             dgvProveedores.KeyDown += (s, e) => { if (e.KeyCode == Keys.Enter) { e.Handled = true; SeleccionarYSalir(); } };
 
-            // Panel Inferior de Botones
             Panel pnlBotones = new Panel { Dock = DockStyle.Bottom, Height = 48, Padding = new Padding(0, 8, 0, 0) };
 
             Button btnSeleccionar = new Button
@@ -174,13 +168,12 @@ namespace SISTEMAACTUALIZADO.Modals
         {
             try
             {
-                using var db = new AppDbContext();
-                _listaOriginal = db.Proveedores.Where(p => p.Estado).OrderBy(p => p.RazonSocial).ToList();
+                _listaOriginal = _proveedorService.ObtenerProveedoresActivos();
                 ActualizarGrilla(_listaOriginal);
             }
             catch (Exception ex)
             {
-                MessageBox.Show($"Error al cargar datos: {ex.Message}", "Error DB", MessageBoxButtons.OK, MessageBoxIcon.Error);
+                MessageBox.Show($"Error al cargar datos: {ex.Message}", "Error", MessageBoxButtons.OK, MessageBoxIcon.Error);
             }
         }
 
@@ -188,7 +181,6 @@ namespace SISTEMAACTUALIZADO.Modals
         {
             if (dgvProveedores == null || dgvProveedores.IsDisposed) return;
 
-            // Uso de lista tipada directa sin setear a null primero para evitar NullReference en eventos internos
             dgvProveedores.DataSource = lista.ToList();
 
             if (dgvProveedores.Columns.Count > 0)

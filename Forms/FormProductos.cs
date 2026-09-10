@@ -3,14 +3,16 @@ using System.Collections.Generic;
 using System.Drawing;
 using System.Linq;
 using System.Windows.Forms;
-using SISTEMAACTUALIZADO.Data;
 using SISTEMAACTUALIZADO.Models;
 using SISTEMAACTUALIZADO.Modals;
+using SISTEMAACTUALIZADO.Services;
 
 namespace SISTEMAACTUALIZADO
 {
     public class FormProductos : Form
     {
+        private readonly ProductoService _productoService = new ProductoService();
+
         private DataGridView dgvProductos = null!;
         private TextBox txtBuscar = null!;
         private Button btnBuscar = null!;
@@ -23,7 +25,6 @@ namespace SISTEMAACTUALIZADO
         private Button btnEliminar = null!;
         private List<Producto> _listaProductos = new List<Producto>();
 
-        // Configuración de visibilidad de las listas 2 a 10 (Por defecto activas 2 a 5)
         private bool[] _listasVisibles = new bool[] { true, true, true, true, false, false, false, false, false };
 
         public FormProductos()
@@ -45,13 +46,12 @@ namespace SISTEMAACTUALIZADO
                 AutoScroll = true
             };
 
-            // Barra Superior de Controles
             Panel pnlTop = new Panel
             {
                 Dock = DockStyle.Top,
                 Height = 65,
                 BackColor = Color.White,
-                Padding = new Padding(12, 12, 12, 12),
+                Padding = new Padding(12),
                 Margin = new Padding(0, 0, 0, 12)
             };
             pnlTop.Paint += (s, e) =>
@@ -59,7 +59,6 @@ namespace SISTEMAACTUALIZADO
                 ControlPaint.DrawBorder(e.Graphics, pnlTop.ClientRectangle, Color.FromArgb(226, 232, 240), ButtonBorderStyle.Solid);
             };
 
-            // Sección Izquierda: Búsqueda
             FlowLayoutPanel pnlLeft = new FlowLayoutPanel
             {
                 Dock = DockStyle.Left,
@@ -90,7 +89,6 @@ namespace SISTEMAACTUALIZADO
 
             pnlLeft.Controls.AddRange(new Control[] { lblBuscar, txtBuscar, btnBuscar, btnRecargar });
 
-            // Sección Derecha: Acciones y Configuración de Listas
             FlowLayoutPanel pnlRight = new FlowLayoutPanel
             {
                 Dock = DockStyle.Right,
@@ -106,7 +104,6 @@ namespace SISTEMAACTUALIZADO
             btnNuevo = CrearBoton("➕ Nuevo Producto", Color.FromArgb(16, 185, 129), Color.White, BtnNuevo_Click);
             btnMargenes = CrearBoton("⚙️ Márgenes %", Color.FromArgb(245, 158, 11), Color.White, BtnMargenes_Click);
 
-            // Menú desplegable para activar/desactivar qué listas ver
             CrearMenuListasVisibles();
             btnColumnasVisibles = CrearBoton("👁️ Listas Visibles ▼", Color.FromArgb(241, 245, 249), Color.FromArgb(30, 41, 59), (s, e) =>
             {
@@ -118,7 +115,6 @@ namespace SISTEMAACTUALIZADO
             pnlTop.Controls.Add(pnlRight);
             pnlTop.Controls.Add(pnlLeft);
 
-            // Grilla de Productos
             Panel pnlGridCard = new Panel
             {
                 Dock = DockStyle.Fill,
@@ -223,13 +219,12 @@ namespace SISTEMAACTUALIZADO
         {
             try
             {
-                using var db = new AppDbContext();
-                _listaProductos = db.Productos.Where(p => p.Estado).OrderBy(p => p.Nombre).ToList();
+                _listaProductos = _productoService.ObtenerProductosActivos();
                 ActualizarGrilla(_listaProductos);
             }
             catch (Exception ex)
             {
-                MessageBox.Show($"Error al cargar productos: {ex.Message}", "Error DB", MessageBoxButtons.OK, MessageBoxIcon.Error);
+                MessageBox.Show($"Error al cargar productos: {ex.Message}", "Error", MessageBoxButtons.OK, MessageBoxIcon.Error);
             }
         }
 
@@ -262,36 +257,21 @@ namespace SISTEMAACTUALIZADO
             }
 
             int orden = 0;
-
-            // 1° Descripción Producto
             ConfigurarCol("Nombre", "Descripción Producto", orden++, 220);
-
-            // 2° Categoría
             ConfigurarCol("Categoria", "Categoría", orden++, 110);
-
-            // 3° Familia
             ConfigurarCol("NFamilia", "Familia", orden++, 110);
-
-            // 4° Stock
             ConfigurarCol("Stock", "Stock", orden++, 75, DataGridViewContentAlignment.MiddleRight, "#,##0", null, true);
-
-            // 5° Costo Neto
             ConfigurarCol("PrecioCosto", "Costo Neto", orden++, 95, DataGridViewContentAlignment.MiddleRight, "$#,##0");
-
-            // 6° Precio Venta (Lista 1)
             ConfigurarCol("PrecioUnitario", "Precio Venta (L1)", orden++, 125, DataGridViewContentAlignment.MiddleRight, "$#,##0", Color.FromArgb(16, 185, 129), true);
 
-            // Listas 2 a 10 (Dinámicas según el menú de selección)
             for (int i = 2; i <= 10; i++)
             {
                 string propName = $"Precio{i}";
                 bool estaVisible = _listasVisibles[i - 2];
                 ConfigurarCol(propName, $"Lista {i}", orden++, 105, DataGridViewContentAlignment.MiddleRight, "$#,##0", Color.FromArgb(2, 132, 199), false, estaVisible);
             }
-            // Justo antes del SKU:
-            ConfigurarCol("ListaDefectoPOS", "Lista Activa POS", orden++, 100, DataGridViewContentAlignment.MiddleCenter, "Lista #0", Color.FromArgb(147, 51, 234), true);
 
-            // SKU / Código Barra al final
+            ConfigurarCol("ListaDefectoPOS", "Lista Activa POS", orden++, 100, DataGridViewContentAlignment.MiddleCenter, "Lista #0", Color.FromArgb(147, 51, 234), true);
             ConfigurarCol("CodigoBarra", "SKU / Código Barra", orden++, 130);
 
             if (dgvProductos.Rows.Count > 0)
@@ -343,25 +323,9 @@ namespace SISTEMAACTUALIZADO
         {
             using (var modal = new FormNuevoProductoModal())
             {
-                if (modal.ShowDialog(this) == DialogResult.OK && modal.ProductoResultado != null)
+                if (modal.ShowDialog(this) == DialogResult.OK)
                 {
-                    try
-                    {
-                        using var db = new AppDbContext();
-                        if (modal.ProductoResultado.ProductoID == 0)
-                        {
-                            modal.ProductoResultado.Stock = modal.CantidadFactura;
-                            db.Productos.Add(modal.ProductoResultado);
-                            db.SaveChanges();
-                        }
-                        
-                        CargarProductos();
-                        MessageBox.Show("Producto registrado exitosamente en el catálogo.", "Éxito", MessageBoxButtons.OK, MessageBoxIcon.Information);
-                    }
-                    catch (Exception ex)
-                    {
-                        MessageBox.Show($"Error al guardar en catálogo: {ex.Message}", "Error DB", MessageBoxButtons.OK, MessageBoxIcon.Error);
-                    }
+                    CargarProductos();
                 }
             }
         }
@@ -408,19 +372,13 @@ namespace SISTEMAACTUALIZADO
             {
                 try
                 {
-                    using var db = new AppDbContext();
-                    var p = db.Productos.Find(prod.ProductoID);
-                    if (p != null)
-                    {
-                        p.Estado = false;
-                        db.SaveChanges();
-                        MessageBox.Show("Producto eliminado exitosamente.", "Éxito", MessageBoxButtons.OK, MessageBoxIcon.Information);
-                        CargarProductos();
-                    }
+                    _productoService.EliminarProducto(prod.ProductoID);
+                    MessageBox.Show("Producto eliminado exitosamente.", "Éxito", MessageBoxButtons.OK, MessageBoxIcon.Information);
+                    CargarProductos();
                 }
                 catch (Exception ex)
                 {
-                    MessageBox.Show($"Error al eliminar: {ex.Message}", "Error DB", MessageBoxButtons.OK, MessageBoxIcon.Error);
+                    MessageBox.Show($"Error al eliminar: {ex.Message}", "Error", MessageBoxButtons.OK, MessageBoxIcon.Error);
                 }
             }
         }

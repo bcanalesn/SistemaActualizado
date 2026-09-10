@@ -5,12 +5,13 @@ using System.Windows.Forms;
 using SISTEMAACTUALIZADO.Data;
 using SISTEMAACTUALIZADO.Helpers;
 using SISTEMAACTUALIZADO.Models;
+using SISTEMAACTUALIZADO.Services;
 
 namespace SISTEMAACTUALIZADO
 {
     public class FormReportes : Form
     {
-        private AppDbContext _db = new AppDbContext();
+        private readonly ReporteService _reporteService = new ReporteService();
 
         private DateTimePicker dtpDesde = null!;
         private DateTimePicker dtpHasta = null!;
@@ -20,7 +21,6 @@ namespace SISTEMAACTUALIZADO
         private Label lblMontoTotal = null!;
         private Label lblCantVentas = null!;
         private Label lblTicketPromedio = null!;
-
         private DataGridView dgvVentas = null!;
 
         public FormReportes()
@@ -237,28 +237,25 @@ namespace SISTEMAACTUALIZADO
         {
             try
             {
-                var ventasList = _db.TVE2607
-                    .Where(v => v.FecDoc >= desde && v.FecDoc <= hasta && v.status != "Anulado")
-                    .OrderByDescending(v => v.FecDoc)
-                    .ToList();
+                var resumen = _reporteService.ObtenerResumenVentas(desde, hasta);
 
-                decimal totalRecaudado = ventasList.Sum(v => v.Total);
-                int cantidadVentas = ventasList.Count;
-                decimal ticketPromedio = cantidadVentas > 0 ? totalRecaudado / cantidadVentas : 0;
+                lblMontoTotal.Text = MonedaHelper.Formatear(resumen.TotalRecaudado, conSigno: true);
+                lblCantVentas.Text = $"{resumen.CantidadVentas} {(resumen.CantidadVentas == 1 ? "venta" : "ventas")}";
+                lblTicketPromedio.Text = MonedaHelper.Formatear(resumen.TicketPromedio, conSigno: true);
 
-                // Formato chileno en KPIs
-                lblMontoTotal.Text = MonedaHelper.Formatear(totalRecaudado, conSigno: true);
-                lblCantVentas.Text = $"{cantidadVentas} {(cantidadVentas == 1 ? "venta" : "ventas")}";
-                lblTicketPromedio.Text = MonedaHelper.Formatear(ticketPromedio, conSigno: true);
+                dgvVentas.DataSource = resumen.Ventas;
 
-                dgvVentas.DataSource = ventasList;
-
-                if (dgvVentas.Columns["nroDTE"] != null) dgvVentas.Columns["nroDTE"].HeaderText = "N° Folio DTE";
+                if (dgvVentas.Columns["IdTve"] != null) dgvVentas.Columns["IdTve"].Visible = false;
+                if (dgvVentas.Columns["NroDTE"] != null) dgvVentas.Columns["NroDTE"].HeaderText = "N° Folio DTE";
                 if (dgvVentas.Columns["FecDoc"] != null) { dgvVentas.Columns["FecDoc"].HeaderText = "Fecha y Hora"; dgvVentas.Columns["FecDoc"].DefaultCellStyle.Format = "dd/MM/yyyy HH:mm"; }
                 if (dgvVentas.Columns["Documento"] != null) dgvVentas.Columns["Documento"].HeaderText = "Tipo Documento";
-                if (dgvVentas.Columns["Total"] != null) 
-                { 
-                    dgvVentas.Columns["Total"].HeaderText = "Total Venta"; 
+                if (dgvVentas.Columns["RazonSocial"] != null) dgvVentas.Columns["RazonSocial"].HeaderText = "Cliente";
+                if (dgvVentas.Columns["RuT"] != null) dgvVentas.Columns["RuT"].HeaderText = "RUT";
+                if (dgvVentas.Columns["MedioPago"] != null) dgvVentas.Columns["MedioPago"].HeaderText = "Medio Pago";
+                if (dgvVentas.Columns["Vendedor"] != null) dgvVentas.Columns["Vendedor"].HeaderText = "Vendedor";
+                if (dgvVentas.Columns["Total"] != null)
+                {
+                    dgvVentas.Columns["Total"].HeaderText = "Total Venta";
                     dgvVentas.Columns["Total"].DefaultCellStyle = new DataGridViewCellStyle
                     {
                         FormatProvider = new System.Globalization.CultureInfo("es-CL"),
@@ -268,16 +265,10 @@ namespace SISTEMAACTUALIZADO
                         ForeColor = Color.FromArgb(16, 185, 129)
                     };
                 }
-
-                string[] ocultar = new string[] { "idTve", "idLocal", "nmbLocal", "iddocDTE", "nroInT", "SubTotal", "Descuento", "Neto", "Impto1", "Impto2", "Impto3", "IvA", "UserDTE", "Vendedor", "nroZ", "Url", "nPAX", "Idcliente", "DNI", "RuT", "dv", "RazonSocial", "Giro", "Direccion", "idcomuna", "nComuna", "idCiudad", "nCiudad", "Fono1", "Fono2", "email", "status", "idREF", "nroREF", "codigoREF", "FechaREF", "HoraDoc", "Detalles", "CajaTurnoID", "MedioPago", "Vuelto" };
-                foreach (var col in ocultar)
-                {
-                    if (dgvVentas.Columns[col] != null) dgvVentas.Columns[col].Visible = false;
-                }
             }
             catch (Exception ex)
             {
-                MessageBox.Show($"Error al cargar el reporte de ventas desde TVE2607: {ex.Message}", "Error DB", MessageBoxButtons.OK, MessageBoxIcon.Error);
+                MessageBox.Show($"Error al cargar el reporte: {ex.Message}", "Error", MessageBoxButtons.OK, MessageBoxIcon.Error);
             }
         }
     }

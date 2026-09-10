@@ -3,7 +3,6 @@ using System.Collections.Generic;
 using System.Drawing;
 using System.Linq;
 using System.Windows.Forms;
-using SISTEMAACTUALIZADO.Data;
 using SISTEMAACTUALIZADO.Helpers;
 using SISTEMAACTUALIZADO.Models;
 using SISTEMAACTUALIZADO.Services;
@@ -19,12 +18,10 @@ namespace SISTEMAACTUALIZADO.Forms
         private Button btnBuscar = null!;
         private Button btnLimpiar = null!;
 
-        // Botonera de acciones
         private Button btnRegistrarAbono = null!;
         private Button btnHistorialPagos = null!;
         private Button btnDesbloquearCliente = null!;
 
-        // KPIs
         private Label lblKpiTotalDeuda = null!;
         private Label lblKpiDeudaVencida = null!;
         private Label lblKpiDocsPendientes = null!;
@@ -33,7 +30,7 @@ namespace SISTEMAACTUALIZADO.Forms
         private DataGridView dgvCxC = null!;
         private Label lblFooterStatus = null!;
 
-        private List<CuentaPorCobrar> _cxcCargadas = new List<CuentaPorCobrar>();
+        private List<ItemCuentaPorCobrarDTO> _cxcCargadas = new List<ItemCuentaPorCobrarDTO>();
 
         public FormCuentasPorCobrar()
         {
@@ -222,18 +219,19 @@ namespace SISTEMAACTUALIZADO.Forms
             dgvCxC.Columns.Add(new DataGridViewTextBoxColumn { Name = "Mora", HeaderText = "MORA", FillWeight = 12 });
             dgvCxC.Columns.Add(new DataGridViewTextBoxColumn { Name = "Total", HeaderText = "TOTAL ORIGINAL", FillWeight = 15, DefaultCellStyle = estiloMoneda });
             dgvCxC.Columns.Add(new DataGridViewTextBoxColumn { Name = "Abonado", HeaderText = "ABONADO", FillWeight = 14, DefaultCellStyle = estiloMoneda });
-            dgvCxC.Columns.Add(new DataGridViewTextBoxColumn { 
-                Name = "Saldo", 
-                HeaderText = "SALDO PENDIENTE", 
-                FillWeight = 16, 
-                DefaultCellStyle = new DataGridViewCellStyle 
-                { 
+            dgvCxC.Columns.Add(new DataGridViewTextBoxColumn
+            {
+                Name = "Saldo",
+                HeaderText = "SALDO PENDIENTE",
+                FillWeight = 16,
+                DefaultCellStyle = new DataGridViewCellStyle
+                {
                     FormatProvider = new System.Globalization.CultureInfo("es-CL"),
-                    Format = "$ #,##0", 
-                    Font = new Font("Segoe UI", 8.5F, FontStyle.Bold), 
+                    Format = "$ #,##0",
+                    Font = new Font("Segoe UI", 8.5F, FontStyle.Bold),
                     ForeColor = Color.FromArgb(220, 38, 38),
                     Alignment = DataGridViewContentAlignment.MiddleRight
-                } 
+                }
             });
             dgvCxC.Columns.Add(new DataGridViewTextBoxColumn { Name = "Estado", HeaderText = "ESTADO", FillWeight = 13 });
         }
@@ -242,55 +240,25 @@ namespace SISTEMAACTUALIZADO.Forms
         {
             try
             {
-                CreditoService.ActualizarEstadosMorosidadDiario();
-
-                using var db = new AppDbContext();
                 DateTime fD = dtpDesde.Value.Date;
                 DateTime fH = dtpHasta.Value.Date.AddDays(1).AddTicks(-1);
+                string filtro = txtBuscar.Text.Trim();
+                string estSel = cbEstado.SelectedIndex > 0 ? cbEstado.SelectedItem!.ToString()! : "Todos";
 
-                var query = db.CuentasPorCobrar
-                    .Where(c => c.FechaEmision >= fD && c.FechaEmision <= fH)
-                    .AsQueryable();
-
-                string filtro = txtBuscar.Text.Trim().ToLower();
-                if (!string.IsNullOrEmpty(filtro))
-                {
-                    query = query.Where(c => (c.Cliente != null && (c.Cliente.RazonSocial.ToLower().Contains(filtro) || c.Cliente.Rut.Contains(filtro))) || c.FolioDoc.ToString().Contains(filtro));
-                }
-
-                if (cbEstado.SelectedIndex > 0)
-                {
-                    string estSel = cbEstado.SelectedItem!.ToString()!;
-                    query = query.Where(c => c.Estado == estSel);
-                }
-
-                _cxcCargadas = query.OrderBy(c => c.FechaVencimiento).ToList();
-
-                var idsClientes = _cxcCargadas.Select(c => c.IdCliente).Distinct().ToList();
-                var clientesDict = db.Clientes.Where(c => idsClientes.Contains(c.IdCliente)).ToDictionary(c => c.IdCliente, c => c);
+                var resumen = CreditoService.ObtenerCartera(fD, fH, filtro, estSel);
+                _cxcCargadas = resumen.Items;
 
                 dgvCxC.Rows.Clear();
-                DateTime hoy = DateTime.Today;
-
                 foreach (var c in _cxcCargadas)
                 {
-                    clientesDict.TryGetValue(c.IdCliente, out var cli);
-                    string nomCli = cli?.RazonSocial ?? "Cliente General";
-                    string rutCli = cli != null ? RutHelper.Formatear(cli.Rut) : "--";
-
-                    int diasMora = (hoy > c.FechaVencimiento.Date && c.SaldoPendiente > 0) ? (hoy - c.FechaVencimiento.Date).Days : 0;
-                    string strMora = diasMora > 0 ? $"🔴 {diasMora} d" : "🟢 Al día";
-
-                    string nomDoc = c.TipoDTE == 33 ? $"Factura #{c.FolioDoc}" : $"Boleta #{c.FolioDoc}";
-
                     dgvCxC.Rows.Add(
                         c.CxCID,
-                        nomDoc,
-                        nomCli,
-                        rutCli,
+                        c.DocumentoNombre,
+                        c.ClienteNombre,
+                        c.Rut,
                         c.FechaEmision.ToString("dd/MM/yyyy"),
                         c.FechaVencimiento.ToString("dd/MM/yyyy"),
-                        strMora,
+                        c.MoraTexto,
                         c.MontoOriginal,
                         c.MontoAbonado,
                         c.SaldoPendiente,
@@ -298,21 +266,16 @@ namespace SISTEMAACTUALIZADO.Forms
                     );
                 }
 
-                decimal totalDeuda = db.CuentasPorCobrar.Where(c => c.Estado != "PAGADA" && c.Estado != "ANULADA").Sum(c => c.SaldoPendiente);
-                decimal deudaVencida = db.CuentasPorCobrar.Where(c => c.FechaVencimiento < hoy && c.SaldoPendiente > 0).Sum(c => c.SaldoPendiente);
-                int docsPendientes = db.CuentasPorCobrar.Count(c => c.Estado != "PAGADA" && c.Estado != "ANULADA");
-                int clientesMora = db.Clientes.Count(c => c.EstadoCrediticio == "MOROSO" || c.EstadoCrediticio == "BLOQUEADO");
-
-                lblKpiTotalDeuda.Text = MonedaHelper.Formatear(totalDeuda, conSigno: true);
-                lblKpiDeudaVencida.Text = MonedaHelper.Formatear(deudaVencida, conSigno: true);
-                lblKpiDocsPendientes.Text = docsPendientes.ToString("N0", new System.Globalization.CultureInfo("es-CL"));
-                lblKpiClientesMora.Text = clientesMora.ToString("N0", new System.Globalization.CultureInfo("es-CL"));
+                lblKpiTotalDeuda.Text = MonedaHelper.Formatear(resumen.TotalDeuda, conSigno: true);
+                lblKpiDeudaVencida.Text = MonedaHelper.Formatear(resumen.DeudaVencida, conSigno: true);
+                lblKpiDocsPendientes.Text = resumen.DocsPendientes.ToString("N0", new System.Globalization.CultureInfo("es-CL"));
+                lblKpiClientesMora.Text = resumen.ClientesMora.ToString("N0", new System.Globalization.CultureInfo("es-CL"));
 
                 lblFooterStatus.Text = $"Mostrando {_cxcCargadas.Count} documento(s) por cobrar.";
             }
             catch (Exception ex)
             {
-                MessageBox.Show($"Error al cargar Cuentas por Cobrar: {ex.Message}", "Error DB", MessageBoxButtons.OK, MessageBoxIcon.Error);
+                MessageBox.Show($"Error al cargar Cuentas por Cobrar: {ex.Message}", "Error", MessageBoxButtons.OK, MessageBoxIcon.Error);
             }
         }
 
@@ -345,12 +308,12 @@ namespace SISTEMAACTUALIZADO.Forms
                 BackColor = Color.White
             };
 
-            Label lblTit = new Label { Text = $"Documento: {(item.TipoDTE == 33 ? "Factura" : "Boleta")} #{item.FolioDoc}\nSaldo Pendiente: {MonedaHelper.Formatear(item.SaldoPendiente, conSigno: true)}", Location = new Point(20, 15), Size = new Size(320, 38), Font = new Font("Segoe UI", 9.5F, FontStyle.Bold), ForeColor = Color.FromArgb(15, 23, 42) };
-            
+            Label lblTit = new Label { Text = $"Documento: {item.DocumentoNombre}\nSaldo Pendiente: {MonedaHelper.Formatear(item.SaldoPendiente, conSigno: true)}", Location = new Point(20, 15), Size = new Size(320, 38), Font = new Font("Segoe UI", 9.5F, FontStyle.Bold), ForeColor = Color.FromArgb(15, 23, 42) };
+
             Label lblM = new Label { Text = "Monto a Abonar ($):", Location = new Point(20, 65), AutoSize = true, Font = new Font("Segoe UI", 8.5F, FontStyle.Bold) };
             TextBox txtM = new TextBox { Text = MonedaHelper.Formatear(item.SaldoPendiente), Location = new Point(20, 85), Size = new Size(320, 26), Font = new Font("Segoe UI", 10.5F, FontStyle.Bold) };
-            txtM.KeyPress += (s, e) => { if (!char.IsControl(e.KeyChar) && !char.IsDigit(e.KeyChar)) e.Handled = true; };
-            txtM.TextChanged += (s, e) => MonedaHelper.AplicarMascaraEnVivo(txtM);
+            txtM.KeyPress += (s, ev) => { if (!char.IsControl(ev.KeyChar) && !char.IsDigit(ev.KeyChar)) ev.Handled = true; };
+            txtM.TextChanged += (s, ev) => MonedaHelper.AplicarMascaraEnVivo(txtM);
 
             Label lblMed = new Label { Text = "Medio de Pago:", Location = new Point(20, 120), AutoSize = true, Font = new Font("Segoe UI", 8.5F, FontStyle.Bold) };
             ComboBox cbMed = new ComboBox { Location = new Point(20, 140), Size = new Size(320, 26), DropDownStyle = ComboBoxStyle.DropDownList, Font = new Font("Segoe UI", 9.5F) };
@@ -373,15 +336,14 @@ namespace SISTEMAACTUALIZADO.Forms
 
                 try
                 {
-                    using var db = new AppDbContext();
-                    CreditoService.ProcesarPagoCliente(item.IdCliente, montoAbono, cbMed.SelectedItem!.ToString()!, txtComp.Text.Trim(), "Abono desde módulo CxC", "ADMIN", new List<int> { item.CxCID }, db);
+                    CreditoService.ProcesarPagoCliente(item.IdCliente, montoAbono, cbMed.SelectedItem!.ToString()!, txtComp.Text.Trim(), "Abono desde módulo CxC", "ADMIN", new List<int> { item.CxCID });
                     MessageBox.Show("¡Pago registrado exitosamente!", "Abono Aplicado", MessageBoxButtons.OK, MessageBoxIcon.Information);
                     modalAbono.DialogResult = DialogResult.OK;
                     modalAbono.Close();
                 }
                 catch (Exception ex)
                 {
-                    MessageBox.Show($"Error al procesar el pago: {ex.Message}", "Error DB", MessageBoxButtons.OK, MessageBoxIcon.Error);
+                    MessageBox.Show($"Error al procesar el pago: {ex.Message}", "Error", MessageBoxButtons.OK, MessageBoxIcon.Error);
                 }
             };
 
@@ -395,33 +357,39 @@ namespace SISTEMAACTUALIZADO.Forms
 
         private void BtnHistorialPagos_Click(object? sender, EventArgs e)
         {
-            using var db = new AppDbContext();
-            var pagos = db.PagosClientes.OrderByDescending(p => p.FechaPago).Take(50).ToList();
-
-            Form modalHist = new Form { Text = "Historial de Pagos y Abonos Recientes", Size = new Size(720, 440), StartPosition = FormStartPosition.CenterParent, BackColor = Color.White };
-            DataGridView dgv = new DataGridView { Dock = DockStyle.Fill, BackgroundColor = Color.White, ReadOnly = true, AllowUserToAddRows = false, SelectionMode = DataGridViewSelectionMode.FullRowSelect, AutoSizeColumnsMode = DataGridViewAutoSizeColumnsMode.Fill };
-            
-            dgv.Columns.Add("ID", "N° PAGO");
-            dgv.Columns.Add("Fecha", "FECHA");
-            dgv.Columns.Add("Monto", "MONTO");
-            dgv.Columns.Add("Medio", "MEDIO PAGO");
-            dgv.Columns.Add("Comprobante", "COMPROBANTE");
-            dgv.Columns.Add("Usuario", "COBRADOR");
-
-            dgv.Columns["Monto"].DefaultCellStyle = new DataGridViewCellStyle
+            try
             {
-                FormatProvider = new System.Globalization.CultureInfo("es-CL"),
-                Format = "$ #,##0",
-                Alignment = DataGridViewContentAlignment.MiddleRight
-            };
+                var pagos = CreditoService.ObtenerHistorialPagosRecientes(50);
 
-            foreach (var p in pagos)
-            {
-                dgv.Rows.Add(p.PagoID, p.FechaPago.ToString("dd/MM/yyyy HH:mm"), p.MontoTotalPago, p.MedioPago, p.NroComprobante ?? "--", p.UsuarioCobrador);
+                Form modalHist = new Form { Text = "Historial de Pagos y Abonos Recientes", Size = new Size(720, 440), StartPosition = FormStartPosition.CenterParent, BackColor = Color.White };
+                DataGridView dgv = new DataGridView { Dock = DockStyle.Fill, BackgroundColor = Color.White, ReadOnly = true, AllowUserToAddRows = false, SelectionMode = DataGridViewSelectionMode.FullRowSelect, AutoSizeColumnsMode = DataGridViewAutoSizeColumnsMode.Fill };
+
+                dgv.Columns.Add("ID", "N° PAGO");
+                dgv.Columns.Add("Fecha", "FECHA");
+                dgv.Columns.Add("Monto", "MONTO");
+                dgv.Columns.Add("Medio", "MEDIO PAGO");
+                dgv.Columns.Add("Comprobante", "COMPROBANTE");
+                dgv.Columns.Add("Usuario", "COBRADOR");
+
+                dgv.Columns["Monto"].DefaultCellStyle = new DataGridViewCellStyle
+                {
+                    FormatProvider = new System.Globalization.CultureInfo("es-CL"),
+                    Format = "$ #,##0",
+                    Alignment = DataGridViewContentAlignment.MiddleRight
+                };
+
+                foreach (var p in pagos)
+                {
+                    dgv.Rows.Add(p.PagoID, p.FechaPago.ToString("dd/MM/yyyy HH:mm"), p.MontoTotalPago, p.MedioPago, p.NroComprobante ?? "--", p.UsuarioCobrador);
+                }
+
+                modalHist.Controls.Add(dgv);
+                modalHist.ShowDialog(this);
             }
-
-            modalHist.Controls.Add(dgv);
-            modalHist.ShowDialog(this);
+            catch (Exception ex)
+            {
+                MessageBox.Show($"Error al consultar historial: {ex.Message}", "Error", MessageBoxButtons.OK, MessageBoxIcon.Error);
+            }
         }
 
         private void BtnDesbloquearCliente_Click(object? sender, EventArgs e)
@@ -436,16 +404,9 @@ namespace SISTEMAACTUALIZADO.Forms
             var item = _cxcCargadas.FirstOrDefault(c => c.CxCID == cxcId);
             if (item == null) return;
 
-            using var db = new AppDbContext();
-            var cliente = db.Clientes.Find(item.IdCliente);
+            var detalle = CreditoService.ObtenerDetalleCrediticioCliente(item.IdCliente);
+            var cliente = detalle.Cliente;
             if (cliente == null) return;
-
-            DateTime hoy = DateTime.Today;
-            var facturasVencidas = db.CuentasPorCobrar
-                .Where(c => c.IdCliente == cliente.IdCliente && (c.Estado == "PENDIENTE" || c.Estado == "PARCIAL" || c.Estado == "VENCIDA") && c.FechaVencimiento < hoy)
-                .ToList();
-
-            decimal deudaVencidaTotal = facturasVencidas.Sum(f => f.SaldoPendiente);
 
             using Form modalEstado = new Form
             {
@@ -458,29 +419,29 @@ namespace SISTEMAACTUALIZADO.Forms
                 BackColor = Color.White
             };
 
-            Label lblTit = new Label 
-            { 
-                Text = $"Cliente: {cliente.RazonSocial}\nRUT: {RutHelper.Formatear(cliente.Rut)}", 
-                Location = new Point(20, 12), 
-                Size = new Size(400, 36), 
-                Font = new Font("Segoe UI", 9.5F, FontStyle.Bold), 
-                ForeColor = Color.FromArgb(15, 23, 42) 
+            Label lblTit = new Label
+            {
+                Text = $"Cliente: {cliente.RazonSocial}\nRUT: {RutHelper.Formatear(cliente.Rut)}",
+                Location = new Point(20, 12),
+                Size = new Size(400, 36),
+                Font = new Font("Segoe UI", 9.5F, FontStyle.Bold),
+                ForeColor = Color.FromArgb(15, 23, 42)
             };
 
-            Panel pnlInfo = new Panel 
-            { 
-                Location = new Point(20, 52), 
-                Size = new Size(400, 80), 
-                BackColor = Color.FromArgb(248, 250, 252), 
-                BorderStyle = BorderStyle.FixedSingle, 
-                Padding = new Padding(8) 
+            Panel pnlInfo = new Panel
+            {
+                Location = new Point(20, 52),
+                Size = new Size(400, 80),
+                BackColor = Color.FromArgb(248, 250, 252),
+                BorderStyle = BorderStyle.FixedSingle,
+                Padding = new Padding(8)
             };
 
             Label lblDetalle = new Label
             {
                 Text = $"• Estado Crediticio Actual: [ {cliente.EstadoCrediticio} ]\n" +
-                       $"• Facturas Vencidas: {facturasVencidas.Count} documento(s)\n" +
-                       $"• Monto Vencido: {MonedaHelper.Formatear(deudaVencidaTotal, conSigno: true)}\n" +
+                       $"• Facturas Vencidas: {detalle.CantidadVencidas} documento(s)\n" +
+                       $"• Monto Vencido: {MonedaHelper.Formatear(detalle.DeudaVencida, conSigno: true)}\n" +
                        $"• Cupo Total: {MonedaHelper.Formatear(cliente.CupoCredito, conSigno: true)}",
                 Font = new Font("Segoe UI", 8.5F),
                 ForeColor = cliente.EstadoCrediticio == "ACTIVO" ? Color.FromArgb(22, 163, 74) : Color.FromArgb(220, 38, 38),
@@ -500,25 +461,25 @@ namespace SISTEMAACTUALIZADO.Forms
             cbNuevoEstado.SelectedIndex = cliente.EstadoCrediticio == "ACTIVO" ? 1 : 0;
 
             Label lblMot = new Label { Text = "Motivo del cambio de estado:", Location = new Point(20, 195), AutoSize = true, Font = new Font("Segoe UI", 8.5F, FontStyle.Bold) };
-            TextBox txtMot = new TextBox 
-            { 
-                Location = new Point(20, 215), 
-                Size = new Size(400, 70), 
-                Multiline = true, 
-                Font = new Font("Segoe UI", 9F), 
-                Text = cliente.EstadoCrediticio == "ACTIVO" ? "Bloqueo preventivo por decisión administrativa." : "Autorización gerencial por compromiso de pago." 
+            TextBox txtMot = new TextBox
+            {
+                Location = new Point(20, 215),
+                Size = new Size(400, 70),
+                Multiline = true,
+                Font = new Font("Segoe UI", 9F),
+                Text = cliente.EstadoCrediticio == "ACTIVO" ? "Bloqueo preventivo por decisión administrativa." : "Autorización gerencial por compromiso de pago."
             };
 
-            Button btnGuardar = new Button 
-            { 
-                Text = "💾 Aplicar Cambio de Estado", 
-                Location = new Point(20, 305), 
-                Size = new Size(400, 42), 
-                BackColor = Color.FromArgb(16, 185, 129), 
-                ForeColor = Color.White, 
-                FlatStyle = FlatStyle.Flat, 
-                Font = new Font("Segoe UI", 9.5F, FontStyle.Bold), 
-                Cursor = Cursors.Hand 
+            Button btnGuardar = new Button
+            {
+                Text = "💾 Aplicar Cambio de Estado",
+                Location = new Point(20, 305),
+                Size = new Size(400, 42),
+                BackColor = Color.FromArgb(16, 185, 129),
+                ForeColor = Color.White,
+                FlatStyle = FlatStyle.Flat,
+                Font = new Font("Segoe UI", 9.5F, FontStyle.Bold),
+                Cursor = Cursors.Hand
             };
             btnGuardar.FlatAppearance.BorderSize = 0;
 
@@ -537,28 +498,17 @@ namespace SISTEMAACTUALIZADO.Forms
                     return;
                 }
 
-                string estadoAnt = cliente.EstadoCrediticio ?? "ACTIVO";
-                cliente.EstadoCrediticio = estadoSeleccionado;
-
-                db.HistorialCondicionesCredito.Add(new HistorialCondicionesCredito
+                try
                 {
-                    IdCliente = cliente.IdCliente,
-                    DiasCreditoAnterior = cliente.DiasCreditoHabiles,
-                    DiasCreditoNuevo = cliente.DiasCreditoHabiles,
-                    CupoAnterior = cliente.CupoCredito,
-                    CupoNuevo = cliente.CupoCredito,
-                    EstadoAnterior = estadoAnt,
-                    EstadoNuevo = estadoSeleccionado,
-                    Motivo = txtMot.Text.Trim(),
-                    FechaCambio = DateTime.Now,
-                    UsuarioResponsable = "ADMIN"
-                });
-
-                db.SaveChanges();
-
-                MessageBox.Show($"El estado crediticio del cliente '{cliente.RazonSocial}' se actualizó a: {estadoSeleccionado}.", "Estado Actualizado", MessageBoxButtons.OK, MessageBoxIcon.Information);
-                modalEstado.DialogResult = DialogResult.OK;
-                modalEstado.Close();
+                    CreditoService.CambiarEstadoCrediticio(cliente.IdCliente, estadoSeleccionado, txtMot.Text.Trim(), "ADMIN");
+                    MessageBox.Show($"El estado crediticio del cliente '{cliente.RazonSocial}' se actualizó a: {estadoSeleccionado}.", "Estado Actualizado", MessageBoxButtons.OK, MessageBoxIcon.Information);
+                    modalEstado.DialogResult = DialogResult.OK;
+                    modalEstado.Close();
+                }
+                catch (Exception ex)
+                {
+                    MessageBox.Show($"Error al actualizar estado: {ex.Message}", "Error", MessageBoxButtons.OK, MessageBoxIcon.Error);
+                }
             };
 
             modalEstado.Controls.AddRange(new Control[] { lblTit, pnlInfo, lblAccion, cbNuevoEstado, lblMot, txtMot, btnGuardar });

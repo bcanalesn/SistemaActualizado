@@ -6,7 +6,6 @@ using System.IO;
 using System.Linq;
 using System.Runtime.InteropServices;
 using System.Windows.Forms;
-using SISTEMAACTUALIZADO.Data;
 using SISTEMAACTUALIZADO.Helpers;
 using SISTEMAACTUALIZADO.Models;
 using SISTEMAACTUALIZADO.Services;
@@ -19,6 +18,8 @@ namespace SISTEMAACTUALIZADO.Modals
         private extern static void ReleaseCapture();
         [DllImport("user32.DLL", EntryPoint = "SendMessage")]
         private extern static void SendMessage(IntPtr hWnd, int wMsg, int wParam, int lParam);
+
+        private readonly ProductoService _productoService = new ProductoService();
 
         // Campos Base
         private TextBox txtCodigoBarra = null!;
@@ -348,9 +349,8 @@ namespace SISTEMAACTUALIZADO.Modals
         {
             try
             {
-                using var db = new AppDbContext();
-                var categorias = db.Productos.Where(p => p.Estado && !string.IsNullOrEmpty(p.Categoria)).Select(p => p.Categoria).Distinct().OrderBy(c => c).ToList();
-                var familias = db.Productos.Where(p => p.Estado && !string.IsNullOrEmpty(p.NFamilia)).Select(p => p.NFamilia!).Distinct().OrderBy(f => f).ToList();
+                var categorias = _productoService.ObtenerCategoriasRegistradas();
+                var familias = _productoService.ObtenerTodasLasFamilias();
 
                 cbCategoria.Items.Clear();
                 cbCategoria.Items.AddRange(categorias.Count > 0 ? categorias.ToArray() : new string[] { "Abarrotes", "Lácteos", "Bebidas", "Aseo", "General" });
@@ -401,11 +401,7 @@ namespace SISTEMAACTUALIZADO.Modals
         {
             try
             {
-                using var db = new AppDbContext();
-                var reglas = db.PreciosQ
-                    .Where(pq => pq.IdProducto == productoId)
-                    .OrderBy(pq => pq.Qini)
-                    .ToList();
+                var reglas = _productoService.ObtenerReglasEscala(productoId);
 
                 if (reglas.Count >= 2)
                 {
@@ -452,24 +448,6 @@ namespace SISTEMAACTUALIZADO.Modals
             txtPrecioUnitario.Text = MonedaHelper.Formatear(precioL1);
         }
 
-        private decimal ObtenerPrecioPorListaNumero(Producto p, int nroLista)
-        {
-            return nroLista switch
-            {
-                1 => p.PrecioUnitario,
-                2 => p.Precio2 > 0 ? p.Precio2 : p.PrecioUnitario,
-                3 => p.Precio3 > 0 ? p.Precio3 : p.PrecioUnitario,
-                4 => p.Precio4 > 0 ? p.Precio4 : p.PrecioUnitario,
-                5 => p.Precio5 > 0 ? p.Precio5 : p.PrecioUnitario,
-                6 => p.Precio6 > 0 ? p.Precio6 : p.PrecioUnitario,
-                7 => p.Precio7 > 0 ? p.Precio7 : p.PrecioUnitario,
-                8 => p.Precio8 > 0 ? p.Precio8 : p.PrecioUnitario,
-                9 => p.Precio9 > 0 ? p.Precio9 : p.PrecioUnitario,
-                10 => p.Precio10 > 0 ? p.Precio10 : p.PrecioUnitario,
-                _ => p.PrecioUnitario
-            };
-        }
-
         private void BtnCargarFoto_Click(object? sender, EventArgs e)
         {
             using OpenFileDialog ofd = new OpenFileDialog { Filter = "Imágenes (*.png;*.jpg;*.jpeg;*.webp)|*.png;*.jpg;*.jpeg;*.webp" };
@@ -504,106 +482,45 @@ namespace SISTEMAACTUALIZADO.Modals
 
             try
             {
-                using var db = new AppDbContext();
+                var productoGuardar = _productoAEditar ?? new Producto();
 
-                if (_productoAEditar == null)
+                productoGuardar.CodigoBarra = string.IsNullOrWhiteSpace(txtCodigoBarra.Text) 
+                    ? "GEN-" + DateTime.Now.Ticks.ToString().Substring(12) 
+                    : txtCodigoBarra.Text.Trim();
+                productoGuardar.Nombre = nombre;
+                productoGuardar.Categoria = cbCategoria.Text.Trim();
+                productoGuardar.NFamilia = cbFamilia.Text.Trim();
+                productoGuardar.PrecioCosto = costo;
+                productoGuardar.ListaDefectoPOS = listaSeleccionada;
+                productoGuardar.PrecioUnitario = pvp;
+                productoGuardar.Stock = stockActual;
+                productoGuardar.StockMinimo = stockMin > 0 ? stockMin : 5;
+                productoGuardar.ImagenPath = _rutaImagenSeleccionada;
+                productoGuardar.Estado = true;
+                productoGuardar.FchUpd = DateTime.Now;
+
+                var tramos = _filasTramos.Select(f => new TramoEscalaDTO
                 {
-                    var nuevoProd = new Producto
-                    {
-                        CodigoBarra = string.IsNullOrWhiteSpace(txtCodigoBarra.Text) ? "GEN-" + DateTime.Now.Ticks.ToString().Substring(12) : txtCodigoBarra.Text.Trim(),
-                        Nombre = nombre,
-                        Categoria = cbCategoria.Text.Trim(),
-                        NFamilia = cbFamilia.Text.Trim(),
-                        PrecioCosto = costo,
-                        ListaDefectoPOS = listaSeleccionada,
-                        PrecioUnitario = pvp,
-                        Stock = stockActual,
-                        StockMinimo = stockMin > 0 ? stockMin : 5,
-                        ImagenPath = _rutaImagenSeleccionada,
-                        Estado = true,
-                        FchUpd = DateTime.Now
-                    };
+                    NumeroTramo = f.NumeroTramo,
+                    Desde = f.ValorDesde,
+                    Hasta = f.EsUltimo ? 999999.000m : f.ValorHasta,
+                    NumeroLista = f.CbLista.SelectedIndex + 1
+                }).ToList();
 
-                    db.Productos.Add(nuevoProd);
-                    db.SaveChanges();
-
-                    GuardarReglasEscalaBD(db, nuevoProd.ProductoID, nuevoProd.Nombre);
-                    ProductoResultado = nuevoProd;
-                }
-                else
-                {
-                    var prodBd = db.Productos.Find(_productoAEditar.ProductoID);
-                    if (prodBd != null)
-                    {
-                        prodBd.CodigoBarra = txtCodigoBarra.Text.Trim();
-                        prodBd.Nombre = nombre;
-                        prodBd.Categoria = cbCategoria.Text.Trim();
-                        prodBd.NFamilia = cbFamilia.Text.Trim();
-                        prodBd.PrecioCosto = costo;
-                        prodBd.ListaDefectoPOS = listaSeleccionada;
-                        prodBd.PrecioUnitario = pvp;
-                        prodBd.Stock = stockActual;
-                        prodBd.StockMinimo = stockMin;
-                        prodBd.ImagenPath = _rutaImagenSeleccionada;
-                        prodBd.FchUpd = DateTime.Now;
-                        prodBd.Sincro = 0;
-
-                        GuardarReglasEscalaBD(db, prodBd.ProductoID, prodBd.Nombre);
-                        db.SaveChanges();
-
-                        ProductoResultado = prodBd;
-                    }
-                }
+                ProductoResultado = _productoService.GuardarProducto(productoGuardar, tramos, rbModoEscala.Checked, CantidadFactura);
 
                 this.DialogResult = DialogResult.OK;
                 this.Close();
             }
             catch (Exception ex)
             {
-                MessageBox.Show($"Error al guardar: {ex.Message}", "Error DB", MessageBoxButtons.OK, MessageBoxIcon.Error);
-            }
-        }
-
-        private void GuardarReglasEscalaBD(AppDbContext db, int productoId, string nombreProducto)
-        {
-            var existentes = db.PreciosQ.Where(pq => pq.IdProducto == productoId).ToList();
-            int bloqueoEstado = rbModoEscala.Checked ? 0 : 1;
-
-            if (_filasTramos.Count >= 2)
-            {
-                if (existentes.Count > 0)
-                {
-                    db.PreciosQ.RemoveRange(existentes);
-                }
-
-                var prod = db.Productos.Find(productoId);
-
-                for (int i = 0; i < _filasTramos.Count; i++)
-                {
-                    var f = _filasTramos[i];
-                    decimal qIni = f.ValorDesde;
-                    decimal qFin = f.EsUltimo ? 999999.000m : f.ValorHasta;
-                    int nroLista = f.CbLista.SelectedIndex + 1;
-                    decimal precioValor = prod != null ? ObtenerPrecioPorListaNumero(prod, nroLista) : 0m;
-
-                    db.PreciosQ.Add(new PrecioQ
-                    {
-                        IdProducto = productoId,
-                        NProducto = nombreProducto,
-                        Qini = qIni,
-                        Qfin = qFin,
-                        NPrecio = precioValor,
-                        IdPrecio = nroLista.ToString(),
-                        Bloqueo = bloqueoEstado,
-                        FchMod = DateTime.Now,
-                        HoraMod = DateTime.Now.ToString("HH:mm:ss")
-                    });
-                }
+                MessageBox.Show($"Error al guardar: {ex.Message}", "Error", MessageBoxButtons.OK, MessageBoxIcon.Error);
             }
         }
 
         private class FilaTramoUI
         {
+            public int NumeroTramo { get; }
             public Panel Contenedor { get; }
             public NumericUpDown? NumDesde { get; }
             public NumericUpDown? NumHasta { get; }
@@ -616,6 +533,7 @@ namespace SISTEMAACTUALIZADO.Modals
 
             public FilaTramoUI(int nroTramo, bool esPrimero, bool esUltimo, decimal sugeridoHasta)
             {
+                NumeroTramo = nroTramo;
                 EsPrimero = esPrimero;
                 EsUltimo = esUltimo;
 

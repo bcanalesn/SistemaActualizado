@@ -1,15 +1,16 @@
 using System;
 using System.Drawing;
-using System.Linq;
 using System.Windows.Forms;
-using SISTEMAACTUALIZADO.Data;
 using SISTEMAACTUALIZADO.Helpers;
 using SISTEMAACTUALIZADO.Models;
+using SISTEMAACTUALIZADO.Services;
 
 namespace SISTEMAACTUALIZADO.Modals
 {
     public class FormSeleccionarClienteModal : Form
     {
+        private readonly ClienteService _clienteService = new ClienteService();
+
         private TextBox txtRut = null!;
         private Panel pnlInfoCliente = null!;
         private Label lblNombreCliente = null!;
@@ -94,7 +95,6 @@ namespace SISTEMAACTUALIZADO.Modals
                 }
             };
 
-            // Contenedor de Información de Crédito y Cliente
             pnlInfoCliente = new Panel
             {
                 Location = new Point(24, 122),
@@ -192,11 +192,11 @@ namespace SISTEMAACTUALIZADO.Modals
 
             try
             {
-                using var db = new AppDbContext();
-                var cli = db.Clientes.FirstOrDefault(c => c.Rut == rutLimpio && c.Estado);
+                var info = _clienteService.ObtenerInfoCrediticiaPorRut(rutLimpio);
 
-                if (cli != null)
+                if (info != null)
                 {
+                    var cli = info.Cliente;
                     ClienteSeleccionado = cli;
                     btnAsignar.Enabled = true;
 
@@ -204,20 +204,10 @@ namespace SISTEMAACTUALIZADO.Modals
                     lblEstadoCliente.Text = $"Status: [ {cli.EstadoCrediticio} ]  -  Categoría: {cli.CategoriaCliente}";
                     lblEstadoCliente.ForeColor = cli.EstadoCrediticio == "MOROSO" ? Color.FromArgb(239, 68, 68) : Color.FromArgb(22, 163, 74);
 
-                    // Consultar cuentas por cobrar en tiempo real
-                    var facturasCliente = db.CuentasPorCobrar
-                        .Where(c => c.IdCliente == cli.IdCliente && (c.Estado == "PENDIENTE" || c.Estado == "PARCIAL" || c.Estado == "VENCIDA"))
-                        .ToList();
-
-                    decimal deudaTotal = facturasCliente.Sum(c => c.SaldoPendiente);
-                    decimal cupoDisp = Math.Max(0, cli.CupoCredito - deudaTotal);
-                    int facturasVencidas = facturasCliente.Count(c => c.FechaVencimiento < DateTime.Today);
-
-                    string detalleMora = facturasVencidas > 0
-                        ? $"\n⚠️ FACTURAS VENCIDAS: {facturasVencidas} documento(s) impago(s)"
+                    string detalleMora = info.FacturasVencidas > 0
+                        ? $"\n⚠️ FACTURAS VENCIDAS: {info.FacturasVencidas} documento(s) impago(s)"
                         : "\n✔ Al día sin documentos vencidos";
 
-                    // Obtener los días efectivos (evaluando DiasCreditoHabiles o DiasCredito)
                     int diasEfectivos = cli.DiasCreditoHabiles > 0 ? cli.DiasCreditoHabiles : cli.DiasCredito;
                     bool tieneCreditoHabilitado = cli.PermiteCredito || diasEfectivos > 0;
 
@@ -226,11 +216,11 @@ namespace SISTEMAACTUALIZADO.Modals
                         : "Solo Contado";
 
                     lblCreditoInfo.Text = $"• Modalidad: {modalidadTexto}\n" +
-                                        $"• Cupo Total: ${cli.CupoCredito:N0}\n" +
-                                        $"• Deuda Vigente: ${deudaTotal:N0}\n" +
-                                        $"• Cupo Disponible: ${cupoDisp:N0}\n" +
-                                        $"• Lista de Precios: Lista {cli.ListaPrecioDefecto}" +
-                                        detalleMora;
+                                          $"• Cupo Total: ${cli.CupoCredito:N0}\n" +
+                                          $"• Deuda Vigente: ${info.DeudaTotal:N0}\n" +
+                                          $"• Cupo Disponible: ${info.CupoDisponible:N0}\n" +
+                                          $"• Lista de Precios: Lista {cli.ListaPrecioDefecto}" +
+                                          detalleMora;
                 }
                 else
                 {

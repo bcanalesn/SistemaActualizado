@@ -1,17 +1,18 @@
 using System;
 using System.Collections.Generic;
 using System.Drawing;
-using System.Linq;
 using System.Windows.Forms;
-using SISTEMAACTUALIZADO.Data;
 using SISTEMAACTUALIZADO.Helpers;
 using SISTEMAACTUALIZADO.Models;
+using SISTEMAACTUALIZADO.Services;
 
 namespace SISTEMAACTUALIZADO.Modals
 {
     public class FormPreciosEspecialesClienteModal : Form
     {
         private readonly Cliente _cliente;
+        private readonly ProductoService _productoService = new ProductoService();
+
         private ComboBox cbProductos = null!;
         private Label lblCostoReferencia = null!;
         private TextBox txtPrecioEspecial = null!;
@@ -128,8 +129,7 @@ namespace SISTEMAACTUALIZADO.Modals
 
         private void CargarProductos()
         {
-            using var db = new AppDbContext();
-            _productos = db.Productos.Where(p => p.Estado).OrderBy(p => p.Nombre).ToList();
+            _productos = _productoService.ObtenerProductosActivos();
             cbProductos.DataSource = _productos;
             cbProductos.DisplayMember = "Nombre";
             cbProductos.ValueMember = "ProductoID";
@@ -147,48 +147,36 @@ namespace SISTEMAACTUALIZADO.Modals
 
         private void CargarPreciosEspeciales()
         {
-            DateTime hoy = DateTime.Today;
-            using var db = new AppDbContext();
-
-            var datos = (from pe in db.PreciosEspecialesClientes
-                         join pr in db.Productos on pe.ProductoId equals pr.ProductoID
-                         where pe.ClienteId == _cliente.IdCliente && pe.Estado
-                         orderby pe.FechaFin descending
-                         select new
-                         {
-                             pe.IdEspecial,
-                             Producto = pr.Nombre,
-                             CostoBase = pr.PrecioCosto,
-                             PrecioEspecial = pe.PrecioEspecial,
-                             Desde = pe.FechaInicio,
-                             Hasta = pe.FechaFin,
-                             EstadoVigencia = (pe.FechaInicio <= hoy && pe.FechaFin >= hoy) ? "🟢 VIGENTE" : (pe.FechaFin < hoy ? "🔴 EXPIRADO" : "🟡 PROGRAMADO")
-                         }).Take(10)
-                         .ToList();
-
-            dgvPrecios.DataSource = datos;
-
-            var estiloMoneda = new DataGridViewCellStyle
+            try
             {
-                FormatProvider = new System.Globalization.CultureInfo("es-CL"),
-                Format = "$ #,##0",
-                Alignment = DataGridViewContentAlignment.MiddleRight
-            };
+                dgvPrecios.DataSource = _productoService.ObtenerPreciosEspecialesCliente(_cliente.IdCliente);
 
-            if (dgvPrecios.Columns["IdEspecial"] != null) dgvPrecios.Columns["IdEspecial"].Visible = false;
-            if (dgvPrecios.Columns["CostoBase"] != null)
-            {
-                dgvPrecios.Columns["CostoBase"].HeaderText = "COSTO NETO";
-                dgvPrecios.Columns["CostoBase"].DefaultCellStyle = estiloMoneda;
+                var estiloMoneda = new DataGridViewCellStyle
+                {
+                    FormatProvider = new System.Globalization.CultureInfo("es-CL"),
+                    Format = "$ #,##0",
+                    Alignment = DataGridViewContentAlignment.MiddleRight
+                };
+
+                if (dgvPrecios.Columns["IdEspecial"] != null) dgvPrecios.Columns["IdEspecial"].Visible = false;
+                if (dgvPrecios.Columns["CostoBase"] != null)
+                {
+                    dgvPrecios.Columns["CostoBase"].HeaderText = "COSTO NETO";
+                    dgvPrecios.Columns["CostoBase"].DefaultCellStyle = estiloMoneda;
+                }
+                if (dgvPrecios.Columns["PrecioEspecial"] != null)
+                {
+                    dgvPrecios.Columns["PrecioEspecial"].HeaderText = "PRECIO PACTADO";
+                    dgvPrecios.Columns["PrecioEspecial"].DefaultCellStyle = estiloMoneda;
+                }
+                if (dgvPrecios.Columns["Desde"] != null) dgvPrecios.Columns["Desde"].DefaultCellStyle.Format = "dd/MM/yyyy";
+                if (dgvPrecios.Columns["Hasta"] != null) dgvPrecios.Columns["Hasta"].DefaultCellStyle.Format = "dd/MM/yyyy";
+                if (dgvPrecios.Columns["EstadoVigencia"] != null) dgvPrecios.Columns["EstadoVigencia"].HeaderText = "ESTADO";
             }
-            if (dgvPrecios.Columns["PrecioEspecial"] != null)
+            catch (Exception ex)
             {
-                dgvPrecios.Columns["PrecioEspecial"].HeaderText = "PRECIO PACTADO";
-                dgvPrecios.Columns["PrecioEspecial"].DefaultCellStyle = estiloMoneda;
+                MessageBox.Show($"Error al cargar convenios: {ex.Message}", "Error", MessageBoxButtons.OK, MessageBoxIcon.Error);
             }
-            if (dgvPrecios.Columns["Desde"] != null) dgvPrecios.Columns["Desde"].DefaultCellStyle.Format = "dd/MM/yyyy";
-            if (dgvPrecios.Columns["Hasta"] != null) dgvPrecios.Columns["Hasta"].DefaultCellStyle.Format = "dd/MM/yyyy";
-            if (dgvPrecios.Columns["EstadoVigencia"] != null) dgvPrecios.Columns["EstadoVigencia"].HeaderText = "ESTADO";
         }
 
         private void BtnGuardar_Click(object? sender, EventArgs e)
@@ -223,7 +211,6 @@ namespace SISTEMAACTUALIZADO.Modals
 
             try
             {
-                using var db = new AppDbContext();
                 var nuevo = new PrecioEspecialCliente
                 {
                     ClienteId = _cliente.IdCliente,
@@ -235,16 +222,14 @@ namespace SISTEMAACTUALIZADO.Modals
                     FechaRegistro = DateTime.Now
                 };
 
-                db.PreciosEspecialesClientes.Add(nuevo);
-                db.SaveChanges();
-
+                _productoService.GuardarPrecioEspecial(nuevo);
                 MessageBox.Show("Precio especial registrado con éxito.", "Guardado", MessageBoxButtons.OK, MessageBoxIcon.Information);
                 txtPrecioEspecial.Clear();
                 CargarPreciosEspeciales();
             }
             catch (Exception ex)
             {
-                MessageBox.Show($"Error al guardar precio especial: {ex.Message}", "Error DB", MessageBoxButtons.OK, MessageBoxIcon.Error);
+                MessageBox.Show($"Error al guardar precio especial: {ex.Message}", "Error", MessageBoxButtons.OK, MessageBoxIcon.Error);
             }
         }
     }

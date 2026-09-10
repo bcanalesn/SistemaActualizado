@@ -4,9 +4,18 @@ using System.Linq;
 using Microsoft.EntityFrameworkCore;
 using SISTEMAACTUALIZADO.Data;
 using SISTEMAACTUALIZADO.Models;
+using SISTEMAACTUALIZADO.Helpers;
 
 namespace SISTEMAACTUALIZADO.Services
 {
+    public class InfoCrediticiaClienteDTO
+    {
+        public Cliente Cliente { get; set; } = null!;
+        public decimal DeudaTotal { get; set; }
+        public decimal CupoDisponible { get; set; }
+        public int FacturasVencidas { get; set; }
+    }
+
     public class ClienteService
     {
         public List<Cliente> ObtenerClientes(string filtro = "")
@@ -33,11 +42,38 @@ namespace SISTEMAACTUALIZADO.Services
             if (string.IsNullOrWhiteSpace(rut)) return null;
 
             using var db = new AppDbContext();
-            string rutLimpio = rut.Replace(".", "").Replace("-", "").Trim().ToLower();
+            string rutLimpio = RutHelper.Limpiar(rut).ToLower();
 
             return db.Clientes.AsNoTracking().FirstOrDefault(c => 
-                c.Rut.Replace(".", "").Replace("-", "").Trim().ToLower() == rutLimpio
+                c.Rut.ToLower() == rutLimpio && c.Estado
             );
+        }
+
+        public InfoCrediticiaClienteDTO? ObtenerInfoCrediticiaPorRut(string rut)
+        {
+            string rutLimpio = RutHelper.Limpiar(rut);
+            if (string.IsNullOrWhiteSpace(rutLimpio)) return null;
+
+            using var db = new AppDbContext();
+            var cli = db.Clientes.AsNoTracking().FirstOrDefault(c => c.Rut == rutLimpio && c.Estado);
+            if (cli == null) return null;
+
+            var facturasCliente = db.CuentasPorCobrar
+                .AsNoTracking()
+                .Where(c => c.IdCliente == cli.IdCliente && (c.Estado == "PENDIENTE" || c.Estado == "PARCIAL" || c.Estado == "VENCIDA"))
+                .ToList();
+
+            decimal deudaTotal = facturasCliente.Sum(c => c.SaldoPendiente);
+            decimal cupoDisp = Math.Max(0, cli.CupoCredito - deudaTotal);
+            int facturasVencidas = facturasCliente.Count(c => c.FechaVencimiento < DateTime.Today);
+
+            return new InfoCrediticiaClienteDTO
+            {
+                Cliente = cli,
+                DeudaTotal = deudaTotal,
+                CupoDisponible = cupoDisp,
+                FacturasVencidas = facturasVencidas
+            };
         }
 
         public List<Cliente> BuscarClientesPredictivo(string busqueda, int limite = 5)
@@ -57,7 +93,7 @@ namespace SISTEMAACTUALIZADO.Services
                 .ToList();
         }
 
-        public void GuardarCliente(Cliente cliente, bool esNuevo)
+        public void GuardarCliente(Cliente cliente, bool esNuevo, string usuarioResponsable = "ADMIN")
         {
             using var db = new AppDbContext();
 
@@ -70,6 +106,10 @@ namespace SISTEMAACTUALIZADO.Services
                 var existente = db.Clientes.Find(cliente.IdCliente);
                 if (existente != null)
                 {
+                    int diasAnt = existente.DiasCreditoHabiles;
+                    decimal cupoAnt = existente.CupoCredito;
+                    string estadoAnt = existente.EstadoCrediticio ?? "ACTIVO";
+
                     existente.Rut = cliente.Rut;
                     existente.RazonSocial = cliente.RazonSocial;
                     existente.Giro = cliente.Giro;
@@ -80,10 +120,31 @@ namespace SISTEMAACTUALIZADO.Services
                     existente.Email = cliente.Email;
                     existente.FormaPago = cliente.FormaPago;
                     existente.DiasCredito = cliente.DiasCredito;
+                    existente.DiasCreditoHabiles = cliente.DiasCreditoHabiles;
                     existente.CupoCredito = cliente.CupoCredito;
                     existente.ListaPrecioDefecto = cliente.ListaPrecioDefecto;
                     existente.CategoriaCliente = cliente.CategoriaCliente;
+                    existente.PermiteCredito = cliente.PermiteCredito;
+                    existente.ModalidadPago = cliente.ModalidadPago;
+                    existente.EstadoCrediticio = cliente.EstadoCrediticio;
                     existente.Estado = cliente.Estado;
+
+                    if (diasAnt != cliente.DiasCreditoHabiles || cupoAnt != cliente.CupoCredito)
+                    {
+                        db.HistorialCondicionesCredito.Add(new HistorialCondicionesCredito
+                        {
+                            IdCliente = existente.IdCliente,
+                            DiasCreditoAnterior = diasAnt,
+                            DiasCreditoNuevo = cliente.DiasCreditoHabiles,
+                            CupoAnterior = cupoAnt,
+                            CupoNuevo = cliente.CupoCredito,
+                            EstadoAnterior = estadoAnt,
+                            EstadoNuevo = existente.EstadoCrediticio,
+                            Motivo = "Modificación de condiciones crediticias desde ficha de cliente",
+                            FechaCambio = DateTime.Now,
+                            UsuarioResponsable = usuarioResponsable
+                        });
+                    }
                 }
             }
 
@@ -101,24 +162,13 @@ namespace SISTEMAACTUALIZADO.Services
             }
         }
 
-        public List<dynamic> ObtenerUltimasComprasPorRut(string? rut, int cantidad = 2)
-        {
-            if (string.IsNullOrWhiteSpace(rut)) return new List<dynamic>();
-
-            using var db = new AppDbContext();
-            string rutLimpio = rut.Replace(".", "").Replace("-", "").Trim().ToLower();
-
-            // Consulta desacoplada para leer últimas ventas asociadas al RUT
-            return new List<dynamic>();
-        }
-
         public void EliminarCliente(int idCliente)
         {
             using var db = new AppDbContext();
             var cliente = db.Clientes.Find(idCliente);
             if (cliente != null)
             {
-                cliente.Estado = false; // Baja lógica (Soft Delete)
+                cliente.Estado = false;
                 db.SaveChanges();
             }
         }

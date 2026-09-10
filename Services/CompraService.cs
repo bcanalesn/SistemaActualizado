@@ -1,6 +1,7 @@
 using System;
 using System.Collections.Generic;
 using System.Linq;
+using Microsoft.EntityFrameworkCore;
 using SISTEMAACTUALIZADO.Data;
 using SISTEMAACTUALIZADO.Models;
 
@@ -8,6 +9,18 @@ namespace SISTEMAACTUALIZADO.Services
 {
     public class CompraService
     {
+        public Compra? ObtenerCompraPorId(int compraId)
+        {
+            using var db = new AppDbContext();
+            return db.Compras.AsNoTracking().FirstOrDefault(c => c.CompraID == compraId);
+        }
+
+        public List<DetalleCompra> ObtenerDetallesCompra(int compraId)
+        {
+            using var db = new AppDbContext();
+            return db.DetalleCompras.AsNoTracking().Where(d => d.CompraID == compraId).ToList();
+        }
+
         public bool RegistrarFacturaCompra(Compra compra, List<DetalleCompra> detalles, bool actualizarPreciosVenta = true)
         {
             if (compra == null) throw new ArgumentNullException(nameof(compra));
@@ -17,18 +30,15 @@ namespace SISTEMAACTUALIZADO.Services
             using var transaction = db.Database.BeginTransaction();
             try
             {
-                // 1. Guardar cabecera
                 db.Compras.Add(compra);
                 db.SaveChanges();
 
-                // 2. Procesar líneas
                 foreach (var item in detalles)
                 {
                     item.CompraID = compra.CompraID;
                     item.Compra = null;
                     item.Producto = null;
 
-                    // SOLO SI ES MERCADERÍA AFECTA STOCK Y PRECIOS
                     if (item.AfectaStock && item.ProductoID.HasValue && item.ProductoID.Value > 0)
                     {
                         var producto = db.Productos.FirstOrDefault(p => p.ProductoID == item.ProductoID.Value);
@@ -38,7 +48,6 @@ namespace SISTEMAACTUALIZADO.Services
 
                             if (actualizarPreciosVenta && item.PrecioCostoUnitario > 0)
                             {
-                                // Actualiza costo base y recalcula todas las listas (1 a 10) con margen activo
                                 ProductoService.AplicarNuevoCostoYRecalcularListas(producto, item.PrecioCostoUnitario);
                             }
                             else

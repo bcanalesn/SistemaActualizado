@@ -7,14 +7,16 @@ using System.IO;
 using System.Linq;
 using System.Text;
 using System.Windows.Forms;
-using SISTEMAACTUALIZADO.Data;
 using SISTEMAACTUALIZADO.Models;
 using SISTEMAACTUALIZADO.Modals;
+using SISTEMAACTUALIZADO.Services;
 
 namespace SISTEMAACTUALIZADO.Forms
 {
     public class FormLibroCompras : Form
     {
+        private readonly LibroContableService _libroService = new LibroContableService();
+
         // Controles de Filtros
         private TextBox txtFiltroTexto = null!;
         private DateTimePicker dtpFechaDesde = null!;
@@ -33,7 +35,7 @@ namespace SISTEMAACTUALIZADO.Forms
         private Button btnFiltroEsteMes = null!;
         private Button btnFiltroMesAnterior = null!;
 
-        // Tarjetas KPI Superiores (5 Tarjetas)
+        // Tarjetas KPI Superiores
         private Label lblKpiTotalBrutoMonto = null!;
         private Label lblKpiComprasNetoMonto = null!;
         private Label lblKpiFacturasCant = null!;
@@ -88,7 +90,6 @@ namespace SISTEMAACTUALIZADO.Forms
 
         private Panel CrearTarjetasKpi()
         {
-            // Se amplía la separación inferior de 10px a 16px para evitar contacto con los filtros
             Panel pnlWrapper = new Panel { Dock = DockStyle.Top, Height = 90, Margin = new Padding(0, 0, 0, 16) };
 
             TableLayoutPanel tlp = new TableLayoutPanel
@@ -99,25 +100,16 @@ namespace SISTEMAACTUALIZADO.Forms
                 Margin = new Padding(0),
                 Padding = new Padding(0)
             };
-            tlp.ColumnStyles.Add(new ColumnStyle(SizeType.Percent, 22F)); // Total Compras Bruto
-            tlp.ColumnStyles.Add(new ColumnStyle(SizeType.Percent, 20F)); // Neto
-            tlp.ColumnStyles.Add(new ColumnStyle(SizeType.Percent, 18F)); // Facturas
-            tlp.ColumnStyles.Add(new ColumnStyle(SizeType.Percent, 20F)); // IVA Crédito
-            tlp.ColumnStyles.Add(new ColumnStyle(SizeType.Percent, 20F)); // Proveedores
+            tlp.ColumnStyles.Add(new ColumnStyle(SizeType.Percent, 22F));
+            tlp.ColumnStyles.Add(new ColumnStyle(SizeType.Percent, 20F));
+            tlp.ColumnStyles.Add(new ColumnStyle(SizeType.Percent, 18F));
+            tlp.ColumnStyles.Add(new ColumnStyle(SizeType.Percent, 20F));
+            tlp.ColumnStyles.Add(new ColumnStyle(SizeType.Percent, 20F));
 
-            // KPI 1: TOTAL COMPRAS (BRUTO)
             tlp.Controls.Add(CrearCardKpi("💰", Color.FromArgb(209, 250, 229), Color.FromArgb(5, 150, 105), "Total Compras", out lblKpiTotalBrutoMonto, "$ 0", "Total bruto (con IVA)"), 0, 0);
-
-            // KPI 2: Total Neto
             tlp.Controls.Add(CrearCardKpi("💲", Color.FromArgb(240, 253, 244), Color.FromArgb(22, 163, 74), "Total Neto", out lblKpiComprasNetoMonto, "$ 0", "Total neto del período"), 1, 0);
-
-            // KPI 3: IVA Crédito Fiscal
             tlp.Controls.Add(CrearCardKpi("🏷️", Color.FromArgb(243, 232, 255), Color.FromArgb(147, 51, 234), "Total IVA", out lblKpiIvaMonto, "$ 0", "Total IVA recuperable"), 3, 0);
-            
-            // KPI 4: Facturas Recibidas
             tlp.Controls.Add(CrearCardKpi("📄", Color.FromArgb(239, 246, 255), Color.FromArgb(37, 99, 235), "Facturas Recibidas", out lblKpiFacturasCant, "0", "100% del total"), 2, 0);
-
-            // KPI 5: Proveedores Activos
             tlp.Controls.Add(CrearCardKpi("👥", Color.FromArgb(254, 243, 199), Color.FromArgb(217, 119, 6), "Proveedores Activos", out lblKpiProveedoresCant, "0", "Con compras en el período"), 4, 0);
 
             pnlWrapper.Controls.Add(tlp);
@@ -185,7 +177,7 @@ namespace SISTEMAACTUALIZADO.Forms
                 Height = 110,
                 BackColor = Color.White,
                 Padding = new Padding(14, 8, 14, 8),
-                Margin = new Padding(0, 0, 0, 14) // Separación inferior con respecto a la grilla
+                Margin = new Padding(0, 0, 0, 14)
             };
             pnl.Paint += (s, e) => ControlPaint.DrawBorder(e.Graphics, pnl.ClientRectangle, Color.FromArgb(226, 232, 240), ButtonBorderStyle.Solid);
 
@@ -373,35 +365,15 @@ namespace SISTEMAACTUALIZADO.Forms
         {
             try
             {
-                using var db = new AppDbContext();
                 DateTime fDesde = dtpFechaDesde.Value.Date;
                 DateTime fHasta = dtpFechaHasta.Value.Date.AddDays(1).AddTicks(-1);
 
-                var query = db.Compras
-                    .Where(c => c.FechaEmision >= fDesde && c.FechaEmision <= fHasta)
-                    .AsQueryable();
+                string filtro = txtFiltroTexto.Text.Trim();
+                string tipoSel = cbTipoDoc.SelectedIndex > 0 ? cbTipoDoc.SelectedItem!.ToString()! : "Todos";
+                string estadoSel = cbEstado.SelectedIndex > 0 ? cbEstado.SelectedItem!.ToString()! : "Todos";
 
-                string filtro = txtFiltroTexto.Text.Trim().ToLower();
-                if (!string.IsNullOrEmpty(filtro))
-                {
-                    query = query.Where(c => c.RazonSocialProveedor.ToLower().Contains(filtro) ||
-                                             c.RutProveedor.ToLower().Contains(filtro) ||
-                                             c.NroFacturaProveedor.ToString().Contains(filtro));
-                }
-
-                if (cbTipoDoc.SelectedIndex > 0)
-                {
-                    string tipoSel = cbTipoDoc.SelectedItem!.ToString()!;
-                    query = query.Where(c => c.TipoDocumento == tipoSel);
-                }
-
-                if (cbEstado.SelectedIndex > 0)
-                {
-                    string estadoSel = cbEstado.SelectedItem!.ToString()!;
-                    query = query.Where(c => c.Estado == estadoSel);
-                }
-
-                _comprasCargadas = query.OrderByDescending(c => c.FechaEmision).ToList();
+                var resumen = _libroService.ObtenerLibroCompras(fDesde, fHasta, filtro, tipoSel, estadoSel);
+                _comprasCargadas = resumen.Compras;
 
                 dgvLibro.Rows.Clear();
                 foreach (var c in _comprasCargadas)
@@ -420,24 +392,17 @@ namespace SISTEMAACTUALIZADO.Forms
                     );
                 }
 
-                // Cálculo y asignación de los 5 KPIs
-                decimal totalBruto = _comprasCargadas.Sum(c => c.MontoTotal);
-                decimal totalNeto = _comprasCargadas.Sum(c => c.MontoNeto);
-                decimal totalIva = _comprasCargadas.Sum(c => c.MontoIva);
-                int totalFacturas = _comprasCargadas.Count;
-                int totalProveedores = _comprasCargadas.Select(c => c.RutProveedor).Distinct().Count();
-
-                lblKpiTotalBrutoMonto.Text = $"$ {totalBruto:N0}";
-                lblKpiComprasNetoMonto.Text = $"$ {totalNeto:N0}";
-                lblKpiFacturasCant.Text = totalFacturas.ToString("N0");
-                lblKpiIvaMonto.Text = $"$ {totalIva:N0}";
-                lblKpiProveedoresCant.Text = totalProveedores.ToString("N0");
+                lblKpiTotalBrutoMonto.Text = $"$ {resumen.TotalBruto:N0}";
+                lblKpiComprasNetoMonto.Text = $"$ {resumen.TotalNeto:N0}";
+                lblKpiFacturasCant.Text = resumen.TotalFacturas.ToString("N0");
+                lblKpiIvaMonto.Text = $"$ {resumen.TotalIva:N0}";
+                lblKpiProveedoresCant.Text = resumen.TotalProveedores.ToString("N0");
 
                 lblContadorFooter.Text = $"Mostrando {_comprasCargadas.Count} documento(s) en el período seleccionado.";
             }
             catch (Exception ex)
             {
-                MessageBox.Show($"Error al cargar el Libro de Compras: {ex.Message}", "Error DB", MessageBoxButtons.OK, MessageBoxIcon.Error);
+                MessageBox.Show($"Error al cargar el Libro de Compras: {ex.Message}", "Error", MessageBoxButtons.OK, MessageBoxIcon.Error);
             }
         }
 

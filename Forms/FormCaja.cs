@@ -4,7 +4,6 @@ using System.Drawing;
 using System.Drawing.Drawing2D;
 using System.Linq;
 using System.Windows.Forms;
-using SISTEMAACTUALIZADO.Data;
 using SISTEMAACTUALIZADO.Helpers;
 using SISTEMAACTUALIZADO.Modals;
 using SISTEMAACTUALIZADO.Models;
@@ -1336,16 +1335,7 @@ namespace SISTEMAACTUALIZADO
 
             if (medioPago == "Crédito Comercial")
             {
-                using var db = new AppDbContext();
-                string rutLimpio = RutHelper.Limpiar(_ticketSeleccionado.RuT ?? "");
-                var cliente = db.Clientes.FirstOrDefault(c => (c.IdCliente == _ticketSeleccionado.Idcliente && c.IdCliente > 0) || (c.Rut == rutLimpio || c.Rut == _ticketSeleccionado.RuT));
-                if (cliente == null)
-                {
-                    MessageBox.Show("El ticket no tiene un cliente válido registrado para otorgar crédito comercial.", "Cliente Requerido", MessageBoxButtons.OK, MessageBoxIcon.Warning);
-                    return;
-                }
-
-                var resCredito = CreditoService.ValidarVentaCredito(cliente, _ticketSeleccionado.Total, db);
+                var resCredito = CreditoService.ValidarVentaCreditoPorRutOId(_ticketSeleccionado.Idcliente, _ticketSeleccionado.RuT ?? "", _ticketSeleccionado.Total);
                 if (!resCredito.EsValido)
                 {
                     MessageBox.Show(resCredito.MensajeError, "Crédito Comercial Denegado", MessageBoxButtons.OK, MessageBoxIcon.Stop);
@@ -1389,13 +1379,7 @@ namespace SISTEMAACTUALIZADO
 
                 if (_medioPagoSeleccionado == "Crédito Comercial")
                 {
-                    using var db = new AppDbContext();
-                    string rutLimpio = RutHelper.Limpiar(_ticketSeleccionado.RuT ?? "");
-                    var cliente = db.Clientes.FirstOrDefault(c => (c.IdCliente == _ticketSeleccionado.Idcliente && c.IdCliente > 0) || (c.Rut == rutLimpio || c.Rut == _ticketSeleccionado.RuT));
-                    if (cliente != null)
-                    {
-                        CreditoService.RegistrarFacturaCredito(_ticketSeleccionado.idTve, folioOficial, DateTime.Now, cliente, _ticketSeleccionado.Total, cajero, db);
-                    }
+                    CreditoService.RegistrarFacturaCreditoDirecto(_ticketSeleccionado.idTve, folioOficial, DateTime.Now, _ticketSeleccionado.Idcliente, _ticketSeleccionado.RuT ?? "", _ticketSeleccionado.Total, cajero);
                 }
 
                 var detalles = _cajaService.ObtenerDetallesTicket(_ticketSeleccionado.idTve);
