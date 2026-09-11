@@ -21,7 +21,7 @@ namespace SISTEMAACTUALIZADO
         // PARÁMETRO DE PRUEBA: Minutos para que la caja se considere vencida
         // Cámbialo aquí a 1, 2, 5, etc. según tus pruebas.
         // =========================================================================
-        private const double MINUTOS_PRUEBA_VENCIMIENTO = 2.0;
+        private const double MINUTOS_PRUEBA_VENCIMIENTO = 1.0;
 
         private readonly CajaService _cajaService = new CajaService();
         private static CajaTurno? _turnoActual;

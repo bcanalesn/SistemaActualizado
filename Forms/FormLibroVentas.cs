@@ -59,6 +59,14 @@ namespace SISTEMAACTUALIZADO
 
         public FormLibroVentas()
         {
+            // Activar doble búfer y redibujado en redimensión para evitar líneas residuales
+            this.DoubleBuffered = true;
+            this.SetStyle(ControlStyles.AllPaintingInWmPaint | 
+                           ControlStyles.UserPaint | 
+                           ControlStyles.OptimizedDoubleBuffer | 
+                           ControlStyles.ResizeRedraw, true);
+            this.UpdateStyles();
+
             InitializeComponent();
 
             DateTime hoyInicio = DateTime.Today;
@@ -84,6 +92,9 @@ namespace SISTEMAACTUALIZADO
                 AutoScroll = true
             };
 
+            // =========================================================================
+            // 1. TARJETAS KPI SUPERIORES
+            // =========================================================================
             Panel pnlKpiWrapper = new Panel
             {
                 Dock = DockStyle.Top,
@@ -113,31 +124,52 @@ namespace SISTEMAACTUALIZADO
             card3.Margin = new Padding(6, 0, 6, 0);
             card4.Margin = new Padding(6, 0, 0, 0);
 
+            pnlKpisLayout.Resize += (s, e) => pnlKpisLayout.Invalidate(true);
+
             pnlKpisLayout.Controls.Add(card1, 0, 0);
             pnlKpisLayout.Controls.Add(card2, 1, 0);
             pnlKpisLayout.Controls.Add(card3, 2, 0);
             pnlKpisLayout.Controls.Add(card4, 3, 0);
             pnlKpiWrapper.Controls.Add(pnlKpisLayout);
 
+            // =========================================================================
+            // 2. SECCIÓN FILTROS Y BÚSQUEDA
+            // =========================================================================
             Panel pnlFiltrosWrapper = new Panel
             {
                 Dock = DockStyle.Top,
-                Height = 130,
-                Padding = new Padding(0, 0, 0, 12),
+                Height = 125,
+                Padding = new Padding(0, 0, 0, 10),
                 BackColor = Color.Transparent
             };
 
-            Panel pnlFiltrosCard = CrearTarjetaRedondeada(0, 0, 0, 118, Color.White, Color.FromArgb(226, 232, 240));
+            Panel pnlFiltrosCard = CrearTarjetaRedondeada(0, 0, 0, 115, Color.White, Color.FromArgb(226, 232, 240));
             pnlFiltrosCard.Dock = DockStyle.Fill;
-            pnlFiltrosCard.Padding = new Padding(16, 10, 16, 10);
+            pnlFiltrosCard.Padding = new Padding(16, 8, 16, 8);
 
-            FlowLayoutPanel flowFiltrosFila1 = new FlowLayoutPanel { Dock = DockStyle.Top, Height = 54, WrapContents = false, BackColor = Color.Transparent };
+            // Fila 1: Entradas y Botones de búsqueda
+            FlowLayoutPanel flowFiltrosFila1 = new FlowLayoutPanel
+            {
+                Dock = DockStyle.Top,
+                Height = 54,
+                WrapContents = false,
+                AutoScroll = false,
+                BackColor = Color.Transparent
+            };
 
-            txtBuscar = new TextBox { Size = new Size(160, 26), Font = new Font("Segoe UI", 9.5F), BorderStyle = BorderStyle.None, BackColor = Color.FromArgb(248, 250, 252), Text = "Ingrese folio o RUT", ForeColor = Color.Gray };
+            txtBuscar = new TextBox
+            {
+                Size = new Size(170, 26),
+                Font = new Font("Segoe UI", 9.5F),
+                BorderStyle = BorderStyle.None,
+                BackColor = Color.FromArgb(248, 250, 252),
+                Text = "Ingrese folio o RUT",
+                ForeColor = Color.Gray
+            };
             txtBuscar.Enter += (s, e) => { if (txtBuscar.Text.StartsWith("Ingrese")) { txtBuscar.Text = ""; txtBuscar.ForeColor = Color.Black; } };
             txtBuscar.Leave += (s, e) => { if (string.IsNullOrWhiteSpace(txtBuscar.Text)) { txtBuscar.Text = "Ingrese folio o RUT"; txtBuscar.ForeColor = Color.Gray; } };
             txtBuscar.KeyDown += (s, e) => { if (e.KeyCode == Keys.Enter) { EjcutarBusqueda(); e.SuppressKeyPress = true; } };
-            Panel pnlGrpFolio = CrearGrupoConCaja("Folio DTE / RUT", txtBuscar, 175);
+            Panel pnlGrpFolio = CrearGrupoConCaja("Folio DTE / RUT", txtBuscar, 185);
 
             dtpDesde = new DateTimePicker { Size = new Size(120, 26), Format = DateTimePickerFormat.Short, Font = new Font("Segoe UI", 9.5F) };
             Panel pnlGrpDesde = CrearGrupoLimpio("Fecha desde", dtpDesde, 125);
@@ -145,23 +177,46 @@ namespace SISTEMAACTUALIZADO
             dtpHasta = new DateTimePicker { Size = new Size(120, 26), Format = DateTimePickerFormat.Short, Font = new Font("Segoe UI", 9.5F) };
             Panel pnlGrpHasta = CrearGrupoLimpio("Fecha hasta", dtpHasta, 125);
 
-            cbTipoDocumento = new ComboBox { Size = new Size(145, 26), DropDownStyle = ComboBoxStyle.DropDownList, Font = new Font("Segoe UI", 9.5F) };
+            cbTipoDocumento = new ComboBox { Size = new Size(155, 26), DropDownStyle = ComboBoxStyle.DropDownList, Font = new Font("Segoe UI", 9.5F) };
             cbTipoDocumento.Items.AddRange(new string[] { "Todos", "Boleta Electrónica", "Factura Electrónica", "Nota de Crédito" });
             cbTipoDocumento.SelectedIndex = 0;
-            Panel pnlGrpTipoDoc = CrearGrupoLimpio("Tipo Documento", cbTipoDocumento, 150);
+            Panel pnlGrpTipoDoc = CrearGrupoLimpio("Tipo Documento", cbTipoDocumento, 160);
 
-            btnBuscar = CrearBotonRedondeado("🔍  Buscar", Color.FromArgb(0, 102, 255), Color.White, new Size(92, 34), 8);
+            btnBuscar = CrearBoton("🔍  Buscar", Color.FromArgb(0, 102, 255), Color.White, new Size(95, 34), 8);
             btnBuscar.Margin = new Padding(8, 14, 6, 0);
             btnBuscar.Click += (s, e) => EjcutarBusqueda();
 
-            btnLimpiar = CrearBotonRedondeado("🗑️  Limpiar", Color.FromArgb(241, 245, 249), Color.FromArgb(51, 65, 85), new Size(88, 34), 8);
+            btnLimpiar = CrearBoton("🗑️  Limpiar", Color.FromArgb(241, 245, 249), Color.FromArgb(51, 65, 85), new Size(90, 34), 8);
             btnLimpiar.Margin = new Padding(0, 14, 0, 0);
             btnLimpiar.Click += (s, e) => LimpiarFiltros();
 
             flowFiltrosFila1.Controls.AddRange(new Control[] { pnlGrpFolio, pnlGrpDesde, pnlGrpHasta, pnlGrpTipoDoc, btnBuscar, btnLimpiar });
 
-            FlowLayoutPanel flowFiltrosFila2 = new FlowLayoutPanel { Dock = DockStyle.Top, Height = 34, WrapContents = false, BackColor = Color.Transparent };
-            Label lblFiltrosRapidos = new Label { Text = "Filtros rápidos:", Font = new Font("Segoe UI", 8.5F, FontStyle.Bold), ForeColor = Color.FromArgb(100, 116, 139), Margin = new Padding(0, 6, 8, 0), AutoSize = true };
+            // Fila 2: Subdividida (Izquierda: Filtros Rápidos | Derecha: Exportar / Imprimir)
+            Panel pnlFila2Acciones = new Panel
+            {
+                Dock = DockStyle.Top,
+                Height = 36,
+                BackColor = Color.Transparent,
+                Padding = new Padding(0, 4, 0, 0)
+            };
+
+            FlowLayoutPanel flowFiltrosRapidos = new FlowLayoutPanel
+            {
+                Dock = DockStyle.Left,
+                AutoSize = true,
+                WrapContents = false,
+                BackColor = Color.Transparent
+            };
+
+            Label lblFiltrosRapidos = new Label
+            {
+                Text = "Filtros rápidos:",
+                Font = new Font("Segoe UI", 8.5F, FontStyle.Bold),
+                ForeColor = Color.FromArgb(100, 116, 139),
+                Margin = new Padding(0, 6, 8, 0),
+                AutoSize = true
+            };
 
             btnFiltroHoy = CrearPillBoton("📅 Hoy", 65, (s, e) => AplicarFiltroFecha(DateTime.Today, DateTime.Today.AddDays(1).AddTicks(-1)));
             btnFiltroAyer = CrearPillBoton("📅 Ayer", 65, (s, e) => AplicarFiltroFecha(DateTime.Today.AddDays(-1), DateTime.Today.AddTicks(-1)));
@@ -174,21 +229,43 @@ namespace SISTEMAACTUALIZADO
                 AplicarFiltroFecha(inicioMesAnt, finMesAnt);
             });
 
-            btnExportarCSV = CrearBotonRedondeado("📥  Exportar CSV", Color.FromArgb(240, 253, 244), Color.FromArgb(22, 101, 52), new Size(125, 28), 6);
-            btnExportarCSV.Margin = new Padding(18, 2, 6, 0);
-            btnExportarCSV.Click += BtnExportarCSV_Click;
+            flowFiltrosRapidos.Controls.AddRange(new Control[] { lblFiltrosRapidos, btnFiltroHoy, btnFiltroAyer, btnFiltro7Dias, btnFiltroEsteMes, btnFiltroMesAnterior });
 
-            btnImprimirF29Top = CrearBotonRedondeado("🖨️  Imprimir F29", Color.FromArgb(15, 23, 42), Color.White, new Size(115, 28), 6);
-            btnImprimirF29Top.Margin = new Padding(0, 2, 0, 0);
+            FlowLayoutPanel flowBotonesDerecha = new FlowLayoutPanel
+            {
+                Dock = DockStyle.Right,
+                AutoSize = true,
+                FlowDirection = FlowDirection.RightToLeft,
+                WrapContents = false,
+                BackColor = Color.Transparent
+            };
+
+            btnImprimirF29Top = CrearBoton("🖨️  Imprimir F29", Color.FromArgb(15, 23, 42), Color.White, new Size(125, 28), 6);
+            btnImprimirF29Top.Margin = new Padding(6, 2, 0, 0);
             btnImprimirF29Top.Click += (s, e) => MessageBox.Show("Generando reporte F29 oficial para impresión...", "Imprimir F29", MessageBoxButtons.OK, MessageBoxIcon.Information);
 
-            flowFiltrosFila2.Controls.AddRange(new Control[] { lblFiltrosRapidos, btnFiltroHoy, btnFiltroAyer, btnFiltro7Dias, btnFiltroEsteMes, btnFiltroMesAnterior, btnExportarCSV, btnImprimirF29Top });
+            btnExportarCSV = CrearBoton("📥  Exportar CSV", Color.FromArgb(240, 253, 244), Color.FromArgb(22, 101, 52), new Size(125, 28), 6);
+            btnExportarCSV.Margin = new Padding(0, 2, 0, 0);
+            btnExportarCSV.Click += BtnExportarCSV_Click;
 
-            pnlFiltrosCard.Controls.Add(flowFiltrosFila2);
+            flowBotonesDerecha.Controls.AddRange(new Control[] { btnImprimirF29Top, btnExportarCSV });
+
+            pnlFila2Acciones.Controls.Add(flowBotonesDerecha);
+            pnlFila2Acciones.Controls.Add(flowFiltrosRapidos);
+
+            pnlFiltrosCard.Controls.Add(pnlFila2Acciones);
             pnlFiltrosCard.Controls.Add(flowFiltrosFila1);
             pnlFiltrosWrapper.Controls.Add(pnlFiltrosCard);
 
-            TableLayoutPanel pnlGridAndDetail = new TableLayoutPanel { Dock = DockStyle.Top, Height = 480, ColumnCount = 2, RowCount = 1 };
+            // =========================================================================
+            // 3. GRILLA PRINCIPAL Y PANEL RESUMEN LATERAL F29
+            // =========================================================================
+            TableLayoutPanel pnlGridAndDetail = new TableLayoutPanel
+            {
+                Dock = DockStyle.Fill,
+                ColumnCount = 2,
+                RowCount = 1
+            };
             pnlGridAndDetail.ColumnStyles.Add(new ColumnStyle(SizeType.Percent, 73F));
             pnlGridAndDetail.ColumnStyles.Add(new ColumnStyle(SizeType.Percent, 27F));
 
@@ -216,26 +293,23 @@ namespace SISTEMAACTUALIZADO
             dgvLibro.CellFormatting += DgvLibro_CellFormatting;
             dgvLibro.CellDoubleClick += DgvLibro_CellDoubleClick;
 
-            Panel pnlPaginador = new Panel { Dock = DockStyle.Bottom, Height = 42, Padding = new Padding(4, 8, 4, 0) };
-            lblPaginadorInfo = new Label { Text = "Mostrando registros...", Font = new Font("Segoe UI", 8.5F), ForeColor = Color.FromArgb(100, 116, 139), Dock = DockStyle.Left, TextAlign = ContentAlignment.MiddleLeft, AutoSize = true };
-
-            FlowLayoutPanel flowNumPaginas = new FlowLayoutPanel { Dock = DockStyle.Right, FlowDirection = FlowDirection.LeftToRight, AutoSize = true, WrapContents = false };
-            Button btnPagPrev = CrearBotonRedondeado("<", Color.FromArgb(248, 250, 252), Color.FromArgb(100, 116, 139), new Size(32, 30), 6);
-            Button btnPag1 = CrearBotonRedondeado("1", Color.FromArgb(0, 102, 255), Color.White, new Size(32, 30), 6);
-            Button btnPagNext = CrearBotonRedondeado(">", Color.FromArgb(248, 250, 252), Color.FromArgb(100, 116, 139), new Size(32, 30), 6);
-
-            btnPagPrev.Margin = new Padding(0, 0, 4, 0);
-            btnPag1.Margin = new Padding(0, 0, 4, 0);
-            btnPagNext.Margin = new Padding(0, 0, 0, 0);
-
-            flowNumPaginas.Controls.AddRange(new Control[] { btnPagPrev, btnPag1, btnPagNext });
+            Panel pnlPaginador = new Panel { Dock = DockStyle.Bottom, Height = 32, Padding = new Padding(4, 6, 4, 0) };
+            lblPaginadorInfo = new Label
+            {
+                Text = "Mostrando registros...",
+                Font = new Font("Segoe UI", 8.5F),
+                ForeColor = Color.FromArgb(100, 116, 139),
+                Dock = DockStyle.Fill,
+                TextAlign = ContentAlignment.MiddleLeft,
+                AutoSize = false
+            };
 
             pnlPaginador.Controls.Add(lblPaginadorInfo);
-            pnlPaginador.Controls.Add(flowNumPaginas);
 
             pnlTableCard.Controls.Add(dgvLibro);
             pnlTableCard.Controls.Add(pnlPaginador);
 
+            // Panel Detalle Lateral F29
             Panel pnlDetailCard = CrearTarjetaRedondeada(0, 0, 0, 0, Color.White, Color.FromArgb(226, 232, 240));
             pnlDetailCard.Dock = DockStyle.Fill;
             pnlDetailCard.Padding = new Padding(14);
@@ -259,13 +333,13 @@ namespace SISTEMAACTUALIZADO
 
             Panel pnlBotonesAccion = new Panel { Dock = DockStyle.Bottom, Height = 95, Padding = new Padding(0, 6, 0, 0) };
 
-            btnImprimirF29 = CrearBotonRedondeado("🖨️  Imprimir F29", Color.FromArgb(0, 102, 255), Color.White, new Size(200, 40), 8);
+            btnImprimirF29 = CrearBoton("🖨️  Imprimir F29", Color.FromArgb(0, 102, 255), Color.White, new Size(200, 40), 8);
             btnImprimirF29.Dock = DockStyle.Top;
             btnImprimirF29.Click += (s, e) => MessageBox.Show("Generando reporte F29...", "Impresión F29", MessageBoxButtons.OK, MessageBoxIcon.Information);
 
             Panel pnlSpacerBtn = new Panel { Dock = DockStyle.Top, Height = 6 };
 
-            btnNotaCredito = CrearBotonRedondeado("📄  Emitir Nota de Crédito", Color.FromArgb(220, 38, 38), Color.White, new Size(200, 40), 8);
+            btnNotaCredito = CrearBoton("📄  Emitir Nota de Crédito", Color.FromArgb(220, 38, 38), Color.White, new Size(200, 40), 8);
             btnNotaCredito.Dock = DockStyle.Top;
             btnNotaCredito.Enabled = false;
             btnNotaCredito.Click += BtnNotaCredito_Click;
@@ -282,6 +356,7 @@ namespace SISTEMAACTUALIZADO
             pnlGridAndDetail.Controls.Add(pnlTableCard, 0, 0);
             pnlGridAndDetail.Controls.Add(pnlDetailCard, 1, 0);
 
+            // Agregar secciones al contenedor principal
             pnlMain.Controls.Add(pnlGridAndDetail);
             pnlMain.Controls.Add(pnlFiltrosWrapper);
             pnlMain.Controls.Add(pnlKpiWrapper);
@@ -307,10 +382,21 @@ namespace SISTEMAACTUALIZADO
 
         private Panel CrearTarjetaRedondeada(int x, int y, int ancho, int alto, Color colorFondo, Color colorBorde)
         {
-            Panel pnl = new Panel { Location = new Point(x, y), Size = new Size(ancho, alto), BackColor = colorFondo };
+            Panel pnl = new Panel 
+            { 
+                Location = new Point(x, y), 
+                Size = new Size(ancho, alto), 
+                BackColor = colorFondo 
+            };
+
+            // Forzar invalidación completa cada vez que la tarjeta cambie de tamaño al maximizar
+            pnl.Resize += (s, e) => pnl.Invalidate();
+
             pnl.Paint += (s, e) =>
             {
                 e.Graphics.SmoothingMode = SmoothingMode.AntiAlias;
+                e.Graphics.Clear(pnl.BackColor); // Limpia trazos anteriores antes de redibujar
+
                 Rectangle r = new Rectangle(0, 0, pnl.Width - 1, pnl.Height - 1);
                 using GraphicsPath p = CrearRutaRedondeada(r, 10);
                 using Pen pen = new Pen(colorBorde, 1.2f);
@@ -356,23 +442,25 @@ namespace SISTEMAACTUALIZADO
             return pnl;
         }
 
-        private Button CrearBotonRedondeado(string texto, Color back, Color fore, Size size, int radio)
+        private Button CrearBoton(string texto, Color back, Color fore, Size size, int radio = 0)
         {
-            Button b = new Button { Text = texto, Size = size, BackColor = back, ForeColor = fore, FlatStyle = FlatStyle.Flat, Font = new Font("Segoe UI", 8.5F, FontStyle.Bold), Cursor = Cursors.Hand };
-            b.FlatAppearance.BorderSize = 0;
-            b.Paint += (s, e) =>
-            {
-                e.Graphics.SmoothingMode = SmoothingMode.AntiAlias;
-                Rectangle r = new Rectangle(0, 0, b.Width - 1, b.Height - 1);
-                using GraphicsPath p = CrearRutaRedondeada(r, radio);
-                b.Region = new Region(p);
+            Button b = new Button 
+            { 
+                Text = texto, 
+                Size = size, 
+                BackColor = back, 
+                ForeColor = fore, 
+                FlatStyle = FlatStyle.Flat, 
+                Font = new Font("Segoe UI", 8.5F, FontStyle.Bold), 
+                Cursor = Cursors.Hand 
             };
+            b.FlatAppearance.BorderSize = 0;
             return b;
         }
 
         private Button CrearPillBoton(string texto, int ancho, EventHandler onClick)
         {
-            Button b = CrearBotonRedondeado(texto, Color.FromArgb(241, 245, 249), Color.FromArgb(71, 85, 105), new Size(ancho, 25), 12);
+            Button b = CrearBoton(texto, Color.FromArgb(241, 245, 249), Color.FromArgb(71, 85, 105), new Size(ancho, 25), 12);
             b.Font = new Font("Segoe UI", 8F, FontStyle.Bold);
             b.Margin = new Padding(0, 2, 6, 0);
             b.Click += onClick;
@@ -650,7 +738,7 @@ namespace SISTEMAACTUALIZADO
 
             CheckBox chkRestock = new CheckBox { Text = "🔄 Reintegrar automáticamente todos los productos al inventario", Location = new Point(25, 235), AutoSize = true, Checked = true, Font = new Font("Segoe UI", 8.5F, FontStyle.Bold), ForeColor = Color.FromArgb(3, 105, 161) };
 
-            Button btnEmitirNC = CrearBotonRedondeado("⚡ GENERAR Y EMITIR NOTA DE CRÉDITO CONSOLIDADA", Color.FromArgb(220, 38, 38), Color.White, new Size(430, 48), 8);
+            Button btnEmitirNC = CrearBoton("⚡ GENERAR Y EMITIR NOTA DE CRÉDITO CONSOLIDADA", Color.FromArgb(220, 38, 38), Color.White, new Size(430, 48), 8);
             btnEmitirNC.Location = new Point(25, 330);
 
             btnEmitirNC.Click += (s, args) =>

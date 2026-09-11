@@ -1,5 +1,6 @@
 using System;
 using System.Drawing;
+using System.Drawing.Drawing2D;
 using System.Linq;
 using System.Windows.Forms;
 using SISTEMAACTUALIZADO.Data;
@@ -18,12 +19,20 @@ namespace SISTEMAACTUALIZADO
         private Button btnNuevo = null!;
         private Button btnEditar = null!;
         private Button btnEstado = null!;
+        private Label lblContadorFooter = null!;
 
         private DataGridView dgvUsuarios = null!;
         private Usuario? _usuarioSeleccionado = null;
 
         public FormUsuarios()
         {
+            this.DoubleBuffered = true;
+            this.SetStyle(ControlStyles.AllPaintingInWmPaint | 
+                           ControlStyles.UserPaint | 
+                           ControlStyles.OptimizedDoubleBuffer | 
+                           ControlStyles.ResizeRedraw, true);
+            this.UpdateStyles();
+
             InitializeComponent();
             CargarUsuarios();
         }
@@ -31,124 +40,136 @@ namespace SISTEMAACTUALIZADO
         private void InitializeComponent()
         {
             this.SuspendLayout();
-            this.BackColor = Color.FromArgb(244, 246, 249);
+            this.BackColor = Color.FromArgb(248, 250, 252);
             this.Font = new Font("Segoe UI", 9.5F, FontStyle.Regular, GraphicsUnit.Point);
 
             Panel pnlMain = new Panel
             {
                 Dock = DockStyle.Fill,
-                Padding = new Padding(20),
-                BackColor = Color.FromArgb(244, 246, 249)
+                Padding = new Padding(16, 12, 16, 16),
+                BackColor = Color.FromArgb(248, 250, 252),
+                AutoScroll = true
             };
 
-            // BARRA SUPERIOR DE BÚSQUEDA Y ACCIONES
-            Panel pnlHeader = new Panel
+            // =========================================================================
+            // 1. ENCABEZADO Y ACCIONES PRINCIPALES
+            // =========================================================================
+            Panel pnlHeader = new Panel 
+            { 
+                Dock = DockStyle.Top, 
+                Height = 60, 
+                BackColor = Color.Transparent, 
+                Padding = new Padding(0, 0, 0, 10) 
+            };
+
+            Panel pnlTitulos = new Panel
+            {
+                Dock = DockStyle.Left,
+                Width = 430,
+                BackColor = Color.Transparent
+            };
+
+            Label lblTitulo = new Label
+            {
+                Text = "👤 Cuentas de Usuario",
+                Font = new Font("Segoe UI", 14F, FontStyle.Bold),
+                ForeColor = Color.FromArgb(15, 23, 42),
+                Dock = DockStyle.Top,
+                Height = 26
+            };
+
+            Label lblSubtitulo = new Label
+            {
+                Text = "Control de acceso, gestión de contraseñas y roles del personal",
+                Font = new Font("Segoe UI", 8.2F),
+                ForeColor = Color.FromArgb(100, 116, 139),
+                Dock = DockStyle.Top,
+                Height = 20
+            };
+
+            pnlTitulos.Controls.Add(lblSubtitulo);
+            pnlTitulos.Controls.Add(lblTitulo);
+
+            FlowLayoutPanel pnlBotonesAccion = new FlowLayoutPanel
+            {
+                Dock = DockStyle.Right,
+                AutoSize = true,
+                FlowDirection = FlowDirection.RightToLeft,
+                WrapContents = false,
+                BackColor = Color.Transparent,
+                Padding = new Padding(0, 2, 0, 0)
+            };
+
+            btnNuevo = CrearBoton("➕ Nuevo Usuario", Color.FromArgb(16, 185, 129), Color.White, new Size(145, 34), 6);
+            btnNuevo.Margin = new Padding(4, 0, 0, 0);
+            btnNuevo.Click += BtnNuevo_Click;
+
+            btnEditar = CrearBoton("✏️ Editar / Clave", Color.FromArgb(2, 132, 199), Color.White, new Size(130, 34), 6);
+            btnEditar.Margin = new Padding(4, 0, 0, 0);
+            btnEditar.Enabled = false;
+            btnEditar.Click += BtnEditar_Click;
+
+            btnEstado = CrearBoton("🔄 Activar / Bloquear", Color.FromArgb(245, 158, 11), Color.White, new Size(160, 34), 6);
+            btnEstado.Margin = new Padding(4, 0, 0, 0);
+            btnEstado.Enabled = false;
+            btnEstado.Click += BtnEstado_Click;
+
+            pnlBotonesAccion.Controls.AddRange(new Control[] { btnNuevo, btnEditar, btnEstado });
+            pnlHeader.Controls.Add(pnlBotonesAccion);
+            pnlHeader.Controls.Add(pnlTitulos);
+
+            // =========================================================================
+            // 2. BARRA DE FILTROS Y BÚSQUEDA
+            // =========================================================================
+            Panel pnlFiltrosWrapper = new Panel
             {
                 Dock = DockStyle.Top,
-                Height = 70,
-                BackColor = Color.White,
-                Padding = new Padding(15, 12, 15, 12)
+                Height = 84,
+                Padding = new Padding(0, 0, 0, 12),
+                BackColor = Color.Transparent
             };
 
-            Label lblBuscar = new Label
+            Panel pnlFiltrosCard = CrearTarjetaRedondeada(0, 0, 0, 72, Color.White, Color.FromArgb(226, 232, 240));
+            pnlFiltrosCard.Dock = DockStyle.Fill;
+            pnlFiltrosCard.Padding = new Padding(16, 12, 16, 12);
+
+            FlowLayoutPanel flpFiltros = new FlowLayoutPanel
             {
-                Text = "🔍 Buscar:",
-                Location = new Point(15, 23),
-                AutoSize = true,
-                Font = new Font("Segoe UI", 9.5F, FontStyle.Bold),
-                ForeColor = Color.FromArgb(100, 116, 139)
+                Dock = DockStyle.Fill,
+                WrapContents = false,
+                BackColor = Color.Transparent
             };
 
             txtBuscar = new TextBox
             {
-                Location = new Point(85, 18),
-                Size = new Size(180, 32),
-                Font = new Font("Segoe UI", 10.5F),
-                BorderStyle = BorderStyle.FixedSingle
+                Size = new Size(260, 26),
+                Font = new Font("Segoe UI", 9.5F),
+                BorderStyle = BorderStyle.None,
+                BackColor = Color.FromArgb(248, 250, 252),
+                PlaceholderText = "Nombre de usuario o nombre completo..."
             };
             txtBuscar.KeyDown += (s, e) => { if (e.KeyCode == Keys.Enter) { CargarUsuarios(txtBuscar.Text.Trim()); e.SuppressKeyPress = true; } };
+            Panel pnlGrpBuscar = CrearGrupoConCaja("BUSCAR USUARIO", txtBuscar, 275);
 
-            btnBuscar = new Button
-            {
-                Text = "Buscar",
-                Location = new Point(275, 17),
-                Size = new Size(75, 34),
-                BackColor = Color.FromArgb(30, 41, 59),
-                ForeColor = Color.White,
-                FlatStyle = FlatStyle.Flat,
-                Font = new Font("Segoe UI", 9F, FontStyle.Bold),
-                Cursor = Cursors.Hand
-            };
-            btnBuscar.FlatAppearance.BorderSize = 0;
+            btnBuscar = CrearBoton("🔍 Buscar", Color.FromArgb(30, 41, 59), Color.White, new Size(95, 32), 6);
+            btnBuscar.Margin = new Padding(8, 14, 4, 0);
             btnBuscar.Click += (s, e) => CargarUsuarios(txtBuscar.Text.Trim());
 
-            btnRefrescar = new Button
-            {
-                Text = "🔄 Recargar",
-                Location = new Point(358, 17),
-                Size = new Size(95, 34),
-                BackColor = Color.FromArgb(241, 245, 249),
-                ForeColor = Color.FromArgb(51, 65, 85),
-                FlatStyle = FlatStyle.Flat,
-                Font = new Font("Segoe UI", 9F, FontStyle.Bold),
-                Cursor = Cursors.Hand
-            };
-            btnRefrescar.FlatAppearance.BorderSize = 0;
+            btnRefrescar = CrearBoton("🔄 Recargar", Color.FromArgb(241, 245, 249), Color.FromArgb(51, 65, 85), new Size(105, 32), 6);
+            btnRefrescar.Margin = new Padding(4, 14, 0, 0);
             btnRefrescar.Click += (s, e) => { txtBuscar.Clear(); CargarUsuarios(); };
 
-            btnNuevo = new Button
-            {
-                Text = "➕ Nuevo Usuario",
-                Dock = DockStyle.Right,
-                Width = 145,
-                BackColor = Color.FromArgb(16, 185, 129),
-                ForeColor = Color.White,
-                FlatStyle = FlatStyle.Flat,
-                Font = new Font("Segoe UI", 8.5F, FontStyle.Bold),
-                Cursor = Cursors.Hand
-            };
-            btnNuevo.FlatAppearance.BorderSize = 0;
-            btnNuevo.Click += BtnNuevo_Click;
+            flpFiltros.Controls.AddRange(new Control[] { pnlGrpBuscar, btnBuscar, btnRefrescar });
+            pnlFiltrosCard.Controls.Add(flpFiltros);
+            pnlFiltrosWrapper.Controls.Add(pnlFiltrosCard);
 
-            btnEditar = new Button
-            {
-                Text = "✏️ Editar / Clave",
-                Dock = DockStyle.Right,
-                Width = 130,
-                BackColor = Color.FromArgb(2, 132, 199),
-                ForeColor = Color.White,
-                FlatStyle = FlatStyle.Flat,
-                Font = new Font("Segoe UI", 8.5F, FontStyle.Bold),
-                Cursor = Cursors.Hand,
-                Enabled = false
-            };
-            btnEditar.FlatAppearance.BorderSize = 0;
-            btnEditar.Click += BtnEditar_Click;
+            // =========================================================================
+            // 3. TARJETA DE GRILLA PRINCIPAL REDONDEADA
+            // =========================================================================
+            Panel pnlGridCard = CrearTarjetaRedondeada(0, 0, 0, 0, Color.White, Color.FromArgb(226, 232, 240));
+            pnlGridCard.Dock = DockStyle.Fill;
+            pnlGridCard.Padding = new Padding(10);
 
-            btnEstado = new Button
-            {
-                Text = "🔄 Estado",
-                Dock = DockStyle.Right,
-                Width = 90,
-                BackColor = Color.FromArgb(245, 158, 11),
-                ForeColor = Color.White,
-                FlatStyle = FlatStyle.Flat,
-                Font = new Font("Segoe UI", 8.5F, FontStyle.Bold),
-                Cursor = Cursors.Hand,
-                Enabled = false
-            };
-            btnEstado.FlatAppearance.BorderSize = 0;
-            btnEstado.Click += BtnEstado_Click;
-
-            pnlHeader.Controls.Add(lblBuscar);
-            pnlHeader.Controls.Add(txtBuscar);
-            pnlHeader.Controls.Add(btnBuscar);
-            pnlHeader.Controls.Add(btnRefrescar);
-            pnlHeader.Controls.Add(btnEstado);
-            pnlHeader.Controls.Add(btnEditar);
-            pnlHeader.Controls.Add(btnNuevo);
-
-            // TABLA DE USUARIOS
             dgvUsuarios = new DataGridView
             {
                 Dock = DockStyle.Fill,
@@ -161,57 +182,118 @@ namespace SISTEMAACTUALIZADO
                 AllowUserToAddRows = false,
                 ReadOnly = true,
                 RowHeadersVisible = false,
-                AutoSizeColumnsMode = DataGridViewAutoSizeColumnsMode.Fill
+                AutoSizeColumnsMode = DataGridViewAutoSizeColumnsMode.Fill,
+                AutoGenerateColumns = false,
+                RowTemplate = { Height = 34 }
             };
-            ConfigurarEstiloTabla(dgvUsuarios);
+            ConfigurarEstiloYColumnasTabla();
             dgvUsuarios.SelectionChanged += DgvUsuarios_SelectionChanged;
 
-            Panel pnlGridCard = new Panel
+            Panel pnlFooter = new Panel { Dock = DockStyle.Bottom, Height = 32, Padding = new Padding(4, 6, 4, 0) };
+            lblContadorFooter = new Label
             {
+                Text = "Mostrando 0 cuentas registradas",
+                Font = new Font("Segoe UI", 8.5F),
+                ForeColor = Color.FromArgb(100, 116, 139),
                 Dock = DockStyle.Fill,
-                BackColor = Color.White,
-                Padding = new Padding(1),
-                Margin = new Padding(0, 15, 0, 0)
+                TextAlign = ContentAlignment.MiddleLeft,
+                AutoSize = false
             };
-            pnlGridCard.Controls.Add(dgvUsuarios);
+            pnlFooter.Controls.Add(lblContadorFooter);
 
+            pnlGridCard.Controls.Add(dgvUsuarios);
+            pnlGridCard.Controls.Add(pnlFooter);
+
+            // Orden Z estricto
             pnlMain.Controls.Add(pnlGridCard);
+            pnlMain.Controls.Add(pnlFiltrosWrapper);
             pnlMain.Controls.Add(pnlHeader);
 
             this.Controls.Add(pnlMain);
             this.ResumeLayout(false);
         }
 
-        private void ConfigurarEstiloTabla(DataGridView dgv)
+        private void ConfigurarEstiloYColumnasTabla()
         {
-            dgv.EnableHeadersVisualStyles = false;
-            dgv.ColumnHeadersDefaultCellStyle.BackColor = Color.FromArgb(30, 41, 59);
-            dgv.ColumnHeadersDefaultCellStyle.ForeColor = Color.White;
-            dgv.ColumnHeadersDefaultCellStyle.Font = new Font("Segoe UI", 9.5F, FontStyle.Bold);
-            dgv.ColumnHeadersHeight = 38;
+            dgvUsuarios.EnableHeadersVisualStyles = false;
+            dgvUsuarios.ColumnHeadersDefaultCellStyle.BackColor = Color.FromArgb(15, 23, 42);
+            dgvUsuarios.ColumnHeadersDefaultCellStyle.ForeColor = Color.White;
+            dgvUsuarios.ColumnHeadersDefaultCellStyle.SelectionBackColor = Color.FromArgb(15, 23, 42);
+            dgvUsuarios.ColumnHeadersDefaultCellStyle.SelectionForeColor = Color.White;
+            dgvUsuarios.ColumnHeadersDefaultCellStyle.Font = new Font("Segoe UI", 8.5F, FontStyle.Bold);
+            dgvUsuarios.ColumnHeadersHeight = 36;
 
-            dgv.DefaultCellStyle.Font = new Font("Segoe UI", 9.5F);
-            dgv.DefaultCellStyle.ForeColor = Color.FromArgb(51, 65, 85);
-            dgv.DefaultCellStyle.SelectionBackColor = Color.FromArgb(224, 242, 254);
-            dgv.DefaultCellStyle.SelectionForeColor = Color.FromArgb(15, 23, 42);
-            dgv.RowTemplate.Height = 34;
-            dgv.AlternatingRowsDefaultCellStyle.BackColor = Color.FromArgb(248, 250, 252);
-            dgv.GridColor = Color.FromArgb(226, 232, 240);
+            dgvUsuarios.DefaultCellStyle.Font = new Font("Segoe UI", 8.5F);
+            dgvUsuarios.DefaultCellStyle.ForeColor = Color.FromArgb(15, 23, 42);
+            dgvUsuarios.DefaultCellStyle.SelectionBackColor = Color.FromArgb(224, 242, 254);
+            dgvUsuarios.DefaultCellStyle.SelectionForeColor = Color.FromArgb(15, 23, 42);
+            dgvUsuarios.RowTemplate.Height = 34;
+            dgvUsuarios.AlternatingRowsDefaultCellStyle.BackColor = Color.FromArgb(248, 250, 252);
+            dgvUsuarios.GridColor = Color.FromArgb(226, 232, 240);
+
+            dgvUsuarios.Columns.Clear();
+
+            dgvUsuarios.Columns.Add(new DataGridViewTextBoxColumn 
+            { 
+                Name = "UsuarioID", 
+                HeaderText = "ID", 
+                DataPropertyName = "UsuarioID", 
+                FillWeight = 8, 
+                DefaultCellStyle = { Alignment = DataGridViewContentAlignment.MiddleCenter } 
+            });
+
+            dgvUsuarios.Columns.Add(new DataGridViewTextBoxColumn 
+            { 
+                Name = "NombreUsuario", 
+                HeaderText = "USUARIO (LOGIN)", 
+                DataPropertyName = "NombreUsuario", 
+                FillWeight = 22, 
+                DefaultCellStyle = 
+                { 
+                    Font = new Font("Segoe UI", 8.5F, FontStyle.Bold), 
+                    ForeColor = Color.FromArgb(37, 99, 235) 
+                } 
+            });
+
+            dgvUsuarios.Columns.Add(new DataGridViewTextBoxColumn 
+            { 
+                Name = "NombreCompleto", 
+                HeaderText = "NOMBRE COMPLETO", 
+                DataPropertyName = "NombreCompleto", 
+                FillWeight = 38 
+            });
+
+            dgvUsuarios.Columns.Add(new DataGridViewTextBoxColumn 
+            { 
+                Name = "Rol", 
+                HeaderText = "ROL / PERFIL", 
+                DataPropertyName = "Rol", 
+                FillWeight = 18, 
+                DefaultCellStyle = 
+                { 
+                    Font = new Font("Segoe UI", 8.5F, FontStyle.Bold), 
+                    ForeColor = Color.FromArgb(124, 58, 237) 
+                } 
+            });
+
+            dgvUsuarios.Columns.Add(new DataGridViewCheckBoxColumn 
+            { 
+                Name = "Estado", 
+                HeaderText = "ACTIVO", 
+                DataPropertyName = "Estado", 
+                FillWeight = 14 
+            });
         }
 
         private void CargarUsuarios(string filtro = "")
         {
             try
             {
-                var lista = _usuarioService.ObtenerUsuarios(filtro);
+                var lista = _usuarioService.ObtenerUsuarios(filtro) ?? new System.Collections.Generic.List<Usuario>();
+                dgvUsuarios.DataSource = null;
                 dgvUsuarios.DataSource = lista;
 
-                if (dgvUsuarios.Columns["UsuarioID"] != null) dgvUsuarios.Columns["UsuarioID"].HeaderText = "ID";
-                if (dgvUsuarios.Columns["NombreUsuario"] != null) dgvUsuarios.Columns["NombreUsuario"].HeaderText = "Usuario (Login)";
-                if (dgvUsuarios.Columns["NombreCompleto"] != null) dgvUsuarios.Columns["NombreCompleto"].HeaderText = "Nombre Completo";
-                if (dgvUsuarios.Columns["Rol"] != null) dgvUsuarios.Columns["Rol"].HeaderText = "Rol / Perfil";
-                if (dgvUsuarios.Columns["Clave"] != null) dgvUsuarios.Columns["Clave"].Visible = false;
-                if (dgvUsuarios.Columns["Estado"] != null) dgvUsuarios.Columns["Estado"].HeaderText = "Activo";
+                lblContadorFooter.Text = $"Mostrando {lista.Count:N0} cuenta(s) de usuario registrada(s)";
             }
             catch (Exception ex)
             {
@@ -301,18 +383,9 @@ namespace SISTEMAACTUALIZADO
             cbRol.Items.AddRange(new string[] { "Administrador", "Cajero" });
             cbRol.SelectedItem = string.IsNullOrEmpty(u.Rol) ? "Cajero" : u.Rol;
 
-            Button btnGuardar = new Button
-            {
-                Text = esNuevo ? "💾 Registrar Usuario" : "💾 Guardar Cambios",
-                Location = new Point(25, 330),
-                Size = new Size(330, 42),
-                BackColor = Color.FromArgb(0, 102, 255),
-                ForeColor = Color.White,
-                FlatStyle = FlatStyle.Flat,
-                Font = new Font("Segoe UI", 9.5F, FontStyle.Bold),
-                Cursor = Cursors.Hand
-            };
-            btnGuardar.FlatAppearance.BorderSize = 0;
+            Button btnGuardar = CrearBoton(esNuevo ? "💾 Registrar Usuario" : "💾 Guardar Cambios", Color.FromArgb(0, 102, 255), Color.White, new Size(330, 42), 8);
+            btnGuardar.Location = new Point(25, 325);
+
             btnGuardar.Click += (s, e) =>
             {
                 if (string.IsNullOrWhiteSpace(txtUser.Text) || string.IsNullOrWhiteSpace(txtPass.Text))
@@ -342,6 +415,77 @@ namespace SISTEMAACTUALIZADO
 
             modal.Controls.AddRange(new Control[] { lblTitle, lblUser, txtUser, lblNombre, txtNombre, lblPass, txtPass, lblRol, cbRol, btnGuardar });
             modal.ShowDialog();
+        }
+
+        // =========================================================================
+        // MÉTODOS AUXILIARES DE DISEÑO MODERNO Y BORDES REDONDEADOS
+        // =========================================================================
+        private Panel CrearTarjetaRedondeada(int x, int y, int ancho, int alto, Color colorFondo, Color colorBorde)
+        {
+            Panel pnl = new Panel { Location = new Point(x, y), Size = new Size(ancho, alto), BackColor = colorFondo };
+            pnl.Resize += (s, e) => pnl.Invalidate();
+            pnl.Paint += (s, e) =>
+            {
+                e.Graphics.SmoothingMode = SmoothingMode.AntiAlias;
+                e.Graphics.Clear(pnl.BackColor);
+                Rectangle r = new Rectangle(0, 0, pnl.Width - 1, pnl.Height - 1);
+                using GraphicsPath p = CrearRutaRedondeada(r, 10);
+                using Pen pen = new Pen(colorBorde, 1.2f);
+                e.Graphics.DrawPath(pen, p);
+            };
+            return pnl;
+        }
+
+        private GraphicsPath CrearRutaRedondeada(Rectangle rect, int radio)
+        {
+            GraphicsPath path = new GraphicsPath();
+            int d = radio * 2;
+            path.AddArc(rect.X, rect.Y, d, d, 180, 90);
+            path.AddArc(rect.Right - d, rect.Y, d, d, 270, 90);
+            path.AddArc(rect.Right - d, rect.Bottom - d, d, d, 0, 90);
+            path.AddArc(rect.X, rect.Bottom - d, d, d, 90, 90);
+            path.CloseFigure();
+            return path;
+        }
+
+        private Panel CrearGrupoConCaja(string titulo, Control control, int ancho)
+        {
+            Panel pnl = new Panel { Size = new Size(ancho, 48), Margin = new Padding(0, 0, 8, 0) };
+            Label lbl = new Label { Text = titulo, Font = new Font("Segoe UI", 7.5F, FontStyle.Bold), ForeColor = Color.FromArgb(51, 65, 85), Location = new Point(0, 0), AutoSize = true };
+
+            Panel pnlInputBox = new Panel { Location = new Point(0, 18), Size = new Size(ancho, 28), BackColor = Color.FromArgb(248, 250, 252) };
+            pnlInputBox.Paint += (s, e) =>
+            {
+                e.Graphics.SmoothingMode = SmoothingMode.AntiAlias;
+                Rectangle r = new Rectangle(0, 0, pnlInputBox.Width - 1, pnlInputBox.Height - 1);
+                using GraphicsPath path = CrearRutaRedondeada(r, 6);
+                using Pen pen = new Pen(Color.FromArgb(226, 232, 240), 1f);
+                e.Graphics.DrawPath(pen, path);
+            };
+
+            control.Location = new Point(6, 3);
+            control.Width = ancho - 12;
+            pnlInputBox.Controls.Add(control);
+
+            pnl.Controls.Add(lbl);
+            pnl.Controls.Add(pnlInputBox);
+            return pnl;
+        }
+
+        private Button CrearBoton(string texto, Color back, Color fore, Size size, int radio = 0)
+        {
+            Button b = new Button 
+            { 
+                Text = texto, 
+                Size = size, 
+                BackColor = back, 
+                ForeColor = fore, 
+                FlatStyle = FlatStyle.Flat, 
+                Font = new Font("Segoe UI", 8.5F, FontStyle.Bold), 
+                Cursor = Cursors.Hand 
+            };
+            b.FlatAppearance.BorderSize = 0;
+            return b;
         }
     }
 }

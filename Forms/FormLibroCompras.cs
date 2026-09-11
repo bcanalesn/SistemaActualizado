@@ -2,6 +2,7 @@ using System;
 using System.Collections.Generic;
 using System.Diagnostics;
 using System.Drawing;
+using System.Drawing.Drawing2D;
 using System.Drawing.Printing;
 using System.IO;
 using System.Linq;
@@ -16,6 +17,8 @@ namespace SISTEMAACTUALIZADO.Forms
     public class FormLibroCompras : Form
     {
         private readonly LibroContableService _libroService = new LibroContableService();
+        private readonly ProveedorService _proveedorService = new ProveedorService();
+        private readonly ProductoService _productoService = new ProductoService();
 
         // Controles de Filtros
         private TextBox txtFiltroTexto = null!;
@@ -64,35 +67,29 @@ namespace SISTEMAACTUALIZADO.Forms
         private void InitializeComponent()
         {
             this.SuspendLayout();
-            this.BackColor = Color.FromArgb(244, 246, 249);
-            this.Font = new Font("Segoe UI", 9F, FontStyle.Regular, GraphicsUnit.Point);
-            this.Dock = DockStyle.Fill;
-            this.FormBorderStyle = FormBorderStyle.None;
+            this.BackColor = Color.FromArgb(248, 250, 252);
+            this.Font = new Font("Segoe UI", 9.5F, FontStyle.Regular, GraphicsUnit.Point);
 
             Panel pnlMain = new Panel
             {
                 Dock = DockStyle.Fill,
                 Padding = new Padding(16, 12, 16, 16),
+                BackColor = Color.FromArgb(248, 250, 252),
                 AutoScroll = true
             };
 
-            Panel pnlKpis = CrearTarjetasKpi();
-            Panel pnlFiltros = CrearSeccionFiltros();
-            Panel pnlGrilla = CrearSeccionGrilla();
+            // =========================================================================
+            // 1. KPIS SUPERIORES (92px idéntico a Libro de Ventas)
+            // =========================================================================
+            Panel pnlKpisWrapper = new Panel
+            {
+                Dock = DockStyle.Top,
+                Height = 92,
+                Padding = new Padding(0, 0, 0, 12),
+                BackColor = Color.Transparent
+            };
 
-            pnlMain.Controls.Add(pnlGrilla);
-            pnlMain.Controls.Add(pnlFiltros);
-            pnlMain.Controls.Add(pnlKpis);
-
-            this.Controls.Add(pnlMain);
-            this.ResumeLayout(false);
-        }
-
-        private Panel CrearTarjetasKpi()
-        {
-            Panel pnlWrapper = new Panel { Dock = DockStyle.Top, Height = 90, Margin = new Padding(0, 0, 0, 16) };
-
-            TableLayoutPanel tlp = new TableLayoutPanel
+            TableLayoutPanel tlpKpis = new TableLayoutPanel
             {
                 Dock = DockStyle.Fill,
                 ColumnCount = 5,
@@ -100,204 +97,306 @@ namespace SISTEMAACTUALIZADO.Forms
                 Margin = new Padding(0),
                 Padding = new Padding(0)
             };
-            tlp.ColumnStyles.Add(new ColumnStyle(SizeType.Percent, 22F));
-            tlp.ColumnStyles.Add(new ColumnStyle(SizeType.Percent, 20F));
-            tlp.ColumnStyles.Add(new ColumnStyle(SizeType.Percent, 18F));
-            tlp.ColumnStyles.Add(new ColumnStyle(SizeType.Percent, 20F));
-            tlp.ColumnStyles.Add(new ColumnStyle(SizeType.Percent, 20F));
+            tlpKpis.ColumnStyles.Add(new ColumnStyle(SizeType.Percent, 20F));
+            tlpKpis.ColumnStyles.Add(new ColumnStyle(SizeType.Percent, 20F));
+            tlpKpis.ColumnStyles.Add(new ColumnStyle(SizeType.Percent, 20F));
+            tlpKpis.ColumnStyles.Add(new ColumnStyle(SizeType.Percent, 20F));
+            tlpKpis.ColumnStyles.Add(new ColumnStyle(SizeType.Percent, 20F));
 
-            tlp.Controls.Add(CrearCardKpi("💰", Color.FromArgb(209, 250, 229), Color.FromArgb(5, 150, 105), "Total Compras", out lblKpiTotalBrutoMonto, "$ 0", "Total bruto (con IVA)"), 0, 0);
-            tlp.Controls.Add(CrearCardKpi("💲", Color.FromArgb(240, 253, 244), Color.FromArgb(22, 163, 74), "Total Neto", out lblKpiComprasNetoMonto, "$ 0", "Total neto del período"), 1, 0);
-            tlp.Controls.Add(CrearCardKpi("🏷️", Color.FromArgb(243, 232, 255), Color.FromArgb(147, 51, 234), "Total IVA", out lblKpiIvaMonto, "$ 0", "Total IVA recuperable"), 3, 0);
-            tlp.Controls.Add(CrearCardKpi("📄", Color.FromArgb(239, 246, 255), Color.FromArgb(37, 99, 235), "Facturas Recibidas", out lblKpiFacturasCant, "0", "100% del total"), 2, 0);
-            tlp.Controls.Add(CrearCardKpi("👥", Color.FromArgb(254, 243, 199), Color.FromArgb(217, 119, 6), "Proveedores Activos", out lblKpiProveedoresCant, "0", "Con compras en el período"), 4, 0);
+            var card1 = CrearCardKPI("💰", Color.FromArgb(220, 252, 231), "Total Compras", out lblKpiTotalBrutoMonto, "$ 0", "Total bruto (con IVA)");
+            var card2 = CrearCardKPI("💲", Color.FromArgb(240, 253, 244), "Total Neto", out lblKpiComprasNetoMonto, "$ 0", "Total neto del período");
+            var card3 = CrearCardKPI("📄", Color.FromArgb(239, 246, 255), "Facturas Recibidas", out lblKpiFacturasCant, "0", "100% del total");
+            var card4 = CrearCardKPI("🏷️", Color.FromArgb(243, 232, 255), "Total IVA", out lblKpiIvaMonto, "$ 0", "Total IVA recuperable");
+            var card5 = CrearCardKPI("👥", Color.FromArgb(254, 243, 199), "Proveedores Activos", out lblKpiProveedoresCant, "0", "Con compras en el período");
 
-            pnlWrapper.Controls.Add(tlp);
-            return pnlWrapper;
-        }
+            card1.Margin = new Padding(0, 0, 5, 0);
+            card2.Margin = new Padding(5, 0, 5, 0);
+            card3.Margin = new Padding(5, 0, 5, 0);
+            card4.Margin = new Padding(5, 0, 5, 0);
+            card5.Margin = new Padding(5, 0, 0, 0);
 
-        private Panel CrearCardKpi(string icono, Color bgIcon, Color iconColor, string titulo, out Label lblValor, string valorInicial, string subtitulo)
-        {
-            Panel card = new Panel
-            {
-                Dock = DockStyle.Fill,
-                BackColor = Color.White,
-                Margin = new Padding(4, 0, 4, 0),
-                Padding = new Padding(10, 8, 10, 8)
-            };
-            card.Paint += (s, e) => ControlPaint.DrawBorder(e.Graphics, card.ClientRectangle, Color.FromArgb(226, 232, 240), ButtonBorderStyle.Solid);
+            tlpKpis.Controls.Add(card1, 0, 0);
+            tlpKpis.Controls.Add(card2, 1, 0);
+            tlpKpis.Controls.Add(card3, 2, 0);
+            tlpKpis.Controls.Add(card4, 3, 0);
+            tlpKpis.Controls.Add(card5, 4, 0);
 
-            Label lblIcon = new Label
-            {
-                Text = icono,
-                Font = new Font("Segoe UI", 12F),
-                BackColor = bgIcon,
-                ForeColor = iconColor,
-                Size = new Size(36, 36),
-                Location = new Point(10, 14),
-                TextAlign = ContentAlignment.MiddleCenter
-            };
+            tlpKpis.Resize += (s, e) => tlpKpis.Invalidate(true);
+            pnlKpisWrapper.Controls.Add(tlpKpis);
 
-            Label lblTit = new Label
-            {
-                Text = titulo,
-                Font = new Font("Segoe UI", 7.5F, FontStyle.Bold),
-                ForeColor = Color.FromArgb(100, 116, 139),
-                Location = new Point(50, 8),
-                AutoSize = true
-            };
-
-            lblValor = new Label
-            {
-                Text = valorInicial,
-                Font = new Font("Segoe UI", 12F, FontStyle.Bold),
-                ForeColor = Color.FromArgb(15, 23, 42),
-                Location = new Point(48, 24),
-                AutoSize = true
-            };
-
-            Label lblSub = new Label
-            {
-                Text = subtitulo,
-                Font = new Font("Segoe UI", 7F),
-                ForeColor = Color.FromArgb(148, 163, 184),
-                Location = new Point(50, 48),
-                AutoSize = true
-            };
-
-            card.Controls.AddRange(new Control[] { lblIcon, lblTit, lblValor, lblSub });
-            return card;
-        }
-
-        private Panel CrearSeccionFiltros()
-        {
-            Panel pnl = new Panel
+            // =========================================================================
+            // 2. SECCIÓN FILTROS Y ACCIONES
+            // =========================================================================
+            Panel pnlFiltrosWrapper = new Panel
             {
                 Dock = DockStyle.Top,
-                Height = 110,
-                BackColor = Color.White,
-                Padding = new Padding(14, 8, 14, 8),
-                Margin = new Padding(0, 0, 0, 14)
+                Height = 125,
+                Padding = new Padding(0, 0, 0, 10),
+                BackColor = Color.Transparent
             };
-            pnl.Paint += (s, e) => ControlPaint.DrawBorder(e.Graphics, pnl.ClientRectangle, Color.FromArgb(226, 232, 240), ButtonBorderStyle.Solid);
 
-            FlowLayoutPanel flp1 = new FlowLayoutPanel
+            Panel pnlFiltrosCard = CrearTarjetaRedondeada(0, 0, 0, 115, Color.White, Color.FromArgb(226, 232, 240));
+            pnlFiltrosCard.Dock = DockStyle.Fill;
+            pnlFiltrosCard.Padding = new Padding(16, 8, 16, 8);
+
+            FlowLayoutPanel flowFiltrosFila1 = new FlowLayoutPanel
             {
                 Dock = DockStyle.Top,
-                Height = 50,
+                Height = 54,
                 WrapContents = false,
                 BackColor = Color.Transparent
             };
 
-            Panel pnlTxt = new Panel { Size = new Size(240, 46), Margin = new Padding(0, 0, 8, 0) };
-            Label l1 = new Label { Text = "PROVEEDOR / FOLIO / RUT", Font = new Font("Segoe UI", 7F, FontStyle.Bold), ForeColor = Color.FromArgb(100, 116, 139), Dock = DockStyle.Top };
-            txtFiltroTexto = new TextBox { PlaceholderText = "🔍 Ingrese proveedor, folio o RUT...", Dock = DockStyle.Top, Font = new Font("Segoe UI", 8.5F) };
-            txtFiltroTexto.KeyDown += (s, e) => { if (e.KeyCode == Keys.Enter) CargarDatosLibro(); };
-            pnlTxt.Controls.AddRange(new Control[] { txtFiltroTexto, l1 });
+            txtFiltroTexto = new TextBox
+            {
+                Size = new Size(180, 26),
+                Font = new Font("Segoe UI", 9.5F),
+                BorderStyle = BorderStyle.None,
+                BackColor = Color.FromArgb(248, 250, 252),
+                PlaceholderText = "Proveedor, folio o RUT..."
+            };
+            txtFiltroTexto.KeyDown += (s, e) => { if (e.KeyCode == Keys.Enter) { CargarDatosLibro(); e.SuppressKeyPress = true; } };
+            Panel pnlTxt = CrearGrupoConCaja("PROVEEDOR / FOLIO / RUT", txtFiltroTexto, 195);
 
-            Panel pnlDesde = new Panel { Size = new Size(115, 46), Margin = new Padding(0, 0, 8, 0) };
-            Label l2 = new Label { Text = "FECHA DESDE", Font = new Font("Segoe UI", 7F, FontStyle.Bold), ForeColor = Color.FromArgb(100, 116, 139), Dock = DockStyle.Top };
-            dtpFechaDesde = new DateTimePicker { Format = DateTimePickerFormat.Short, Dock = DockStyle.Top, Font = new Font("Segoe UI", 8.5F) };
-            pnlDesde.Controls.AddRange(new Control[] { dtpFechaDesde, l2 });
+            dtpFechaDesde = new DateTimePicker { Size = new Size(120, 26), Format = DateTimePickerFormat.Short, Font = new Font("Segoe UI", 9.5F) };
+            Panel pnlDesde = CrearGrupoLimpio("FECHA DESDE", dtpFechaDesde, 125);
 
-            Panel pnlHasta = new Panel { Size = new Size(115, 46), Margin = new Padding(0, 0, 8, 0) };
-            Label l3 = new Label { Text = "FECHA HASTA", Font = new Font("Segoe UI", 7F, FontStyle.Bold), ForeColor = Color.FromArgb(100, 116, 139), Dock = DockStyle.Top };
-            dtpFechaHasta = new DateTimePicker { Format = DateTimePickerFormat.Short, Dock = DockStyle.Top, Font = new Font("Segoe UI", 8.5F) };
-            pnlHasta.Controls.AddRange(new Control[] { dtpFechaHasta, l3 });
+            dtpFechaHasta = new DateTimePicker { Size = new Size(120, 26), Format = DateTimePickerFormat.Short, Font = new Font("Segoe UI", 9.5F) };
+            Panel pnlHasta = CrearGrupoLimpio("FECHA HASTA", dtpFechaHasta, 125);
 
-            Panel pnlTipo = new Panel { Size = new Size(150, 46), Margin = new Padding(0, 0, 8, 0) };
-            Label l4 = new Label { Text = "TIPO DOCUMENTO", Font = new Font("Segoe UI", 7F, FontStyle.Bold), ForeColor = Color.FromArgb(100, 116, 139), Dock = DockStyle.Top };
-            cbTipoDoc = new ComboBox { DropDownStyle = ComboBoxStyle.DropDownList, Dock = DockStyle.Top, Font = new Font("Segoe UI", 8.5F) };
+            cbTipoDoc = new ComboBox { Size = new Size(155, 26), DropDownStyle = ComboBoxStyle.DropDownList, Font = new Font("Segoe UI", 9.5F) };
             cbTipoDoc.Items.AddRange(new string[] { "Todos", "Factura de Compra", "Factura Exenta", "Boleta de Compra", "Guía de Recepción" });
             cbTipoDoc.SelectedIndex = 0;
-            pnlTipo.Controls.AddRange(new Control[] { cbTipoDoc, l4 });
+            Panel pnlTipo = CrearGrupoLimpio("TIPO DOCUMENTO", cbTipoDoc, 160);
 
-            Panel pnlEstado = new Panel { Size = new Size(110, 46), Margin = new Padding(0, 0, 10, 0) };
-            Label l5 = new Label { Text = "ESTADO", Font = new Font("Segoe UI", 7F, FontStyle.Bold), ForeColor = Color.FromArgb(100, 116, 139), Dock = DockStyle.Top };
-            cbEstado = new ComboBox { DropDownStyle = ComboBoxStyle.DropDownList, Dock = DockStyle.Top, Font = new Font("Segoe UI", 8.5F) };
+            cbEstado = new ComboBox { Size = new Size(110, 26), DropDownStyle = ComboBoxStyle.DropDownList, Font = new Font("Segoe UI", 9.5F) };
             cbEstado.Items.AddRange(new string[] { "Todos", "Recibida", "Anulada" });
             cbEstado.SelectedIndex = 0;
-            pnlEstado.Controls.AddRange(new Control[] { cbEstado, l5 });
+            Panel pnlEstado = CrearGrupoLimpio("ESTADO", cbEstado, 115);
 
-            btnBuscar = new Button { Text = "🔍 Buscar", Size = new Size(95, 26), BackColor = Color.FromArgb(190, 24, 93), ForeColor = Color.White, FlatStyle = FlatStyle.Flat, Font = new Font("Segoe UI", 8.5F, FontStyle.Bold), Cursor = Cursors.Hand, Margin = new Padding(0, 14, 6, 0) };
-            btnBuscar.FlatAppearance.BorderSize = 0;
+            btnBuscar = CrearBoton("🔍  Buscar", Color.FromArgb(190, 24, 93), Color.White, new Size(95, 34), 8);
+            btnBuscar.Margin = new Padding(8, 14, 6, 0);
             btnBuscar.Click += (s, e) => CargarDatosLibro();
 
-            btnLimpiar = new Button { Text = "🧹 Limpiar", Size = new Size(90, 26), BackColor = Color.FromArgb(241, 245, 249), ForeColor = Color.FromArgb(71, 85, 105), FlatStyle = FlatStyle.Flat, Font = new Font("Segoe UI", 8.5F, FontStyle.Bold), Cursor = Cursors.Hand, Margin = new Padding(0, 14, 0, 0) };
-            btnLimpiar.FlatAppearance.BorderColor = Color.FromArgb(203, 213, 225);
+            btnLimpiar = CrearBoton("🗑️  Limpiar", Color.FromArgb(241, 245, 249), Color.FromArgb(51, 65, 85), new Size(90, 34), 8);
+            btnLimpiar.Margin = new Padding(0, 14, 0, 0);
             btnLimpiar.Click += BtnLimpiar_Click;
 
-            flp1.Controls.AddRange(new Control[] { pnlTxt, pnlDesde, pnlHasta, pnlTipo, pnlEstado, btnBuscar, btnLimpiar });
+            flowFiltrosFila1.Controls.AddRange(new Control[] { pnlTxt, pnlDesde, pnlHasta, pnlTipo, pnlEstado, btnBuscar, btnLimpiar });
 
-            Panel pnlFila2 = new Panel { Dock = DockStyle.Bottom, Height = 32 };
+            Panel pnlFila2Acciones = new Panel
+            {
+                Dock = DockStyle.Top,
+                Height = 36,
+                BackColor = Color.Transparent,
+                Padding = new Padding(0, 4, 0, 0)
+            };
 
-            FlowLayoutPanel flpRapidos = new FlowLayoutPanel { Dock = DockStyle.Left, AutoSize = true, WrapContents = false };
-            Label lblFRap = new Label { Text = "Filtros rápidos:", Font = new Font("Segoe UI", 8F, FontStyle.Bold), ForeColor = Color.FromArgb(100, 116, 139), Margin = new Padding(0, 5, 6, 0), AutoSize = true };
+            FlowLayoutPanel flowRapidos = new FlowLayoutPanel
+            {
+                Dock = DockStyle.Left,
+                AutoSize = true,
+                WrapContents = false,
+                BackColor = Color.Transparent
+            };
 
-            btnFiltroHoy = CrearBotonFiltroRapido("📅 Hoy", (s, e) => { dtpFechaDesde.Value = DateTime.Today; dtpFechaHasta.Value = DateTime.Today; CargarDatosLibro(); });
-            btnFiltroAyer = CrearBotonFiltroRapido("📅 Ayer", (s, e) => { dtpFechaDesde.Value = DateTime.Today.AddDays(-1); dtpFechaHasta.Value = DateTime.Today.AddDays(-1); CargarDatosLibro(); });
-            btnFiltro7Dias = CrearBotonFiltroRapido("📅 Últimos 7 días", (s, e) => { dtpFechaDesde.Value = DateTime.Today.AddDays(-7); dtpFechaHasta.Value = DateTime.Today; CargarDatosLibro(); });
-            btnFiltroEsteMes = CrearBotonFiltroRapido("📅 Este mes", (s, e) => { ConfigurarFiltroEsteMes(); CargarDatosLibro(); });
-            btnFiltroMesAnterior = CrearBotonFiltroRapido("📅 Mes anterior", (s, e) => { ConfigurarFiltroMesAnterior(); CargarDatosLibro(); });
+            Label lblFRap = new Label
+            {
+                Text = "Filtros rápidos:",
+                Font = new Font("Segoe UI", 8.5F, FontStyle.Bold),
+                ForeColor = Color.FromArgb(100, 116, 139),
+                Margin = new Padding(0, 6, 8, 0),
+                AutoSize = true
+            };
 
-            flpRapidos.Controls.AddRange(new Control[] { lblFRap, btnFiltroHoy, btnFiltroAyer, btnFiltro7Dias, btnFiltroEsteMes, btnFiltroMesAnterior });
+            btnFiltroHoy = CrearPillBoton("📅 Hoy", 65, (s, e) => { dtpFechaDesde.Value = DateTime.Today; dtpFechaHasta.Value = DateTime.Today; CargarDatosLibro(); });
+            btnFiltroAyer = CrearPillBoton("📅 Ayer", 65, (s, e) => { dtpFechaDesde.Value = DateTime.Today.AddDays(-1); dtpFechaHasta.Value = DateTime.Today.AddDays(-1); CargarDatosLibro(); });
+            btnFiltro7Dias = CrearPillBoton("📅 Últimos 7 días", 115, (s, e) => { dtpFechaDesde.Value = DateTime.Today.AddDays(-7); dtpFechaHasta.Value = DateTime.Today; CargarDatosLibro(); });
+            btnFiltroEsteMes = CrearPillBoton("📅 Este mes", 85, (s, e) => { ConfigurarFiltroEsteMes(); CargarDatosLibro(); });
+            btnFiltroMesAnterior = CrearPillBoton("📅 Mes anterior", 105, (s, e) => { ConfigurarFiltroMesAnterior(); CargarDatosLibro(); });
 
-            FlowLayoutPanel flpExport = new FlowLayoutPanel { Dock = DockStyle.Right, AutoSize = true, WrapContents = false };
-            btnExportarCsv = new Button { Text = "📄 Exportar CSV", Size = new Size(115, 26), BackColor = Color.FromArgb(240, 253, 244), ForeColor = Color.FromArgb(22, 163, 74), FlatStyle = FlatStyle.Flat, Font = new Font("Segoe UI", 8F, FontStyle.Bold), Cursor = Cursors.Hand, Margin = new Padding(0, 0, 6, 0) };
-            btnExportarCsv.FlatAppearance.BorderColor = Color.FromArgb(187, 247, 208);
-            btnExportarCsv.Click += (s, e) => ExportarACSV();
+            flowRapidos.Controls.AddRange(new Control[] { lblFRap, btnFiltroHoy, btnFiltroAyer, btnFiltro7Dias, btnFiltroEsteMes, btnFiltroMesAnterior });
 
-            btnExportarPdf = new Button { Text = "📄 Exportar PDF", Size = new Size(120, 26), BackColor = Color.FromArgb(254, 242, 242), ForeColor = Color.FromArgb(220, 38, 38), FlatStyle = FlatStyle.Flat, Font = new Font("Segoe UI", 8F, FontStyle.Bold), Cursor = Cursors.Hand, Margin = new Padding(0) };
-            btnExportarPdf.FlatAppearance.BorderColor = Color.FromArgb(254, 202, 202);
+            FlowLayoutPanel flowExport = new FlowLayoutPanel
+            {
+                Dock = DockStyle.Right,
+                AutoSize = true,
+                FlowDirection = FlowDirection.RightToLeft,
+                WrapContents = false,
+                BackColor = Color.Transparent
+            };
+
+            btnExportarPdf = CrearBoton("📄 Exportar PDF", Color.FromArgb(254, 242, 242), Color.FromArgb(220, 38, 38), new Size(125, 28), 6);
+            btnExportarPdf.Margin = new Padding(6, 2, 0, 0);
             btnExportarPdf.Click += (s, e) => GenerarReportePdf();
 
-            flpExport.Controls.AddRange(new Control[] { btnExportarCsv, btnExportarPdf });
+            btnExportarCsv = CrearBoton("📥 Exportar CSV", Color.FromArgb(240, 253, 244), Color.FromArgb(22, 163, 74), new Size(125, 28), 6);
+            btnExportarCsv.Margin = new Padding(0, 2, 0, 0);
+            btnExportarCsv.Click += (s, e) => ExportarACSV();
 
-            pnlFila2.Controls.Add(flpRapidos);
-            pnlFila2.Controls.Add(flpExport);
+            flowExport.Controls.AddRange(new Control[] { btnExportarPdf, btnExportarCsv });
 
-            pnl.Controls.Add(pnlFila2);
-            pnl.Controls.Add(flp1);
-            return pnl;
-        }
+            pnlFila2Acciones.Controls.Add(flowExport);
+            pnlFila2Acciones.Controls.Add(flowRapidos);
 
-        private Panel CrearSeccionGrilla()
-        {
-            Panel pnl = new Panel
-            {
-                Dock = DockStyle.Fill,
-                BackColor = Color.White,
-                Padding = new Padding(12),
-                Margin = new Padding(0)
-            };
-            pnl.Paint += (s, e) => ControlPaint.DrawBorder(e.Graphics, pnl.ClientRectangle, Color.FromArgb(226, 232, 240), ButtonBorderStyle.Solid);
+            pnlFiltrosCard.Controls.Add(pnlFila2Acciones);
+            pnlFiltrosCard.Controls.Add(flowFiltrosFila1);
+            pnlFiltrosWrapper.Controls.Add(pnlFiltrosCard);
 
-            Panel pnlFooter = new Panel { Dock = DockStyle.Bottom, Height = 26, Padding = new Padding(0, 6, 0, 0) };
-            lblContadorFooter = new Label { Text = "Mostrando 0 documentos", Font = new Font("Segoe UI", 8F), ForeColor = Color.FromArgb(100, 116, 139), Dock = DockStyle.Left, AutoSize = true };
-            pnlFooter.Controls.Add(lblContadorFooter);
+            // =========================================================================
+            // 3. TARJETA DE GRILLA REDONDEADA
+            // =========================================================================
+            Panel pnlGridCard = CrearTarjetaRedondeada(0, 0, 0, 0, Color.White, Color.FromArgb(226, 232, 240));
+            pnlGridCard.Dock = DockStyle.Fill;
+            pnlGridCard.Padding = new Padding(10);
 
             dgvLibro = new DataGridView
             {
                 Dock = DockStyle.Fill,
                 BackgroundColor = Color.White,
                 BorderStyle = BorderStyle.None,
-                AllowUserToAddRows = false,
-                RowHeadersVisible = false,
+                CellBorderStyle = DataGridViewCellBorderStyle.SingleHorizontal,
+                ColumnHeadersBorderStyle = DataGridViewHeaderBorderStyle.None,
                 SelectionMode = DataGridViewSelectionMode.FullRowSelect,
                 MultiSelect = false,
+                AllowUserToAddRows = false,
                 ReadOnly = true,
+                RowHeadersVisible = false,
                 AutoSizeColumnsMode = DataGridViewAutoSizeColumnsMode.None,
-                RowTemplate = { Height = 32 },
-                GridColor = Color.FromArgb(241, 245, 249)
+                RowTemplate = { Height = 34 }
             };
-            
             dgvLibro.DoubleClick += DgvLibro_DoubleClick;
-
             ConfigurarColumnasTabla();
 
-            pnl.Controls.Add(dgvLibro);
-            pnl.Controls.Add(pnlFooter);
+            Panel pnlFooter = new Panel { Dock = DockStyle.Bottom, Height = 32, Padding = new Padding(4, 6, 4, 0) };
+            lblContadorFooter = new Label
+            {
+                Text = "Mostrando 0 documentos",
+                Font = new Font("Segoe UI", 8.5F),
+                ForeColor = Color.FromArgb(100, 116, 139),
+                Dock = DockStyle.Fill,
+                TextAlign = ContentAlignment.MiddleLeft,
+                AutoSize = false
+            };
+            pnlFooter.Controls.Add(lblContadorFooter);
+
+            pnlGridCard.Controls.Add(dgvLibro);
+            pnlGridCard.Controls.Add(pnlFooter);
+
+            // =========================================================================
+            // APILAMIENTO EN ORDEN TOP CORRECTO (Z-INDEX)
+            // =========================================================================
+            pnlMain.Controls.Add(pnlGridCard);
+            pnlMain.Controls.Add(pnlFiltrosWrapper);
+            pnlMain.Controls.Add(pnlKpisWrapper);
+
+            this.Controls.Add(pnlMain);
+            this.ResumeLayout(false);
+        }
+
+        private Panel CrearCardKPI(string icon, Color iconBg, string titulo, out Label lblValor, string valInit, string subInit)
+        {
+            Panel pnl = CrearTarjetaRedondeada(0, 0, 0, 80, Color.White, Color.FromArgb(226, 232, 240));
+            pnl.Dock = DockStyle.Fill;
+            pnl.Padding = new Padding(12);
+
+            Label lblIcon = new Label { Text = icon, Font = new Font("Segoe UI", 12F), BackColor = iconBg, Size = new Size(36, 36), TextAlign = ContentAlignment.MiddleCenter, Location = new Point(12, 12) };
+            Label lblT = new Label { Text = titulo, Font = new Font("Segoe UI", 8F, FontStyle.Bold), ForeColor = Color.FromArgb(100, 116, 139), Location = new Point(56, 10), AutoSize = true };
+            lblValor = new Label { Text = valInit, Font = new Font("Segoe UI", 13F, FontStyle.Bold), ForeColor = Color.FromArgb(15, 23, 42), Location = new Point(56, 26), AutoSize = true };
+            Label lblSub = new Label { Text = subInit, Font = new Font("Segoe UI", 7.5F), ForeColor = Color.FromArgb(100, 116, 139), Location = new Point(56, 52), AutoSize = true };
+
+            pnl.Controls.AddRange(new Control[] { lblIcon, lblT, lblValor, lblSub });
             return pnl;
+        }
+
+        private Panel CrearTarjetaRedondeada(int x, int y, int ancho, int alto, Color colorFondo, Color colorBorde)
+        {
+            Panel pnl = new Panel { Location = new Point(x, y), Size = new Size(ancho, alto), BackColor = colorFondo };
+            pnl.Resize += (s, e) => pnl.Invalidate();
+            pnl.Paint += (s, e) =>
+            {
+                e.Graphics.SmoothingMode = SmoothingMode.AntiAlias;
+                e.Graphics.Clear(pnl.BackColor);
+                Rectangle r = new Rectangle(0, 0, pnl.Width - 1, pnl.Height - 1);
+                using GraphicsPath p = CrearRutaRedondeada(r, 10);
+                using Pen pen = new Pen(colorBorde, 1.2f);
+                e.Graphics.DrawPath(pen, p);
+            };
+            return pnl;
+        }
+
+        private GraphicsPath CrearRutaRedondeada(Rectangle rect, int radio)
+        {
+            GraphicsPath path = new GraphicsPath();
+            int d = radio * 2;
+            path.AddArc(rect.X, rect.Y, d, d, 180, 90);
+            path.AddArc(rect.Right - d, rect.Y, d, d, 270, 90);
+            path.AddArc(rect.Right - d, rect.Bottom - d, d, d, 0, 90);
+            path.AddArc(rect.X, rect.Bottom - d, d, d, 90, 90);
+            path.CloseFigure();
+            return path;
+        }
+
+        private Panel CrearGrupoConCaja(string titulo, Control control, int ancho)
+        {
+            Panel pnl = new Panel { Size = new Size(ancho, 48), Margin = new Padding(0, 0, 8, 0) };
+            Label lbl = new Label { Text = titulo, Font = new Font("Segoe UI", 7.5F, FontStyle.Bold), ForeColor = Color.FromArgb(51, 65, 85), Location = new Point(0, 0), AutoSize = true };
+
+            Panel pnlInputBox = new Panel { Location = new Point(0, 18), Size = new Size(ancho, 28), BackColor = Color.FromArgb(248, 250, 252) };
+            pnlInputBox.Paint += (s, e) =>
+            {
+                e.Graphics.SmoothingMode = SmoothingMode.AntiAlias;
+                Rectangle r = new Rectangle(0, 0, pnlInputBox.Width - 1, pnlInputBox.Height - 1);
+                using GraphicsPath path = CrearRutaRedondeada(r, 6);
+                using Pen pen = new Pen(Color.FromArgb(226, 232, 240), 1f);
+                e.Graphics.DrawPath(pen, path);
+            };
+
+            control.Location = new Point(6, 3);
+            control.Width = ancho - 12;
+            pnlInputBox.Controls.Add(control);
+
+            pnl.Controls.Add(lbl);
+            pnl.Controls.Add(pnlInputBox);
+            return pnl;
+        }
+
+        private Panel CrearGrupoLimpio(string titulo, Control control, int ancho)
+        {
+            Panel pnl = new Panel { Size = new Size(ancho, 48), Margin = new Padding(0, 0, 8, 0) };
+            Label lbl = new Label { Text = titulo, Font = new Font("Segoe UI", 7.5F, FontStyle.Bold), ForeColor = Color.FromArgb(51, 65, 85), Location = new Point(0, 0), AutoSize = true };
+
+            control.Location = new Point(0, 18);
+            control.Width = ancho;
+
+            pnl.Controls.Add(lbl);
+            pnl.Controls.Add(control);
+            return pnl;
+        }
+
+        private Button CrearBoton(string texto, Color back, Color fore, Size size, int radio = 0)
+        {
+            Button b = new Button 
+            { 
+                Text = texto, 
+                Size = size, 
+                BackColor = back, 
+                ForeColor = fore, 
+                FlatStyle = FlatStyle.Flat, 
+                Font = new Font("Segoe UI", 8.5F, FontStyle.Bold), 
+                Cursor = Cursors.Hand 
+            };
+            b.FlatAppearance.BorderSize = 0;
+            return b;
+        }
+
+        private Button CrearPillBoton(string texto, int ancho, EventHandler onClick)
+        {
+            Button b = CrearBoton(texto, Color.FromArgb(241, 245, 249), Color.FromArgb(71, 85, 105), new Size(ancho, 25), 12);
+            b.Font = new Font("Segoe UI", 8F, FontStyle.Bold);
+            b.Margin = new Padding(0, 2, 6, 0);
+            b.Click += onClick;
+            return b;
         }
 
         private void ConfigurarColumnasTabla()
@@ -341,8 +440,6 @@ namespace SISTEMAACTUALIZADO.Forms
             dgvLibro.Columns["Proveedor"].MinimumWidth = 220;
 
             dgvLibro.Columns["Rut"].Width = 120;
-            dgvLibro.Columns["Rut"].DefaultCellStyle.Alignment = DataGridViewContentAlignment.MiddleLeft;
-
             dgvLibro.Columns["Neto"].Width = 120;
             dgvLibro.Columns["Neto"].DefaultCellStyle.Alignment = DataGridViewContentAlignment.MiddleRight;
             dgvLibro.Columns["Neto"].DefaultCellStyle.Format = "$#,##0";
@@ -437,25 +534,6 @@ namespace SISTEMAACTUALIZADO.Forms
             cbEstado.SelectedIndex = 0;
             ConfigurarFiltroEsteMes();
             CargarDatosLibro();
-        }
-
-        private Button CrearBotonFiltroRapido(string texto, EventHandler onClick)
-        {
-            Button b = new Button
-            {
-                Text = texto,
-                Height = 26,
-                BackColor = Color.FromArgb(241, 245, 249),
-                ForeColor = Color.FromArgb(51, 65, 85),
-                FlatStyle = FlatStyle.Flat,
-                Font = new Font("Segoe UI", 7.5F, FontStyle.Bold),
-                Cursor = Cursors.Hand,
-                AutoSize = true,
-                Margin = new Padding(0, 0, 4, 0)
-            };
-            b.FlatAppearance.BorderColor = Color.FromArgb(226, 232, 240);
-            b.Click += onClick;
-            return b;
         }
 
         private void ExportarACSV()
