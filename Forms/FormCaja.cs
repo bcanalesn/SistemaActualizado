@@ -17,18 +17,12 @@ namespace SISTEMAACTUALIZADO
         private static extern int SendMessage(IntPtr hWnd, int msg, int wParam, [System.Runtime.InteropServices.MarshalAs(System.Runtime.InteropServices.UnmanagedType.LPWStr)] string lParam);
         private const int EM_SETCUEBANNER = 0x1501;
 
-        // =========================================================================
-        // PARÁMETRO DE PRUEBA: Minutos para que la caja se considere vencida
-        // Cámbialo aquí a 1, 2, 5, etc. según tus pruebas.
-        // =========================================================================
-        private const double MINUTOS_PRUEBA_VENCIMIENTO = 1.0;
-
         private readonly CajaService _cajaService = new CajaService();
         private static CajaTurno? _turnoActual;
         private Usuario? _usuarioActual;
 
-        // Temporizador para vigilar vencimiento en segundo plano
-        private System.Windows.Forms.Timer? _timerMedianoche;
+        // Temporizador de vigilancia de fecha límite en segundo plano
+        private System.Windows.Forms.Timer? _timerVigilante;
         private bool _modalArqueoAbierto = false;
 
         private Button btnAbrirCaja = null!;
@@ -69,6 +63,8 @@ namespace SISTEMAACTUALIZADO
         private Button btnAnularTicket = null!;
 
         private Panel pnlBloqueoCaja = null!;
+        private Label lblAvisoBloqueo = null!;
+        private Button btnAccionDesbloqueo = null!;
         private TVE2607? _ticketSeleccionado;
 
         // Variables Pago Múltiple
@@ -83,42 +79,78 @@ namespace SISTEMAACTUALIZADO
             _usuarioActual = usuario;
             InitializeComponent();
 
+            CargarEstadoTurno();
+            ConfigurarVigilanteTurno();
+
+            this.Shown += (s, e) => VerificarEstadoTurnoYBloqueo();
+            this.VisibleChanged += (s, e) => { if (this.Visible) VerificarEstadoTurnoYBloqueo(); };
+        }
+
+        private void CargarEstadoTurno()
+        {
             string nomUser = _usuarioActual?.NombreUsuario ?? "admin";
             _turnoActual = _cajaService.ObtenerTurnoAbierto(nomUser);
             ActualizarEstadoCajaUI();
-
-            // Configurar vigilante cada 3 segundos para pruebas
-            ConfigurarVigilantePrueba();
-
-            this.Shown += (s, e) => VerificarYForzarCierreSiVencio();
-            this.VisibleChanged += (s, e) => { if (this.Visible) VerificarYForzarCierreSiVencio(); };
         }
 
         private bool EsTurnoVencidoPorTiempo()
         {
             if (_turnoActual == null || _turnoActual.Estado != "Abierta") return false;
-            return (DateTime.Now - _turnoActual.FechaApertura).TotalMinutes >= MINUTOS_PRUEBA_VENCIMIENTO;
+
+            if (_turnoActual.FechaLimite.HasValue)
+            {
+                return DateTime.Now > _turnoActual.FechaLimite.Value;
+            }
+
+            // Fallback: Si no tenía FechaLimite asignada, se calculan 12 horas desde la apertura
+            return DateTime.Now > _turnoActual.FechaApertura.AddHours(CajaService.HORAS_TURNO_ESTANDAR);
         }
 
-        private void ConfigurarVigilantePrueba()
+        private void ConfigurarVigilanteTurno()
         {
-            _timerMedianoche = new System.Windows.Forms.Timer();
-            _timerMedianoche.Interval = 3000; // Evalúa cada 3 segundos
-            _timerMedianoche.Tick += (s, e) => VerificarYForzarCierreSiVencio();
-            _timerMedianoche.Start();
+            _timerVigilante = new System.Windows.Forms.Timer();
+            _timerVigilante.Interval = 10000; // Evalúa cada 10 segundos
+            _timerVigilante.Tick += (s, e) => VerificarEstadoTurnoYBloqueo();
+            _timerVigilante.Start();
         }
 
-        private void VerificarYForzarCierreSiVencio()
+        private void VerificarEstadoTurnoYBloqueo()
         {
-            if (this.IsDisposed) return; // Si la ventana anterior ya no existe, ignora la señal
-            if (_modalArqueoAbierto) return;
+            if (this.IsDisposed || _modalArqueoAbierto) return;
 
-            if (EsTurnoVencidoPorTiempo())
+            string nomUser = _usuarioActual?.NombreUsuario ?? "admin";
+            _turnoActual = _cajaService.ObtenerTurnoAbierto(nomUser);
+
+            ActualizarEstadoCajaUI();
+
+            // 1. Si el turno del usuario actual expiró, se le bloquea y se le permite pedir extensión
+            if (_turnoActual != null && EsTurnoVencidoPorTiempo())
             {
                 pnlBloqueoCaja.Visible = true;
                 pnlBloqueoCaja.BringToFront();
+                lblAvisoBloqueo.Text = $"⚠️ TURNO LÍMITE ALCANZADO ({_turnoActual.FechaLimite:dd/MM HH:mm})\nSu jornada ha expirado. Solicite una extensión autorizada a un Administrador o realice el arqueo de cierre.";
+                btnAccionDesbloqueo.Text = "🔑 Solicitar Extensión de Turno";
+                btnAccionDesbloqueo.Visible = true;
+                return;
+            }
 
-                EjecutarArqueoYCierre(esCierreForzado: true);
+            // 2. Si este usuario es Administrador y no tiene caja abierta, avisar si hay turnos abandonados por otros
+            if (_turnoActual == null && (_usuarioActual?.Rol == "Administrador" || nomUser == "admin"))
+            {
+                var abandonados = _cajaService.ObtenerTurnosExpiradosDeOtros(nomUser);
+                if (abandonados.Count > 0)
+                {
+                    lblAvisoBloqueo.Text = $"⚠️ ATENCIÓN ADMINISTRADOR\nExisten {abandonados.Count} turno(s) de otros cajeros con fecha límite vencida sin cerrar.\nPuede auditarlos y cerrarlos forzadamente o abrir su propio turno.";
+                    btnAccionDesbloqueo.Text = "🛡️ Ver Cajas Abandonadas para Cierre";
+                    btnAccionDesbloqueo.Visible = true;
+                    return;
+                }
+            }
+
+            // Si la caja está cerrada normalmente
+            if (_turnoActual == null)
+            {
+                btnAccionDesbloqueo.Visible = false;
             }
         }
 
@@ -135,9 +167,7 @@ namespace SISTEMAACTUALIZADO
                 BackColor = Color.FromArgb(248, 250, 252)
             };
 
-            // ==========================================
             // 1. ENCABEZADO SUPERIOR
-            // ==========================================
             Panel pnlHeader = new Panel
             {
                 Dock = DockStyle.Top,
@@ -202,9 +232,7 @@ namespace SISTEMAACTUALIZADO
 
             pnlHeader.Controls.AddRange(new Control[] { lblTitulo, btnAbrirCaja, flpMetricas, btnVerResumen });
 
-            // ==========================================
-            // CUERPO DE TRABAJO (2 COLUMNAS)
-            // ==========================================
+            // 2. CUERPO DE TRABAJO (2 COLUMNAS)
             Panel pnlWorkArea = new Panel { Dock = DockStyle.Fill, BackColor = Color.Transparent };
 
             TableLayoutPanel gridLayout = new TableLayoutPanel
@@ -228,12 +256,11 @@ namespace SISTEMAACTUALIZADO
             pnlColIzquierda.RowStyles.Add(new RowStyle(SizeType.Percent, 50F));
             pnlColIzquierda.RowStyles.Add(new RowStyle(SizeType.Percent, 50F));
 
-            // 1. Buscador
+            // Buscador
             Panel pnlCardBusqueda = new Panel { Dock = DockStyle.Fill, BackColor = Color.White, Margin = new Padding(0, 0, 0, 8) };
             pnlCardBusqueda.Paint += (s, e) => ControlPaint.DrawBorder(e.Graphics, pnlCardBusqueda.ClientRectangle, Color.FromArgb(226, 232, 240), ButtonBorderStyle.Solid);
             
             Label lblTitBuscar = new Label { Text = "BUSCAR TICKET PENDIENTE", Font = new Font("Segoe UI", 8F, FontStyle.Bold), ForeColor = Color.FromArgb(15, 23, 42), Location = new Point(10, 6), AutoSize = true };
-
             txtBuscarTicket = new TextBox { Location = new Point(10, 26), Size = new Size(200, 26), Font = new Font("Segoe UI", 9.5F), PlaceholderText = "N° Ticket o Cliente..." };
             txtBuscarTicket.KeyDown += (s, e) => { if (e.KeyCode == Keys.Enter) { CargarTicketsPendientes(txtBuscarTicket.Text.Trim()); e.SuppressKeyPress = true; } };
 
@@ -251,7 +278,7 @@ namespace SISTEMAACTUALIZADO
 
             pnlCardBusqueda.Controls.AddRange(new Control[] { lblTitBuscar, txtBuscarTicket, btnBuscar, btnRecargar, btnLimpiar });
 
-            // 2. Grilla Tickets Pendientes
+            // Grilla Tickets Pendientes
             Panel pnlCardPendientes = new Panel { Dock = DockStyle.Fill, BackColor = Color.White, Margin = new Padding(0, 0, 0, 8), Padding = new Padding(8) };
             pnlCardPendientes.Paint += (s, e) => ControlPaint.DrawBorder(e.Graphics, pnlCardPendientes.ClientRectangle, Color.FromArgb(226, 232, 240), ButtonBorderStyle.Solid);
             
@@ -270,7 +297,7 @@ namespace SISTEMAACTUALIZADO
             pnlCardPendientes.Controls.Add(pnlStatusFooter);
             pnlCardPendientes.Controls.Add(lblTitPend);
 
-            // 3. Grilla Detalle Ticket
+            // Grilla Detalle Ticket
             Panel pnlCardDetalle = new Panel { Dock = DockStyle.Fill, BackColor = Color.White, Padding = new Padding(8) };
             pnlCardDetalle.Paint += (s, e) => ControlPaint.DrawBorder(e.Graphics, pnlCardDetalle.ClientRectangle, Color.FromArgb(226, 232, 240), ButtonBorderStyle.Solid);
             
@@ -312,9 +339,7 @@ namespace SISTEMAACTUALIZADO
             pnlColIzquierda.Controls.Add(pnlCardPendientes, 0, 1);
             pnlColIzquierda.Controls.Add(pnlCardDetalle, 0, 2);
 
-            // ==========================================
             // COLUMNA DERECHA (PAGOS Y ACCIONES)
-            // ==========================================
             Panel pnlColDerecha = new Panel { Dock = DockStyle.Fill, BackColor = Color.White, Padding = new Padding(12), AutoScroll = true };
             const int panelW = 485;
 
@@ -382,13 +407,7 @@ namespace SISTEMAACTUALIZADO
             Label lblP = new Label { Text = "PAGA CON", Location = new Point(8, 4), AutoSize = true, Font = new Font("Segoe UI", 7.5F, FontStyle.Bold), ForeColor = Color.FromArgb(15, 23, 42) };
             Label lblSigno = new Label { Text = "$", Location = new Point(8, 22), AutoSize = true, Font = new Font("Segoe UI", 11F, FontStyle.Bold), ForeColor = Color.FromArgb(100, 116, 139) };
             txtPagaCon = new TextBox { Location = new Point(28, 20), Size = new Size(cW - 36, 26), Font = new Font("Segoe UI", 11F, FontStyle.Bold), BorderStyle = BorderStyle.None, BackColor = Color.FromArgb(248, 250, 252), MaxLength = 10 };
-            txtPagaCon.KeyPress += (s, e) =>
-            {
-                if (!char.IsControl(e.KeyChar) && !char.IsDigit(e.KeyChar))
-                {
-                    e.Handled = true;
-                }
-            };
+            txtPagaCon.KeyPress += (s, e) => { if (!char.IsControl(e.KeyChar) && !char.IsDigit(e.KeyChar)) e.Handled = true; };
             txtPagaCon.TextChanged += TxtPagaCon_TextChanged;
             pnlPagaCon.Controls.AddRange(new Control[] { lblP, lblSigno, txtPagaCon });
 
@@ -482,23 +501,43 @@ namespace SISTEMAACTUALIZADO
 
             pnlWorkArea.Controls.Add(gridLayout);
 
-            // CAPA DE BLOQUEO (CAJA CERRADA O TURNO VENCIDO)
+            // CAPA DE BLOQUEO (CAJA CERRADA, TURNO VENCIDO O TURNO ABANDONADO)
             pnlBloqueoCaja = new Panel
             {
                 Dock = DockStyle.Fill,
-                BackColor = Color.FromArgb(160, 241, 245, 249),
+                BackColor = Color.FromArgb(210, 241, 245, 249),
                 Visible = true
             };
 
-            Label lblAvisoBloqueo = new Label
+            lblAvisoBloqueo = new Label
             {
-                Text = "🔒 LA CAJA SE ENCUENTRA CERRADA O CON TURNO VENCIDO\nPresione el botón 'Abrir Caja' o complete el arqueo para habilitar cobros.",
-                Font = new Font("Segoe UI", 12F, FontStyle.Bold),
+                Text = "🔒 LA CAJA SE ENCUENTRA CERRADA\nPresione el botón 'Abrir Caja' para iniciar su jornada.",
+                Font = new Font("Segoe UI", 11.5F, FontStyle.Bold),
                 ForeColor = Color.FromArgb(15, 23, 42),
                 TextAlign = ContentAlignment.MiddleCenter,
                 Dock = DockStyle.Fill
             };
+
+            btnAccionDesbloqueo = new Button
+            {
+                Text = "🔑 Solicitar Extensión de Turno",
+                Size = new Size(270, 42),
+                BackColor = Color.FromArgb(37, 99, 235),
+                ForeColor = Color.White,
+                FlatStyle = FlatStyle.Flat,
+                Font = new Font("Segoe UI", 9.5F, FontStyle.Bold),
+                Cursor = Cursors.Hand,
+                Visible = false
+            };
+            btnAccionDesbloqueo.FlatAppearance.BorderSize = 0;
+            btnAccionDesbloqueo.Click += BtnAccionDesbloqueo_Click;
+
+            pnlBloqueoCaja.Controls.Add(btnAccionDesbloqueo);
             pnlBloqueoCaja.Controls.Add(lblAvisoBloqueo);
+            pnlBloqueoCaja.Resize += (s, e) =>
+            {
+                btnAccionDesbloqueo.Location = new Point((pnlBloqueoCaja.Width - btnAccionDesbloqueo.Width) / 2, (pnlBloqueoCaja.Height / 2) + 48);
+            };
 
             pnlMainContainer.Controls.Add(pnlBloqueoCaja);
             pnlMainContainer.Controls.Add(pnlWorkArea);
@@ -508,6 +547,539 @@ namespace SISTEMAACTUALIZADO
             this.ResumeLayout(false);
 
             CargarTicketsPendientes();
+        }
+
+        private void BtnAccionDesbloqueo_Click(object? sender, EventArgs e)
+        {
+            if (_turnoActual != null && EsTurnoVencidoPorTiempo())
+            {
+                AbrirModalExtensionTurno();
+            }
+            else
+            {
+                AbrirModalCierreForzadoHuerfano();
+            }
+        }
+
+        private void AbrirModalExtensionTurno()
+        {
+            if (_turnoActual == null) return;
+
+            using Form modal = new Form
+            {
+                Text = "Autorización de Extensión de Turno",
+                Size = new Size(380, 310),
+                StartPosition = FormStartPosition.CenterParent,
+                FormBorderStyle = FormBorderStyle.FixedDialog,
+                MaximizeBox = false,
+                MinimizeBox = false,
+                BackColor = Color.White
+            };
+
+            Label lblT = new Label { Text = "🔑 AUTORIZACIÓN DE SUPERVISOR", Location = new Point(20, 16), AutoSize = true, Font = new Font("Segoe UI", 10F, FontStyle.Bold), ForeColor = Color.FromArgb(37, 99, 235) };
+            Label lblSub = new Label { Text = "Un Administrador debe autorizar la extensión del turno:", Location = new Point(20, 38), AutoSize = true, Font = new Font("Segoe UI", 8F), ForeColor = Color.FromArgb(100, 116, 139) };
+
+            Label lblU = new Label { Text = "Usuario Administrador:", Location = new Point(20, 68), AutoSize = true, Font = new Font("Segoe UI", 8.5F, FontStyle.Bold) };
+            TextBox txtU = new TextBox { Location = new Point(20, 88), Size = new Size(325, 26), Font = new Font("Segoe UI", 9.5F) };
+
+            Label lblP = new Label { Text = "Contraseña:", Location = new Point(20, 120), AutoSize = true, Font = new Font("Segoe UI", 8.5F, FontStyle.Bold) };
+            TextBox txtP = new TextBox { Location = new Point(20, 140), Size = new Size(325, 26), Font = new Font("Segoe UI", 9.5F), UseSystemPasswordChar = true };
+
+            Label lblH = new Label { Text = "Horas a Extender:", Location = new Point(20, 172), AutoSize = true, Font = new Font("Segoe UI", 8.5F, FontStyle.Bold) };
+            ComboBox cbH = new ComboBox { Location = new Point(20, 192), Size = new Size(325, 26), DropDownStyle = ComboBoxStyle.DropDownList, Font = new Font("Segoe UI", 9F) };
+            cbH.Items.AddRange(new object[] { "1 Hora", "2 Horas", "3 Horas", "4 Horas" });
+            cbH.SelectedIndex = 1;
+
+            Button btnAut = new Button { Text = "✔ Conceder Extensión", Location = new Point(20, 232), Size = new Size(325, 38), BackColor = Color.FromArgb(16, 185, 129), ForeColor = Color.White, FlatStyle = FlatStyle.Flat, Font = new Font("Segoe UI", 9.5F, FontStyle.Bold), Cursor = Cursors.Hand };
+            btnAut.FlatAppearance.BorderSize = 0;
+
+            btnAut.Click += (s, e) =>
+            {
+                string admin = txtU.Text.Trim();
+                string clave = txtP.Text.Trim();
+
+                if (!_cajaService.ValidarCredencialesAdmin(admin, clave))
+                {
+                    MessageBox.Show("Credenciales inválidas o el usuario no posee rol de Administrador activo.", "Acceso Denegado", MessageBoxButtons.OK, MessageBoxIcon.Warning);
+                    return;
+                }
+
+                int horas = cbH.SelectedIndex + 1;
+                if (_cajaService.ExtenderTurno(_turnoActual.CajaTurnoID, horas, admin))
+                {
+                    MessageBox.Show($"Extensión concedida con éxito (+{horas} hrs).\nNueva fecha límite: {_turnoActual.FechaLimite:dd/MM/yyyy HH:mm}", "Turno Extendido", MessageBoxButtons.OK, MessageBoxIcon.Information);
+                    modal.Close();
+                    VerificarEstadoTurnoYBloqueo();
+                }
+            };
+
+            modal.Controls.AddRange(new Control[] { lblT, lblSub, lblU, txtU, lblP, txtP, lblH, cbH, btnAut });
+            modal.ShowDialog(this);
+        }
+
+        private void AbrirModalCierreForzadoHuerfano()
+        {
+            string nomUser = _usuarioActual?.NombreUsuario ?? "admin";
+            var turnosAbandonados = _cajaService.ObtenerTurnosExpiradosDeOtros(nomUser);
+            if (turnosAbandonados.Count == 0) return;
+
+            using Form modal = new Form
+            {
+                Text = "Cierre Forzado de Turno Abandonado",
+                Size = new Size(420, 530),
+                StartPosition = FormStartPosition.CenterParent,
+                FormBorderStyle = FormBorderStyle.FixedDialog,
+                MaximizeBox = false,
+                MinimizeBox = false,
+                BackColor = Color.White
+            };
+
+            Label lblT = new Label { Text = "🛡️ RESCATE DE TURNOS ABANDONADOS", Location = new Point(20, 14), AutoSize = true, Font = new Font("Segoe UI", 11F, FontStyle.Bold), ForeColor = Color.FromArgb(220, 38, 38) };
+
+            Label lblSel = new Label { Text = "Seleccione la caja a cerrar:", Location = new Point(20, 45), AutoSize = true, Font = new Font("Segoe UI", 8.5F, FontStyle.Bold) };
+            ComboBox cbTurnos = new ComboBox { Location = new Point(20, 68), Size = new Size(360, 26), DropDownStyle = ComboBoxStyle.DropDownList, Font = new Font("Segoe UI", 9F) };
+
+            foreach (var t in turnosAbandonados)
+            {
+                cbTurnos.Items.Add($"Turno #{t.CajaTurnoID} - Cajero: {t.Usuario} (Venció: {t.FechaLimite:dd/MM HH:mm})");
+            }
+            cbTurnos.SelectedIndex = 0;
+
+            Label lblInfo = new Label { Location = new Point(20, 102), Size = new Size(360, 24), Font = new Font("Segoe UI", 8.5F, FontStyle.Bold), ForeColor = Color.FromArgb(14, 116, 144) };
+
+            Action actualizarInfo = () =>
+            {
+                var seleccionado = turnosAbandonados[cbTurnos.SelectedIndex];
+                decimal ventasEfec = _cajaService.CalcularVentasEfectivo(seleccionado.CajaTurnoID);
+                decimal esperado = seleccionado.MontoInicial + ventasEfec;
+                lblInfo.Text = $"Fondo: {MonedaHelper.Formatear(seleccionado.MontoInicial, conSigno: true)} | Ventas Efec: {MonedaHelper.Formatear(ventasEfec, conSigno: true)} | Total Esperado: {MonedaHelper.Formatear(esperado, conSigno: true)}";
+            };
+            cbTurnos.SelectedIndexChanged += (s, e) => actualizarInfo();
+            actualizarInfo();
+
+            Label lblU = new Label { Text = "Usuario Administrador:", Location = new Point(20, 134), AutoSize = true, Font = new Font("Segoe UI", 8.5F, FontStyle.Bold) };
+            TextBox txtU = new TextBox { Location = new Point(20, 154), Size = new Size(360, 26), Font = new Font("Segoe UI", 9.5F) };
+
+            Label lblP = new Label { Text = "Contraseña Administrador:", Location = new Point(20, 186), AutoSize = true, Font = new Font("Segoe UI", 8.5F, FontStyle.Bold) };
+            TextBox txtP = new TextBox { Location = new Point(20, 206), Size = new Size(360, 26), Font = new Font("Segoe UI", 9.5F), UseSystemPasswordChar = true };
+
+            Label lblE = new Label { Text = "Efectivo Físico Contado en Caja ($):", Location = new Point(20, 238), AutoSize = true, Font = new Font("Segoe UI", 8.5F, FontStyle.Bold) };
+            TextBox txtEf = CrearInputMonedaModal(20, 258, 360);
+            txtEf.TextChanged += (s, e) => MonedaHelper.AplicarMascaraEnVivo(txtEf);
+
+            Label lblM = new Label { Text = "Justificación del Cierre Forzado:", Location = new Point(20, 292), AutoSize = true, Font = new Font("Segoe UI", 8.5F, FontStyle.Bold) };
+            TextBox txtMotivo = new TextBox { Location = new Point(20, 312), Size = new Size(360, 48), Multiline = true, Font = new Font("Segoe UI", 9F), Text = "Cajero se retiró sin realizar arqueo al final de jornada." };
+
+            Button btnCerrarForzado = new Button { Text = "🔒 Confirmar Arqueo Forzado", Location = new Point(20, 380), Size = new Size(360, 44), BackColor = Color.FromArgb(239, 68, 68), ForeColor = Color.White, FlatStyle = FlatStyle.Flat, Font = new Font("Segoe UI", 9.5F, FontStyle.Bold), Cursor = Cursors.Hand };
+            btnCerrarForzado.FlatAppearance.BorderSize = 0;
+
+            btnCerrarForzado.Click += (s, e) =>
+            {
+                string admin = txtU.Text.Trim();
+                string clave = txtP.Text.Trim();
+
+                if (!_cajaService.ValidarCredencialesAdmin(admin, clave))
+                {
+                    MessageBox.Show("Credenciales inválidas o el usuario no posee rol de Administrador activo.", "Acceso Denegado", MessageBoxButtons.OK, MessageBoxIcon.Warning);
+                    return;
+                }
+
+                if (string.IsNullOrWhiteSpace(txtEf.Text))
+                {
+                    MessageBox.Show("Debe ingresar el monto de efectivo físico verificado.", "Validación", MessageBoxButtons.OK, MessageBoxIcon.Warning);
+                    return;
+                }
+
+                var turnoSel = turnosAbandonados[cbTurnos.SelectedIndex];
+                decimal real = MonedaHelper.Limpiar(txtEf.Text);
+                _cajaService.CerrarTurnoForzadoPorAdmin(turnoSel.CajaTurnoID, real, admin, txtMotivo.Text.Trim());
+
+                MessageBox.Show($"Turno #{turnoSel.CajaTurnoID} de '{turnoSel.Usuario}' cerrado exitosamente por {admin}.", "Turno Cerrado", MessageBoxButtons.OK, MessageBoxIcon.Information);
+                modal.Close();
+                VerificarEstadoTurnoYBloqueo();
+            };
+
+            modal.Controls.AddRange(new Control[] { lblT, lblSel, cbTurnos, lblInfo, lblU, txtU, lblP, txtP, lblE, txtEf, lblM, txtMotivo, btnCerrarForzado });
+            modal.ShowDialog(this);
+        }
+
+        private void ActualizarEstadoCajaUI()
+        {
+            bool estaAbierta = (_turnoActual != null && _turnoActual.Estado == "Abierta");
+            bool estaVigente = estaAbierta && !EsTurnoVencidoPorTiempo();
+
+            pnlBloqueoCaja.Visible = (!estaAbierta || !estaVigente);
+            if (pnlBloqueoCaja.Visible) pnlBloqueoCaja.BringToFront();
+
+            if (estaAbierta)
+            {
+                btnAbrirCaja.Text = "🔒 Cerrar Caja";
+                btnAbrirCaja.ForeColor = Color.FromArgb(239, 68, 68);
+
+                lblEstadoTag.Text = estaVigente ? "🟢 CAJA ABIERTA" : "⚠️ TURNO VENCIDO";
+                lblEstadoTag.ForeColor = estaVigente ? Color.FromArgb(22, 163, 74) : Color.FromArgb(239, 68, 68);
+
+                lblEstadoDetalle.Text = $"Turno #{_turnoActual!.CajaTurnoID}";
+                lblHoraApertura.Text = _turnoActual.FechaApertura.ToString("HH:mm:ss");
+                lblFondoInicial.Text = MonedaHelper.Formatear(_turnoActual.MontoInicial, conSigno: true);
+
+                if (estaVigente)
+                {
+                    btnAccionDesbloqueo.Visible = false;
+                }
+            }
+            else
+            {
+                btnAbrirCaja.Text = "🏪 Abrir Caja";
+                btnAbrirCaja.ForeColor = Color.FromArgb(37, 99, 235);
+
+                lblEstadoTag.Text = "🔴 CAJA CERRADA";
+                lblEstadoTag.ForeColor = Color.FromArgb(239, 68, 68);
+                lblEstadoDetalle.Text = "Turno --";
+                lblHoraApertura.Text = "--:--";
+                lblFondoInicial.Text = "$ 0";
+
+                lblAvisoBloqueo.Text = "🔒 LA CAJA SE ENCUENTRA CERRADA\nPresione el botón 'Abrir Caja' para iniciar su jornada.";
+                btnAccionDesbloqueo.Visible = false;
+            }
+        }
+
+        private void BtnAbrirCaja_Click(object? sender, EventArgs e)
+        {
+            if (_turnoActual != null && _turnoActual.Estado == "Abierta")
+            {
+                bool esForzado = EsTurnoVencidoPorTiempo();
+                EjecutarArqueoYCierre(esCierreForzado: esForzado);
+            }
+            else
+            {
+                // Cada cajero abre SU propia caja sin importar si otros compañeros tienen turnos abiertos
+                EjecutarAperturaCaja();
+            }
+        }
+
+        private void EjecutarArqueoYCierre(bool esCierreForzado)
+        {
+            if (_turnoActual == null) return;
+
+            _modalArqueoAbierto = true;
+            decimal ventasEfectivo = _cajaService.CalcularVentasEfectivo(_turnoActual.CajaTurnoID);
+            decimal fondoInicial = _turnoActual.MontoInicial;
+            decimal efectivoEsperado = fondoInicial + ventasEfectivo;
+            bool cierreExitoso = false;
+
+            using Form modalCierre = new Form
+            {
+                Text = esCierreForzado ? "⚠️ CIERRE OBLIGATORIO - TURNO EXPIRADO" : "Arqueo y Cierre de Caja",
+                Size = new Size(380, 430),
+                StartPosition = FormStartPosition.CenterParent,
+                FormBorderStyle = FormBorderStyle.FixedDialog,
+                MaximizeBox = false,
+                MinimizeBox = false,
+                ControlBox = !esCierreForzado,
+                BackColor = Color.White,
+                KeyPreview = true
+            };
+
+            modalCierre.FormClosing += (s, ev) =>
+            {
+                if (esCierreForzado && !cierreExitoso)
+                {
+                    ev.Cancel = true;
+                    MessageBox.Show("Debe realizar el conteo de efectivo y confirmar el cierre del turno para continuar.", "Operación Requerida", MessageBoxButtons.OK, MessageBoxIcon.Exclamation);
+                }
+            };
+
+            Label lblT = new Label 
+            { 
+                Text = esCierreForzado ? $"🔒 CIERRE OBLIGATORIO #{_turnoActual.CajaTurnoID}" : "🔒 ARQUEO Y CIERRE DE TURNO", 
+                Location = new Point(20, 14), 
+                AutoSize = true, 
+                Font = new Font("Segoe UI", 11F, FontStyle.Bold), 
+                ForeColor = esCierreForzado ? Color.FromArgb(220, 38, 38) : Color.FromArgb(15, 23, 42) 
+            };
+
+            Label lblSubFecha = new Label
+            {
+                Text = $"Apertura: {_turnoActual.FechaApertura:dd/MM/yyyy HH:mm} (Límite: {_turnoActual.FechaLimite:dd/MM HH:mm})",
+                Location = new Point(20, 36),
+                AutoSize = true,
+                Font = new Font("Segoe UI", 8F),
+                ForeColor = Color.FromArgb(100, 116, 139)
+            };
+
+            Label lblPrompt = new Label { Text = "Ingrese el Efectivo Físico Contado ($):", Location = new Point(20, 60), AutoSize = true, Font = new Font("Segoe UI", 8.5F, FontStyle.Bold) };
+            TextBox txtEfectivoReal = CrearInputMonedaModal(20, 82, 325);
+
+            Label lblResultadoDif = new Label { Text = "Esperando conteo...", Location = new Point(20, 120), Size = new Size(325, 22), Font = new Font("Segoe UI", 9F, FontStyle.Bold), ForeColor = Color.FromArgb(100, 116, 139) };
+            Label lblObs = new Label { Text = "Motivo del descuadre (Obligatorio si no cuadra):", Location = new Point(20, 148), AutoSize = true, Font = new Font("Segoe UI", 8F, FontStyle.Bold), Visible = false };
+            TextBox txtObs = new TextBox { Location = new Point(20, 170), Size = new Size(325, 60), Multiline = true, Font = new Font("Segoe UI", 9F), Visible = false };
+
+            txtEfectivoReal.TextChanged += (s, ev) =>
+            {
+                MonedaHelper.AplicarMascaraEnVivo(txtEfectivoReal);
+                decimal real = MonedaHelper.Limpiar(txtEfectivoReal.Text);
+
+                if (real > 0 || txtEfectivoReal.Text == "0")
+                {
+                    decimal dif = real - efectivoEsperado;
+                    if (dif == 0)
+                    {
+                        lblResultadoDif.Text = $"✔ Caja Cuadrada ({MonedaHelper.Formatear(0, conSigno: true)})";
+                        lblResultadoDif.ForeColor = Color.FromArgb(22, 163, 74);
+                        lblObs.Visible = false;
+                        txtObs.Visible = false;
+                    }
+                    else if (dif < 0)
+                    {
+                        lblResultadoDif.Text = $"⚠️ Faltante: -{MonedaHelper.Formatear(Math.Abs(dif), conSigno: true)}";
+                        lblResultadoDif.ForeColor = Color.FromArgb(239, 68, 68);
+                        lblObs.Visible = true;
+                        txtObs.Visible = true;
+                    }
+                    else
+                    {
+                        lblResultadoDif.Text = $"ℹ️ Sobrante: +{MonedaHelper.Formatear(dif, conSigno: true)}";
+                        lblResultadoDif.ForeColor = Color.FromArgb(234, 88, 12);
+                        lblObs.Visible = true;
+                        txtObs.Visible = true;
+                    }
+                }
+                else
+                {
+                    lblResultadoDif.Text = "Esperando conteo...";
+                    lblResultadoDif.ForeColor = Color.FromArgb(100, 116, 139);
+                }
+            };
+
+            Button btnConfirmar = new Button
+            {
+                Text = "🔒 Confirmar Cierre Definitivo",
+                Location = new Point(20, 248),
+                Size = new Size(325, 44),
+                BackColor = Color.FromArgb(239, 68, 68),
+                ForeColor = Color.White,
+                FlatStyle = FlatStyle.Flat,
+                Font = new Font("Segoe UI", 9.5F, FontStyle.Bold),
+                Cursor = Cursors.Hand
+            };
+            btnConfirmar.FlatAppearance.BorderSize = 0;
+
+            btnConfirmar.Click += (s, ev) =>
+            {
+                if (string.IsNullOrWhiteSpace(txtEfectivoReal.Text))
+                {
+                    MessageBox.Show("Ingrese el monto contado en caja.", "Dato Requerido", MessageBoxButtons.OK, MessageBoxIcon.Warning);
+                    return;
+                }
+
+                decimal realDeclarado = MonedaHelper.Limpiar(txtEfectivoReal.Text);
+                decimal dif = realDeclarado - efectivoEsperado;
+
+                if (dif != 0 && string.IsNullOrWhiteSpace(txtObs.Text))
+                {
+                    MessageBox.Show("Debe indicar el motivo del descuadre en el campo de observaciones.", "Justificación Obligatoria", MessageBoxButtons.OK, MessageBoxIcon.Warning);
+                    return;
+                }
+
+                string motivoFinal = txtObs.Text.Trim();
+                if (esCierreForzado)
+                {
+                    motivoFinal = string.IsNullOrEmpty(motivoFinal)
+                        ? $"[Cierre por expiración de fecha límite {_turnoActual.FechaLimite:dd/MM HH:mm}]"
+                        : $"[Cierre forzado] {motivoFinal}";
+                }
+
+                _cajaService.CerrarTurno(_turnoActual.CajaTurnoID, realDeclarado, motivoFinal);
+                _turnoActual = null;
+                cierreExitoso = true;
+                ActualizarEstadoCajaUI();
+                modalCierre.Close();
+
+                MessageBox.Show(
+                    $"Turno cerrado exitosamente.\n\n• Esperado: {MonedaHelper.Formatear(efectivoEsperado, conSigno: true)}\n• Declarado: {MonedaHelper.Formatear(realDeclarado, conSigno: true)}\n• Diferencia: {(dif >= 0 ? "+$" : "-$")}{MonedaHelper.Formatear(Math.Abs(dif))}",
+                    "Turno Finalizado", 
+                    MessageBoxButtons.OK, 
+                    MessageBoxIcon.Information
+                );
+            };
+
+            modalCierre.Controls.AddRange(new Control[] { lblT, lblSubFecha, lblPrompt, txtEfectivoReal, lblResultadoDif, lblObs, txtObs, btnConfirmar });
+            modalCierre.ShowDialog();
+            _modalArqueoAbierto = false;
+        }
+
+        private void EjecutarAperturaCaja()
+        {
+            // Tomamos las horas asignadas en el perfil del usuario (o 9 por defecto)
+            int horasAsignadas = _usuarioActual?.HorasTurno > 0 ? _usuarioActual.HorasTurno : 9;
+
+            using Form modalApertura = new Form
+            {
+                Text = "Apertura de Caja",
+                Size = new Size(320, 230),
+                StartPosition = FormStartPosition.CenterParent,
+                FormBorderStyle = FormBorderStyle.FixedDialog,
+                MaximizeBox = false,
+                MinimizeBox = false,
+                BackColor = Color.White
+            };
+
+            Label lblM = new Label { Text = "Monto Inicial de Caja ($):", Location = new Point(20, 16), AutoSize = true, Font = new Font("Segoe UI", 9F, FontStyle.Bold) };
+            TextBox txtM = CrearInputMonedaModal(20, 38, 260);
+            txtM.TextChanged += (sa, ea) => MonedaHelper.AplicarMascaraEnVivo(txtM);
+
+            Label lblInfoTurno = new Label 
+            { 
+                Text = $"⏱️ Jornada configurada: {horasAsignadas} hrs de turno", 
+                Location = new Point(20, 75), 
+                AutoSize = true, 
+                Font = new Font("Segoe UI", 8.2F, FontStyle.Bold), 
+                ForeColor = Color.FromArgb(14, 116, 144) 
+            };
+
+            Button btnA = new Button 
+            { 
+                Text = "🚀 Iniciar Turno", 
+                Location = new Point(20, 115), 
+                Size = new Size(260, 42), 
+                BackColor = Color.FromArgb(16, 185, 129), 
+                ForeColor = Color.White, 
+                FlatStyle = FlatStyle.Flat, 
+                Font = new Font("Segoe UI", 9.5F, FontStyle.Bold), 
+                Cursor = Cursors.Hand 
+            };
+            btnA.FlatAppearance.BorderSize = 0;
+
+            btnA.Click += (sa, ea) =>
+            {
+                decimal monto = MonedaHelper.Limpiar(txtM.Text);
+                if (monto >= 0 && !string.IsNullOrWhiteSpace(txtM.Text))
+                {
+                    string usuario = _usuarioActual?.NombreUsuario ?? "admin";
+                    _turnoActual = _cajaService.AbrirTurno(usuario, monto);
+                    modalApertura.DialogResult = DialogResult.OK;
+                    modalApertura.Close();
+                }
+                else
+                {
+                    MessageBox.Show("Ingrese un monto numérico válido.", "Monto Inválido", MessageBoxButtons.OK, MessageBoxIcon.Warning);
+                }
+            };
+
+            modalApertura.Controls.AddRange(new Control[] { lblM, txtM, lblInfoTurno, btnA });
+            if (modalApertura.ShowDialog(this) == DialogResult.OK)
+            {
+                ActualizarEstadoCajaUI();
+            }
+        }
+
+        private void BtnCobrarTicket_Click(object? sender, EventArgs e)
+        {
+            if (_ticketSeleccionado == null) return;
+
+            // CANDADO 1: Caja cerrada
+            if (_turnoActual == null || _turnoActual.Estado != "Abierta")
+            {
+                MessageBox.Show("La caja se encuentra cerrada. Debe iniciar turno antes de procesar cobros.", "Caja Cerrada", MessageBoxButtons.OK, MessageBoxIcon.Warning);
+                VerificarEstadoTurnoYBloqueo();
+                return;
+            }
+
+            // CANDADO 2: Fecha límite expirada
+            if (EsTurnoVencidoPorTiempo())
+            {
+                MessageBox.Show($"El turno activo superó su vigencia límite ({_turnoActual.FechaLimite:dd/MM/yyyy HH:mm}).\n\nDebe solicitar una extensión a un Administrador o realizar el arqueo de cierre.", "Turno Expirado", MessageBoxButtons.OK, MessageBoxIcon.Stop);
+                VerificarEstadoTurnoYBloqueo();
+                return;
+            }
+
+            string tipoDoc = _tipoDocSeleccionado;
+            string medioPago = _medioPagoSeleccionado;
+            decimal pagaCon = 0;
+            decimal vuelto = 0;
+
+            if (tipoDoc.Contains("Factura") && (string.IsNullOrWhiteSpace(_ticketSeleccionado.RuT) || _ticketSeleccionado.RuT.Contains("66.666.666")))
+            {
+                MessageBox.Show("Para emitir Factura Electrónica el ticket debe tener asignado un cliente formal con RUT y Razón Social.", "Factura Requiere Cliente", MessageBoxButtons.OK, MessageBoxIcon.Warning);
+                return;
+            }
+
+            if (medioPago == "Crédito Comercial")
+            {
+                var resCredito = CreditoService.ValidarVentaCreditoPorRutOId(_ticketSeleccionado.Idcliente, _ticketSeleccionado.RuT ?? "", _ticketSeleccionado.Total);
+                if (!resCredito.EsValido)
+                {
+                    MessageBox.Show(resCredito.MensajeError, "Crédito Comercial Denegado", MessageBoxButtons.OK, MessageBoxIcon.Stop);
+                    return;
+                }
+            }
+            else if (medioPago.Contains("Múltiple"))
+            {
+                if (!_pagoMixtoConfirmado)
+                {
+                    MessageBox.Show("Por favor configure el desglose del Pago Múltiple.", "Atención", MessageBoxButtons.OK, MessageBoxIcon.Warning);
+                    return;
+                }
+                pagaCon = _pagoEfectivo + _pagoTarjeta + _pagoTransferencia;
+                vuelto = _vueltoMixto;
+                medioPago = $"Múltiple (Efec: {MonedaHelper.Formatear(_pagoEfectivo, conSigno: true)} | Tarj: {MonedaHelper.Formatear(_pagoTarjeta, conSigno: true)} | Transf: {MonedaHelper.Formatear(_pagoTransferencia, conSigno: true)})";
+            }
+            else if (medioPago == "Efectivo")
+            {
+                pagaCon = MonedaHelper.Limpiar(txtPagaCon.Text);
+                if (pagaCon < _ticketSeleccionado.Total)
+                {
+                    MessageBox.Show("Ingrese un monto en efectivo suficiente para el cobro.", "Atención", MessageBoxButtons.OK, MessageBoxIcon.Warning);
+                    return;
+                }
+                vuelto = pagaCon - _ticketSeleccionado.Total;
+            }
+            else
+            {
+                pagaCon = _ticketSeleccionado.Total;
+                vuelto = 0;
+            }
+
+            try
+            {
+                string cajero = _usuarioActual?.NombreUsuario ?? "admin";
+                
+                int folioOficial = _cajaService.ProcesarCobroTicket(
+                    _ticketSeleccionado, tipoDoc, medioPago, vuelto, _turnoActual.CajaTurnoID, cajero
+                );
+
+                if (_medioPagoSeleccionado == "Crédito Comercial")
+                {
+                    CreditoService.RegistrarFacturaCreditoDirecto(_ticketSeleccionado.idTve, folioOficial, DateTime.Now, _ticketSeleccionado.Idcliente, _ticketSeleccionado.RuT ?? "", _ticketSeleccionado.Total, cajero);
+                }
+
+                var detalles = _cajaService.ObtenerDetallesTicket(_ticketSeleccionado.idTve);
+                List<DetalleCarrito> itemsCarrito = detalles.Select(item => new DetalleCarrito
+                {
+                    ProductoID = item.IdProducto,
+                    Nombre = item.NmbProducto ?? "Producto",
+                    PrecioUnitario = item.Precio,
+                    Cantidad = item.Cantidad
+                }).ToList();
+
+                MessageBox.Show($"¡{tipoDoc.ToUpper()} N° {folioOficial} PROCESADA CON ÉXITO!\n\n" +
+                                $"• Medio de Pago: {medioPago}\n" +
+                                $"• Total: {MonedaHelper.Formatear(_ticketSeleccionado.Total, conSigno: true)}\n" +
+                                $"• Vuelto: {MonedaHelper.Formatear(vuelto, conSigno: true)}",
+                                "Cobro Finalizado", MessageBoxButtons.OK, MessageBoxIcon.Information);
+
+                FormTicketModal formTicket = new FormTicketModal(_ticketSeleccionado, itemsCarrito, pagaCon, vuelto);
+                formTicket.ShowDialog(this);
+
+                txtBuscarTicket.Clear();
+                CargarTicketsPendientes();
+                ActualizarEstadoCajaUI();
+            }
+            catch (Exception ex)
+            {
+                MessageBox.Show($"Error al procesar el cobro: {ex.Message}", "Error DB", MessageBoxButtons.OK, MessageBoxIcon.Error);
+            }
         }
 
         private void LimpiarSeleccionVista()
@@ -799,40 +1371,6 @@ namespace SISTEMAACTUALIZADO
             dgv.GridColor = Color.FromArgb(226, 232, 240);
         }
 
-        private void ActualizarEstadoCajaUI()
-        {
-            bool estaAbierta = (_turnoActual != null && _turnoActual.Estado == "Abierta");
-            bool estaVigente = estaAbierta && !EsTurnoVencidoPorTiempo();
-
-            // Si está cerrada o superó los minutos de prueba, se activa la capa gris
-            pnlBloqueoCaja.Visible = (!estaAbierta || !estaVigente);
-            if (pnlBloqueoCaja.Visible) pnlBloqueoCaja.BringToFront();
-
-            if (estaAbierta)
-            {
-                btnAbrirCaja.Text = "🔒 Cerrar Caja";
-                btnAbrirCaja.ForeColor = Color.FromArgb(239, 68, 68);
-
-                lblEstadoTag.Text = estaVigente ? "🟢 CAJA ABIERTA" : "⚠️ TURNO VENCIDO";
-                lblEstadoTag.ForeColor = estaVigente ? Color.FromArgb(22, 163, 74) : Color.FromArgb(239, 68, 68);
-
-                lblEstadoDetalle.Text = $"Turno #{_turnoActual!.CajaTurnoID}";
-                lblHoraApertura.Text = _turnoActual.FechaApertura.ToString("HH:mm:ss");
-                lblFondoInicial.Text = MonedaHelper.Formatear(_turnoActual.MontoInicial, conSigno: true);
-            }
-            else
-            {
-                btnAbrirCaja.Text = "🏪 Abrir Caja";
-                btnAbrirCaja.ForeColor = Color.FromArgb(37, 99, 235);
-
-                lblEstadoTag.Text = "🔴 CAJA CERRADA";
-                lblEstadoTag.ForeColor = Color.FromArgb(239, 68, 68);
-                lblEstadoDetalle.Text = "Turno --";
-                lblHoraApertura.Text = "--:--";
-                lblFondoInicial.Text = "$ 0";
-            }
-        }
-
         private void AbrirModalPagoMultiplesMedios(decimal totalTicket)
         {
             Form modalMixto = new Form
@@ -984,220 +1522,6 @@ namespace SISTEMAACTUALIZADO
             return txt;
         }
 
-        private void BtnAbrirCaja_Click(object? sender, EventArgs e)
-        {
-            if (_turnoActual != null && _turnoActual.Estado == "Abierta")
-            {
-                bool esForzado = EsTurnoVencidoPorTiempo();
-                EjecutarArqueoYCierre(esCierreForzado: esForzado);
-            }
-            else
-            {
-                EjecutarAperturaCaja();
-            }
-        }
-
-        private void EjecutarArqueoYCierre(bool esCierreForzado)
-        {
-            if (_turnoActual == null) return;
-
-            _modalArqueoAbierto = true;
-            decimal ventasEfectivo = _cajaService.CalcularVentasEfectivo(_turnoActual.CajaTurnoID);
-            decimal fondoInicial = _turnoActual.MontoInicial;
-            decimal efectivoEsperado = fondoInicial + ventasEfectivo;
-            bool cierreExitoso = false;
-
-            using Form modalCierre = new Form
-            {
-                Text = esCierreForzado ? "⚠️ CIERRE OBLIGATORIO - TURNO EXPIRADO" : "Arqueo y Cierre de Caja",
-                Size = new Size(380, 430),
-                StartPosition = FormStartPosition.CenterParent,
-                FormBorderStyle = FormBorderStyle.FixedDialog,
-                MaximizeBox = false,
-                MinimizeBox = false,
-                ControlBox = !esCierreForzado, // Elimina la 'X' en modo obligatorio
-                BackColor = Color.White,
-                KeyPreview = true
-            };
-
-            // Bloquear intento de escape o Alt+F4 si es forzado
-            modalCierre.FormClosing += (s, ev) =>
-            {
-                if (esCierreForzado && !cierreExitoso)
-                {
-                    ev.Cancel = true;
-                    MessageBox.Show("Debe realizar el conteo de efectivo y confirmar el cierre del turno vencido para continuar.", "Operación Requerida", MessageBoxButtons.OK, MessageBoxIcon.Exclamation);
-                }
-            };
-
-            Label lblT = new Label 
-            { 
-                Text = esCierreForzado ? $"🔒 CIERRE OBLIGATORIO #{_turnoActual.CajaTurnoID}" : "🔒 ARQUEO Y CIERRE DE TURNO", 
-                Location = new Point(20, 14), 
-                AutoSize = true, 
-                Font = new Font("Segoe UI", 11F, FontStyle.Bold), 
-                ForeColor = esCierreForzado ? Color.FromArgb(220, 38, 38) : Color.FromArgb(15, 23, 42) 
-            };
-
-            Label lblSubFecha = new Label
-            {
-                Text = $"Apertura: {_turnoActual.FechaApertura:dd/MM/yyyy HH:mm:ss} (Límite: {MINUTOS_PRUEBA_VENCIMIENTO} min)",
-                Location = new Point(20, 36),
-                AutoSize = true,
-                Font = new Font("Segoe UI", 8F),
-                ForeColor = Color.FromArgb(100, 116, 139)
-            };
-
-            Label lblPrompt = new Label { Text = "Ingrese el Efectivo Físico Contado ($):", Location = new Point(20, 60), AutoSize = true, Font = new Font("Segoe UI", 8.5F, FontStyle.Bold) };
-            TextBox txtEfectivoReal = CrearInputMonedaModal(20, 82, 325);
-
-            Label lblResultadoDif = new Label { Text = "Esperando conteo...", Location = new Point(20, 120), Size = new Size(325, 22), Font = new Font("Segoe UI", 9F, FontStyle.Bold), ForeColor = Color.FromArgb(100, 116, 139) };
-            Label lblObs = new Label { Text = "Motivo del descuadre (Obligatorio si no cuadra):", Location = new Point(20, 148), AutoSize = true, Font = new Font("Segoe UI", 8F, FontStyle.Bold), Visible = false };
-            TextBox txtObs = new TextBox { Location = new Point(20, 170), Size = new Size(325, 60), Multiline = true, Font = new Font("Segoe UI", 9F), Visible = false };
-
-            txtEfectivoReal.TextChanged += (s, ev) =>
-            {
-                MonedaHelper.AplicarMascaraEnVivo(txtEfectivoReal);
-                decimal real = MonedaHelper.Limpiar(txtEfectivoReal.Text);
-
-                if (real > 0 || txtEfectivoReal.Text == "0")
-                {
-                    decimal dif = real - efectivoEsperado;
-                    if (dif == 0)
-                    {
-                        lblResultadoDif.Text = $"✔ Caja Cuadrada ({MonedaHelper.Formatear(0, conSigno: true)})";
-                        lblResultadoDif.ForeColor = Color.FromArgb(22, 163, 74);
-                        lblObs.Visible = false;
-                        txtObs.Visible = false;
-                    }
-                    else if (dif < 0)
-                    {
-                        lblResultadoDif.Text = $"⚠️ Faltante: -{MonedaHelper.Formatear(Math.Abs(dif), conSigno: true)}";
-                        lblResultadoDif.ForeColor = Color.FromArgb(239, 68, 68);
-                        lblObs.Visible = true;
-                        txtObs.Visible = true;
-                    }
-                    else
-                    {
-                        lblResultadoDif.Text = $"ℹ️ Sobrante: +{MonedaHelper.Formatear(dif, conSigno: true)}";
-                        lblResultadoDif.ForeColor = Color.FromArgb(234, 88, 12);
-                        lblObs.Visible = true;
-                        txtObs.Visible = true;
-                    }
-                }
-                else
-                {
-                    lblResultadoDif.Text = "Esperando conteo...";
-                    lblResultadoDif.ForeColor = Color.FromArgb(100, 116, 139);
-                }
-            };
-
-            Button btnConfirmar = new Button
-            {
-                Text = "🔒 Confirmar Cierre Definitivo",
-                Location = new Point(20, 248),
-                Size = new Size(325, 44),
-                BackColor = Color.FromArgb(239, 68, 68),
-                ForeColor = Color.White,
-                FlatStyle = FlatStyle.Flat,
-                Font = new Font("Segoe UI", 9.5F, FontStyle.Bold),
-                Cursor = Cursors.Hand
-            };
-            btnConfirmar.FlatAppearance.BorderSize = 0;
-
-            btnConfirmar.Click += (s, ev) =>
-            {
-                if (string.IsNullOrWhiteSpace(txtEfectivoReal.Text))
-                {
-                    MessageBox.Show("Ingrese el monto contado en caja.", "Dato Requerido", MessageBoxButtons.OK, MessageBoxIcon.Warning);
-                    return;
-                }
-
-                decimal realDeclarado = MonedaHelper.Limpiar(txtEfectivoReal.Text);
-                decimal dif = realDeclarado - efectivoEsperado;
-
-                if (dif != 0 && string.IsNullOrWhiteSpace(txtObs.Text))
-                {
-                    MessageBox.Show("Debe indicar el motivo del descuadre en el campo de observaciones.", "Justificación Obligatoria", MessageBoxButtons.OK, MessageBoxIcon.Warning);
-                    return;
-                }
-
-                string motivoFinal = txtObs.Text.Trim();
-                if (esCierreForzado)
-                {
-                    motivoFinal = string.IsNullOrEmpty(motivoFinal)
-                        ? $"[Cierre obligatorio por superar {MINUTOS_PRUEBA_VENCIMIENTO} min]"
-                        : $"[Cierre forzado] {motivoFinal}";
-                }
-
-                _cajaService.CerrarTurno(_turnoActual.CajaTurnoID, realDeclarado, motivoFinal);
-                _turnoActual = null;
-                cierreExitoso = true;
-                ActualizarEstadoCajaUI();
-                modalCierre.Close();
-
-                MessageBox.Show(
-                    $"Turno cerrado exitosamente.\n\n• Esperado: {MonedaHelper.Formatear(efectivoEsperado, conSigno: true)}\n• Declarado: {MonedaHelper.Formatear(realDeclarado, conSigno: true)}\n• Diferencia: {(dif >= 0 ? "+$" : "-$")}{MonedaHelper.Formatear(Math.Abs(dif))}",
-                    "Turno Finalizado", 
-                    MessageBoxButtons.OK, 
-                    MessageBoxIcon.Information
-                );
-
-                // Tras el cierre forzado, se levanta la apertura limpia
-                if (esCierreForzado)
-                {
-                    EjecutarAperturaCaja();
-                }
-            };
-
-            modalCierre.Controls.AddRange(new Control[] { lblT, lblSubFecha, lblPrompt, txtEfectivoReal, lblResultadoDif, lblObs, txtObs, btnConfirmar });
-            modalCierre.ShowDialog();
-            _modalArqueoAbierto = false;
-        }
-
-        private void EjecutarAperturaCaja()
-        {
-            using Form modalApertura = new Form
-            {
-                Text = "Apertura de Caja",
-                Size = new Size(320, 215),
-                StartPosition = FormStartPosition.CenterParent,
-                FormBorderStyle = FormBorderStyle.FixedDialog,
-                MaximizeBox = false,
-                MinimizeBox = false,
-                BackColor = Color.White
-            };
-
-            Label lblM = new Label { Text = "Monto Inicial de Caja ($):", Location = new Point(20, 20), AutoSize = true, Font = new Font("Segoe UI", 9F, FontStyle.Bold) };
-            TextBox txtM = CrearInputMonedaModal(20, 45, 260);
-            txtM.TextChanged += (sa, ea) => MonedaHelper.AplicarMascaraEnVivo(txtM);
-
-            Button btnA = new Button { Text = "🚀 Iniciar Turno", Location = new Point(20, 95), Size = new Size(260, 40), BackColor = Color.FromArgb(16, 185, 129), ForeColor = Color.White, FlatStyle = FlatStyle.Flat, Font = new Font("Segoe UI", 9.5F, FontStyle.Bold), Cursor = Cursors.Hand };
-            btnA.FlatAppearance.BorderSize = 0;
-
-            btnA.Click += (sa, ea) =>
-            {
-                decimal monto = MonedaHelper.Limpiar(txtM.Text);
-                if (monto >= 0 && !string.IsNullOrWhiteSpace(txtM.Text))
-                {
-                    string usuario = _usuarioActual?.NombreUsuario ?? "admin";
-                    _turnoActual = _cajaService.AbrirTurno(usuario, monto);
-                    modalApertura.DialogResult = DialogResult.OK;
-                    modalApertura.Close();
-                }
-                else
-                {
-                    MessageBox.Show("Ingrese un monto numérico válido.", "Monto Inválido", MessageBoxButtons.OK, MessageBoxIcon.Warning);
-                }
-            };
-
-            modalApertura.Controls.AddRange(new Control[] { lblM, txtM, btnA });
-            if (modalApertura.ShowDialog(this) == DialogResult.OK)
-            {
-                ActualizarEstadoCajaUI();
-            }
-        }
-
         private void BtnVerResumen_Click(object? sender, EventArgs e)
         {
             if (_turnoActual == null)
@@ -1299,115 +1623,6 @@ namespace SISTEMAACTUALIZADO
             decimal vuelto = pagaCon - _ticketSeleccionado.Total;
             lblVuelto.Text = MonedaHelper.Formatear(vuelto >= 0 ? vuelto : 0, conSigno: true);
             lblVuelto.ForeColor = vuelto >= 0 ? Color.FromArgb(16, 185, 129) : Color.FromArgb(239, 68, 68);
-        }
-
-        private void BtnCobrarTicket_Click(object? sender, EventArgs e)
-        {
-            if (_ticketSeleccionado == null) return;
-
-            // CANDADO PRINCIPAL: Si la caja está cerrada
-            if (_turnoActual == null || _turnoActual.Estado != "Abierta")
-            {
-                MessageBox.Show("La caja se encuentra cerrada. Debe iniciar turno antes de procesar cobros.", "Caja Cerrada", MessageBoxButtons.OK, MessageBoxIcon.Warning);
-                ActualizarEstadoCajaUI();
-                return;
-            }
-
-            // CANDADO DE TIEMPO TRANSCURRIDO (PRUEBA)
-            if (EsTurnoVencidoPorTiempo())
-            {
-                MessageBox.Show($"El turno activo superó el tiempo máximo permitido ({MINUTOS_PRUEBA_VENCIMIENTO} min). Debe realizar el arqueo y cierre antes de procesar cobros.", "Turno Expirado", MessageBoxButtons.OK, MessageBoxIcon.Stop);
-                ActualizarEstadoCajaUI();
-                EjecutarArqueoYCierre(esCierreForzado: true);
-                return;
-            }
-
-            string tipoDoc = _tipoDocSeleccionado;
-            string medioPago = _medioPagoSeleccionado;
-            decimal pagaCon = 0;
-            decimal vuelto = 0;
-
-            if (tipoDoc.Contains("Factura") && (string.IsNullOrWhiteSpace(_ticketSeleccionado.RuT) || _ticketSeleccionado.RuT.Contains("66.666.666")))
-            {
-                MessageBox.Show("Para emitir Factura Electrónica el ticket debe tener asignado un cliente formal con RUT y Razón Social.", "Factura Requiere Cliente", MessageBoxButtons.OK, MessageBoxIcon.Warning);
-                return;
-            }
-
-            if (medioPago == "Crédito Comercial")
-            {
-                var resCredito = CreditoService.ValidarVentaCreditoPorRutOId(_ticketSeleccionado.Idcliente, _ticketSeleccionado.RuT ?? "", _ticketSeleccionado.Total);
-                if (!resCredito.EsValido)
-                {
-                    MessageBox.Show(resCredito.MensajeError, "Crédito Comercial Denegado", MessageBoxButtons.OK, MessageBoxIcon.Stop);
-                    return;
-                }
-            }
-            else if (medioPago.Contains("Múltiple"))
-            {
-                if (!_pagoMixtoConfirmado)
-                {
-                    MessageBox.Show("Por favor configure el desglose del Pago Múltiple.", "Atención", MessageBoxButtons.OK, MessageBoxIcon.Warning);
-                    return;
-                }
-                pagaCon = _pagoEfectivo + _pagoTarjeta + _pagoTransferencia;
-                vuelto = _vueltoMixto;
-                medioPago = $"Múltiple (Efec: {MonedaHelper.Formatear(_pagoEfectivo, conSigno: true)} | Tarj: {MonedaHelper.Formatear(_pagoTarjeta, conSigno: true)} | Transf: {MonedaHelper.Formatear(_pagoTransferencia, conSigno: true)})";
-            }
-            else if (medioPago == "Efectivo")
-            {
-                pagaCon = MonedaHelper.Limpiar(txtPagaCon.Text);
-                if (pagaCon < _ticketSeleccionado.Total)
-                {
-                    MessageBox.Show("Ingrese un monto en efectivo suficiente para el cobro.", "Atención", MessageBoxButtons.OK, MessageBoxIcon.Warning);
-                    return;
-                }
-                vuelto = pagaCon - _ticketSeleccionado.Total;
-            }
-            else
-            {
-                pagaCon = _ticketSeleccionado.Total;
-                vuelto = 0;
-            }
-
-            try
-            {
-                string cajero = _usuarioActual?.NombreUsuario ?? "admin";
-                
-                int folioOficial = _cajaService.ProcesarCobroTicket(
-                    _ticketSeleccionado, tipoDoc, medioPago, vuelto, _turnoActual.CajaTurnoID, cajero
-                );
-
-                if (_medioPagoSeleccionado == "Crédito Comercial")
-                {
-                    CreditoService.RegistrarFacturaCreditoDirecto(_ticketSeleccionado.idTve, folioOficial, DateTime.Now, _ticketSeleccionado.Idcliente, _ticketSeleccionado.RuT ?? "", _ticketSeleccionado.Total, cajero);
-                }
-
-                var detalles = _cajaService.ObtenerDetallesTicket(_ticketSeleccionado.idTve);
-                List<DetalleCarrito> itemsCarrito = detalles.Select(item => new DetalleCarrito
-                {
-                    ProductoID = item.IdProducto,
-                    Nombre = item.NmbProducto ?? "Producto",
-                    PrecioUnitario = item.Precio,
-                    Cantidad = item.Cantidad
-                }).ToList();
-
-                MessageBox.Show($"¡{tipoDoc.ToUpper()} N° {folioOficial} PROCESADA CON ÉXITO!\n\n" +
-                                $"• Medio de Pago: {medioPago}\n" +
-                                $"• Total: {MonedaHelper.Formatear(_ticketSeleccionado.Total, conSigno: true)}\n" +
-                                $"• Vuelto: {MonedaHelper.Formatear(vuelto, conSigno: true)}",
-                                "Cobro Finalizado", MessageBoxButtons.OK, MessageBoxIcon.Information);
-
-                FormTicketModal formTicket = new FormTicketModal(_ticketSeleccionado, itemsCarrito, pagaCon, vuelto);
-                formTicket.ShowDialog(this);
-
-                txtBuscarTicket.Clear();
-                CargarTicketsPendientes();
-                ActualizarEstadoCajaUI();
-            }
-            catch (Exception ex)
-            {
-                MessageBox.Show($"Error al procesar el cobro: {ex.Message}", "Error DB", MessageBoxButtons.OK, MessageBoxIcon.Error);
-            }
         }
 
         private void BtnImprimirVistaPrevia_Click(object? sender, EventArgs e)

@@ -20,6 +20,7 @@ namespace SISTEMAACTUALIZADO.Modals
         private DateTimePicker dtpInicio = null!;
         private DateTimePicker dtpFin = null!;
         private Button btnGuardar = null!;
+        private Button btnEliminar = null!;
         private DataGridView dgvPrecios = null!;
         private Label lblContadorFooter = null!;
         private List<Producto> _productos = new List<Producto>();
@@ -60,7 +61,9 @@ namespace SISTEMAACTUALIZADO.Modals
                 BackColor = Color.FromArgb(248, 250, 252)
             };
 
+            // =========================================================================
             // 1. ENCABEZADO SUPERIOR
+            // =========================================================================
             Panel pnlHeader = new Panel 
             { 
                 Dock = DockStyle.Top, 
@@ -90,7 +93,9 @@ namespace SISTEMAACTUALIZADO.Modals
             pnlHeader.Controls.Add(lblSubtitulo);
             pnlHeader.Controls.Add(lblTitulo);
 
+            // =========================================================================
             // 2. FORMULARIO EN TARJETA BLANCA REDONDEADA
+            // =========================================================================
             Panel pnlFormWrapper = new Panel
             {
                 Dock = DockStyle.Top,
@@ -112,7 +117,7 @@ namespace SISTEMAACTUALIZADO.Modals
                 Height = 22
             };
 
-            // Fila 1: Producto, Referencia de Costo y Precio Pactado (ampliada a 76px)
+            // Fila 1: Selector de Producto, Referencia y Precio Especial
             Panel pnlFila1 = new Panel { Dock = DockStyle.Top, Height = 76, BackColor = Color.Transparent };
 
             cbProductos = new ComboBox 
@@ -148,7 +153,7 @@ namespace SISTEMAACTUALIZADO.Modals
 
             pnlFila1.Controls.AddRange(new Control[] { pnlGrpProd, lblCostoReferencia, pnlGrpPrecio });
 
-            // Fila 2: Fechas de Vigencia y Botón Guardar
+            // Fila 2: Fechas y Botón Guardar
             Panel pnlFila2 = new Panel { Dock = DockStyle.Top, Height = 58, BackColor = Color.Transparent, Padding = new Padding(0, 6, 0, 0) };
 
             dtpInicio = new DateTimePicker { Size = new Size(140, 26), Format = DateTimePickerFormat.Short, Value = DateTime.Today, Font = new Font("Segoe UI", 9F) };
@@ -170,7 +175,9 @@ namespace SISTEMAACTUALIZADO.Modals
             pnlCardForm.Controls.Add(lblSecTit);
             pnlFormWrapper.Controls.Add(pnlCardForm);
 
+            // =========================================================================
             // 3. TARJETA DE GRILLA PRINCIPAL
+            // =========================================================================
             Panel pnlGridCard = CrearTarjetaRedondeada(0, 0, 0, 0, Color.White, Color.FromArgb(226, 232, 240));
             pnlGridCard.Dock = DockStyle.Fill;
             pnlGridCard.Padding = new Padding(10);
@@ -203,7 +210,13 @@ namespace SISTEMAACTUALIZADO.Modals
             dgvPrecios.DefaultCellStyle.SelectionForeColor = Color.FromArgb(15, 23, 42);
             dgvPrecios.DefaultCellStyle.Font = new Font("Segoe UI", 8.5F);
 
-            Panel pnlFooter = new Panel { Dock = DockStyle.Bottom, Height = 30, Padding = new Padding(4, 6, 4, 0) };
+            dgvPrecios.SelectionChanged += (s, e) =>
+            {
+                btnEliminar.Enabled = dgvPrecios.CurrentRow != null && dgvPrecios.CurrentRow.Index >= 0;
+            };
+
+            Panel pnlFooter = new Panel { Dock = DockStyle.Bottom, Height = 36, Padding = new Padding(4, 4, 4, 0) };
+            
             lblContadorFooter = new Label
             {
                 Text = "Mostrando 0 convenios registrados",
@@ -213,7 +226,14 @@ namespace SISTEMAACTUALIZADO.Modals
                 TextAlign = ContentAlignment.MiddleLeft,
                 AutoSize = false
             };
+
+            btnEliminar = CrearBoton("🗑️ Quitar Convenio", Color.FromArgb(239, 68, 68), Color.White, new Size(155, 30));
+            btnEliminar.Dock = DockStyle.Right;
+            btnEliminar.Enabled = false;
+            btnEliminar.Click += BtnEliminar_Click;
+
             pnlFooter.Controls.Add(lblContadorFooter);
+            pnlFooter.Controls.Add(btnEliminar);
 
             pnlGridCard.Controls.Add(dgvPrecios);
             pnlGridCard.Controls.Add(pnlFooter);
@@ -249,6 +269,7 @@ namespace SISTEMAACTUALIZADO.Modals
             try
             {
                 var lista = _productoService.ObtenerPreciosEspecialesCliente(_cliente.IdCliente);
+                dgvPrecios.DataSource = null;
                 dgvPrecios.DataSource = lista;
 
                 var estiloMoneda = new DataGridViewCellStyle
@@ -318,7 +339,21 @@ namespace SISTEMAACTUALIZADO.Modals
                     dgvPrecios.Columns["EstadoVigencia"].DefaultCellStyle.Font = new Font("Segoe UI", 8.5F, FontStyle.Bold);
                 }
 
-                lblContadorFooter.Text = $"Mostrando {(lista != null ? lista.Count : 0)} convenio(s) registrado(s)";
+                lblContadorFooter.Text = $"Mostrando {(lista != null ? lista.Count : 0)} convenio(s) activo(s)";
+
+                if (dgvPrecios.Rows.Count > 0)
+                {
+                    dgvPrecios.Rows[0].Selected = true;
+                    if (dgvPrecios.Columns["Producto"] != null)
+                    {
+                        dgvPrecios.CurrentCell = dgvPrecios.Rows[0].Cells["Producto"];
+                    }
+                    btnEliminar.Enabled = true;
+                }
+                else
+                {
+                    btnEliminar.Enabled = false;
+                }
             }
             catch (Exception ex)
             {
@@ -338,6 +373,18 @@ namespace SISTEMAACTUALIZADO.Modals
             if (dtpFin.Value.Date < dtpInicio.Value.Date)
             {
                 MessageBox.Show("La fecha de término no puede ser menor a la fecha de inicio.", "Fecha Inválida", MessageBoxButtons.OK, MessageBoxIcon.Warning);
+                return;
+            }
+
+            // Validación de solapamiento de fechas
+            if (_productoService.ExisteSolapamientoPrecioEspecial(_cliente.IdCliente, prod.ProductoID, dtpInicio.Value, dtpFin.Value))
+            {
+                MessageBox.Show(
+                    $"Ya existe un precio especial activo o programado para el producto '{prod.Nombre}' que coincide con el rango seleccionado ({dtpInicio.Value:dd/MM/yyyy} al {dtpFin.Value:dd/MM/yyyy}).\n\nModifique las fechas o dé de baja el convenio previo.",
+                    "Conflicto de Fechas",
+                    MessageBoxButtons.OK,
+                    MessageBoxIcon.Warning
+                );
                 return;
             }
 
@@ -377,6 +424,37 @@ namespace SISTEMAACTUALIZADO.Modals
             catch (Exception ex)
             {
                 MessageBox.Show($"Error al guardar precio especial: {ex.Message}", "Error DB", MessageBoxButtons.OK, MessageBoxIcon.Error);
+            }
+        }
+
+        private void BtnEliminar_Click(object? sender, EventArgs e)
+        {
+            if (dgvPrecios.CurrentRow == null) return;
+
+            if (dgvPrecios.CurrentRow.Cells["IdEspecial"]?.Value is int idEspecial && idEspecial > 0)
+            {
+                string prodNombre = dgvPrecios.CurrentRow.Cells["Producto"]?.Value?.ToString() ?? "el producto seleccionado";
+
+                var confirm = MessageBox.Show(
+                    $"¿Está seguro de anular el precio especial pactado para '{prodNombre}'?\n\nEsta tarifa dejará de aplicarse de inmediato en las ventas del cliente.",
+                    "Confirmar Eliminación",
+                    MessageBoxButtons.YesNo,
+                    MessageBoxIcon.Question
+                );
+
+                if (confirm == DialogResult.Yes)
+                {
+                    try
+                    {
+                        _productoService.EliminarPrecioEspecial(idEspecial);
+                        MessageBox.Show("Convenio eliminado con éxito.", "Éxito", MessageBoxButtons.OK, MessageBoxIcon.Information);
+                        CargarPreciosEspeciales();
+                    }
+                    catch (Exception ex)
+                    {
+                        MessageBox.Show($"Error al eliminar convenio: {ex.Message}", "Error DB", MessageBoxButtons.OK, MessageBoxIcon.Error);
+                    }
+                }
             }
         }
 

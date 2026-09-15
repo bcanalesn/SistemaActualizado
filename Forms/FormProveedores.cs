@@ -140,25 +140,12 @@ namespace SISTEMAACTUALIZADO
             btnEstado.FlatAppearance.BorderSize = 0;
             btnEstado.Click += BtnEstado_Click;
 
-            btnDemo = new Button
-            {
-                Text = "✨ Cargar Demo",
-                Dock = DockStyle.Right,
-                Width = 125,
-                BackColor = Color.FromArgb(124, 58, 237),
-                ForeColor = Color.White,
-                FlatStyle = FlatStyle.Flat,
-                Font = new Font("Segoe UI", 8.5F, FontStyle.Bold),
-                Cursor = Cursors.Hand
-            };
-            btnDemo.FlatAppearance.BorderSize = 0;
-            btnDemo.Click += BtnDemo_Click;
+            
 
             pnlHeader.Controls.Add(lblBuscar);
             pnlHeader.Controls.Add(txtBuscar);
             pnlHeader.Controls.Add(btnBuscar);
             pnlHeader.Controls.Add(btnRefrescar);
-            pnlHeader.Controls.Add(btnDemo);
             pnlHeader.Controls.Add(btnEstado);
             pnlHeader.Controls.Add(btnEditar);
             pnlHeader.Controls.Add(btnNuevo);
@@ -252,26 +239,6 @@ namespace SISTEMAACTUALIZADO
             }
         }
 
-        private void BtnDemo_Click(object? sender, EventArgs e)
-        {
-            try
-            {
-                int agregados = _proveedorService.CargarProveedoresDemo();
-                if (agregados > 0)
-                {
-                    MessageBox.Show($"¡Se agregaron {agregados} proveedores de prueba exitosamente!", "Éxito Demo", MessageBoxButtons.OK, MessageBoxIcon.Information);
-                    CargarProveedores();
-                }
-                else
-                {
-                    MessageBox.Show("Los proveedores de prueba ya se encontraban registrados en la base de datos.", "Aviso", MessageBoxButtons.OK, MessageBoxIcon.Information);
-                }
-            }
-            catch (Exception ex)
-            {
-                MessageBox.Show($"Error al cargar datos demo: {ex.Message}", "Error", MessageBoxButtons.OK, MessageBoxIcon.Error);
-            }
-        }
 
         private void BtnNuevo_Click(object? sender, EventArgs e)
         {

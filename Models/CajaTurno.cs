@@ -19,6 +19,10 @@ namespace SISTEMAACTUALIZADO.Models
 
         public DateTime? FechaCierre { get; set; }
 
+        public DateTime? FechaLimite { get; set; }
+
+        public int HorasExtendidas { get; set; } = 0;
+
         [Column(TypeName = "decimal(14,2)")]
         public decimal MontoInicial { get; set; }
 

@@ -411,6 +411,34 @@ namespace SISTEMAACTUALIZADO.Services
             prod.FchUpd = DateTime.Now;
             prod.Sincro = 0;
         }
+
+        public bool ExisteSolapamientoPrecioEspecial(int clienteId, int productoId, DateTime inicio, DateTime fin)
+        {
+            using var db = new AppDbContext();
+            inicio = inicio.Date;
+            fin = fin.Date;
+
+            // Dos intervalos se solapan si: (InicioA <= FinB) y (FinA >= InicioB)
+            return db.PreciosEspecialesClientes.AsNoTracking().Any(p =>
+                p.ClienteId == clienteId &&
+                p.ProductoId == productoId &&
+                p.Estado &&
+                inicio <= p.FechaFin.Date &&
+                fin >= p.FechaInicio.Date
+            );
+        }
+
+        public void EliminarPrecioEspecial(int idEspecial)
+        {
+            using var db = new AppDbContext();
+            var registro = db.PreciosEspecialesClientes.Find(idEspecial);
+            if (registro != null)
+            {
+                // Borrado lógico para preservar integridad y auditoría
+                registro.Estado = false;
+                db.SaveChanges();
+            }
+        }
     }
 
     public class TramoEscalaDTO

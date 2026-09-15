@@ -276,6 +276,15 @@ namespace SISTEMAACTUALIZADO
                 } 
             });
 
+            dgvUsuarios.Columns.Add(new DataGridViewTextBoxColumn 
+            { 
+                Name = "HorasTurno", 
+                HeaderText = "HORAS TURNO", 
+                DataPropertyName = "HorasTurno", 
+                FillWeight = 14,
+                DefaultCellStyle = { Alignment = DataGridViewContentAlignment.MiddleCenter }
+            });
+
             dgvUsuarios.Columns.Add(new DataGridViewCheckBoxColumn 
             { 
                 Name = "Estado", 
@@ -353,68 +362,91 @@ namespace SISTEMAACTUALIZADO
 
         private void MostrarModalUsuario(Usuario? usuario)
         {
-            bool esNuevo = (usuario == null);
-            Usuario u = usuario ?? new Usuario();
-
-            Form modal = new Form
+            bool esNuevo = (usuario == null); //
+            
+            // Si es edición, traemos los datos frescos directamente de la BD por ID
+            Usuario u;
+            if (esNuevo)
             {
-                Text = esNuevo ? "Crear Nueva Cuenta de Usuario" : "Editar Usuario y Contraseña",
-                Size = new Size(400, 440),
-                StartPosition = FormStartPosition.CenterParent,
-                FormBorderStyle = FormBorderStyle.FixedDialog,
-                MaximizeBox = false,
-                MinimizeBox = false,
-                BackColor = Color.White
+                u = new Usuario(); 
+            }
+            else
+            {
+                using var db = new AppDbContext();
+                u = db.Usuarios.Find(usuario!.UsuarioID) ?? usuario;
+            }
+
+            using Form modal = new Form 
+            {
+                Text = esNuevo ? "Crear Nueva Cuenta de Usuario" : "Editar Usuario y Contraseña", 
+                Size = new Size(400, 520), 
+                StartPosition = FormStartPosition.CenterParent, 
+                FormBorderStyle = FormBorderStyle.FixedDialog, 
+                MaximizeBox = false, 
+                MinimizeBox = false, 
+                BackColor = Color.White 
             };
 
-            Label lblTitle = new Label { Text = esNuevo ? "👤 Crear Cuenta de Usuario" : "✏️ Editar Usuario", Location = new Point(25, 20), Font = new Font("Segoe UI", 12F, FontStyle.Bold), AutoSize = true, ForeColor = Color.FromArgb(15, 23, 42) };
+            Label lblTitle = new Label { Text = esNuevo ? "👤 Crear Cuenta de Usuario" : "✏️ Editar Usuario", Location = new Point(25, 18), Font = new Font("Segoe UI", 12F, FontStyle.Bold), AutoSize = true, ForeColor = Color.FromArgb(15, 23, 42) }; 
 
-            Label lblUser = new Label { Text = "Nombre de Usuario (Login):", Location = new Point(25, 60), AutoSize = true, Font = new Font("Segoe UI", 9F, FontStyle.Bold) };
-            TextBox txtUser = new TextBox { Text = u.NombreUsuario, Location = new Point(25, 82), Size = new Size(330, 30), Font = new Font("Segoe UI", 10F) };
+            Label lblUser = new Label { Text = "Nombre de Usuario (Login):", Location = new Point(25, 55), AutoSize = true, Font = new Font("Segoe UI", 9F, FontStyle.Bold) }; 
+            TextBox txtUser = new TextBox { Text = u.NombreUsuario, Location = new Point(25, 75), Size = new Size(330, 28), Font = new Font("Segoe UI", 9.5F) }; 
 
-            Label lblNombre = new Label { Text = "Nombre Completo:", Location = new Point(25, 122), AutoSize = true, Font = new Font("Segoe UI", 9F, FontStyle.Bold) };
-            TextBox txtNombre = new TextBox { Text = u.NombreCompleto, Location = new Point(25, 144), Size = new Size(330, 30), Font = new Font("Segoe UI", 10F) };
+            Label lblNombre = new Label { Text = "Nombre Completo:", Location = new Point(25, 112), AutoSize = true, Font = new Font("Segoe UI", 9F, FontStyle.Bold) }; 
+            TextBox txtNombre = new TextBox { Text = u.NombreCompleto, Location = new Point(25, 132), Size = new Size(330, 28), Font = new Font("Segoe UI", 9.5F) }; 
 
-            Label lblPass = new Label { Text = "Contraseña:", Location = new Point(25, 184), AutoSize = true, Font = new Font("Segoe UI", 9F, FontStyle.Bold) };
-            TextBox txtPass = new TextBox { Text = u.Clave, Location = new Point(25, 206), Size = new Size(330, 30), Font = new Font("Segoe UI", 10F), UseSystemPasswordChar = true };
+            Label lblPass = new Label { Text = "Contraseña:", Location = new Point(25, 170), AutoSize = true, Font = new Font("Segoe UI", 9F, FontStyle.Bold) }; 
+            TextBox txtPass = new TextBox { Text = u.Clave, Location = new Point(25, 190), Size = new Size(330, 28), Font = new Font("Segoe UI", 9.5F), UseSystemPasswordChar = true }; 
 
-            Label lblRol = new Label { Text = "Rol / Nivel de Acceso:", Location = new Point(25, 246), AutoSize = true, Font = new Font("Segoe UI", 9F, FontStyle.Bold) };
-            ComboBox cbRol = new ComboBox { Location = new Point(25, 268), Size = new Size(330, 30), DropDownStyle = ComboBoxStyle.DropDownList, Font = new Font("Segoe UI", 10F) };
-            cbRol.Items.AddRange(new string[] { "Administrador", "Cajero" });
-            cbRol.SelectedItem = string.IsNullOrEmpty(u.Rol) ? "Cajero" : u.Rol;
+            Label lblRol = new Label { Text = "Rol / Nivel de Acceso:", Location = new Point(25, 228), AutoSize = true, Font = new Font("Segoe UI", 9F, FontStyle.Bold) }; 
+            ComboBox cbRol = new ComboBox { Location = new Point(25, 248), Size = new Size(330, 28), DropDownStyle = ComboBoxStyle.DropDownList, Font = new Font("Segoe UI", 9.5F) }; 
+            cbRol.Items.AddRange(new string[] { "Administrador", "Cajero" }); 
+            cbRol.SelectedItem = string.IsNullOrEmpty(u.Rol) ? "Cajero" : u.Rol; 
 
-            Button btnGuardar = CrearBoton(esNuevo ? "💾 Registrar Usuario" : "💾 Guardar Cambios", Color.FromArgb(0, 102, 255), Color.White, new Size(330, 42), 8);
-            btnGuardar.Location = new Point(25, 325);
+            Label lblHoras = new Label { Text = "Horas de Turno Asignadas (Jornada):", Location = new Point(25, 286), AutoSize = true, Font = new Font("Segoe UI", 9F, FontStyle.Bold) };
+            NumericUpDown numHoras = new NumericUpDown
+            {
+                Location = new Point(25, 308),
+                Size = new Size(330, 28),
+                Font = new Font("Segoe UI", 9.5F),
+                Minimum = 1,
+                Maximum = 24,
+                Value = (u.HorasTurno >= 1 && u.HorasTurno <= 24) ? u.HorasTurno : 9
+            };
+
+            Button btnGuardar = CrearBoton(esNuevo ? "💾 Registrar Usuario" : "💾 Guardar Cambios", Color.FromArgb(0, 102, 255), Color.White, new Size(330, 40), 8); 
+            btnGuardar.Location = new Point(25, 365); 
 
             btnGuardar.Click += (s, e) =>
             {
-                if (string.IsNullOrWhiteSpace(txtUser.Text) || string.IsNullOrWhiteSpace(txtPass.Text))
+                if (string.IsNullOrWhiteSpace(txtUser.Text) || string.IsNullOrWhiteSpace(txtPass.Text)) 
                 {
-                    MessageBox.Show("El usuario y la contraseña son obligatorios.", "Validación", MessageBoxButtons.OK, MessageBoxIcon.Warning);
-                    return;
+                    MessageBox.Show("El usuario y la contraseña son obligatorios.", "Validación", MessageBoxButtons.OK, MessageBoxIcon.Warning); 
+                    return; 
                 }
 
-                u.NombreUsuario = txtUser.Text.Trim();
-                u.NombreCompleto = txtNombre.Text.Trim();
-                u.Clave = txtPass.Text.Trim();
-                u.Rol = cbRol.SelectedItem?.ToString() ?? "Cajero";
+                u.NombreUsuario = txtUser.Text.Trim(); 
+                u.NombreCompleto = txtNombre.Text.Trim(); 
+                u.Clave = txtPass.Text.Trim(); 
+                u.Rol = cbRol.SelectedItem?.ToString() ?? "Cajero"; 
+                u.HorasTurno = (int)numHoras.Value;
 
                 try
                 {
-                    _usuarioService.GuardarUsuario(u, esNuevo);
+                    _usuarioService.GuardarUsuario(u, esNuevo); 
 
-                    MessageBox.Show("Cuenta de usuario guardada con éxito.", "Éxito", MessageBoxButtons.OK, MessageBoxIcon.Information);
-                    modal.Close();
-                    CargarUsuarios(txtBuscar.Text.Trim());
+                    MessageBox.Show("Cuenta de usuario guardada con éxito.", "Éxito", MessageBoxButtons.OK, MessageBoxIcon.Information); 
+                    modal.Close(); 
+                    CargarUsuarios(txtBuscar.Text.Trim()); 
                 }
                 catch (Exception ex)
                 {
-                    MessageBox.Show($"Error al guardar usuario: {ex.Message}", "Error DB", MessageBoxButtons.OK, MessageBoxIcon.Error);
+                    MessageBox.Show($"Error al guardar usuario: {ex.Message}", "Error DB", MessageBoxButtons.OK, MessageBoxIcon.Error); 
                 }
             };
 
-            modal.Controls.AddRange(new Control[] { lblTitle, lblUser, txtUser, lblNombre, txtNombre, lblPass, txtPass, lblRol, cbRol, btnGuardar });
-            modal.ShowDialog();
+            modal.Controls.AddRange(new Control[] { lblTitle, lblUser, txtUser, lblNombre, txtNombre, lblPass, txtPass, lblRol, cbRol, lblHoras, numHoras, btnGuardar }); 
+            modal.ShowDialog(); 
         }
 
         // =========================================================================

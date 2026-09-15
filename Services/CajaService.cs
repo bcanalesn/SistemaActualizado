@@ -5,6 +5,7 @@ using System.Text.RegularExpressions;
 using SISTEMAACTUALIZADO.Data;
 using SISTEMAACTUALIZADO.Models;
 using SISTEMAACTUALIZADO.Helpers;
+using Microsoft.EntityFrameworkCore;
 
 namespace SISTEMAACTUALIZADO.Services
 {
@@ -32,10 +33,24 @@ namespace SISTEMAACTUALIZADO.Services
     public class CajaService
     {
         // 1. GESTIÓN DE TURNOS PERSISTIDOS EN BD
+        public const int HORAS_TURNO_ESTANDAR = 12;
+
         public CajaTurno? ObtenerTurnoAbierto(string usuario)
         {
             using var db = new AppDbContext();
             return db.CajaTurnos.FirstOrDefault(t => t.Usuario == usuario && t.Estado == "Abierta");
+        }
+
+        public List<CajaTurno> ObtenerTurnosExpiradosDeOtros(string usuarioActual)
+        {
+            using var db = new AppDbContext();
+            DateTime ahora = DateTime.Now;
+            return db.CajaTurnos
+                .Where(t => t.Estado == "Abierta" && 
+                            t.Usuario != usuarioActual && 
+                            t.FechaLimite.HasValue && 
+                            t.FechaLimite.Value < ahora)
+                .ToList();
         }
 
         public CajaTurno AbrirTurno(string usuario, decimal montoInicial)
@@ -44,10 +59,17 @@ namespace SISTEMAACTUALIZADO.Services
             var turnoExistente = db.CajaTurnos.FirstOrDefault(t => t.Usuario == usuario && t.Estado == "Abierta");
             if (turnoExistente != null) return turnoExistente;
 
+            // 1. Consultar en la base de datos las horas configuradas para este usuario
+            var userDb = db.Usuarios.AsNoTracking().FirstOrDefault(u => u.NombreUsuario.ToLower() == usuario.Trim().ToLower());
+            int horasAsignadas = (userDb != null && userDb.HorasTurno > 0) ? userDb.HorasTurno : 9;
+
+            DateTime ahora = DateTime.Now;
             var nuevoTurno = new CajaTurno
             {
                 Usuario = usuario,
-                FechaApertura = DateTime.Now,
+                FechaApertura = ahora,
+                FechaLimite = ahora.AddHours(horasAsignadas), // <-- Ahora suma las horas reales de BD (7, 4, etc.)
+                HorasExtendidas = 0,
                 MontoInicial = montoInicial,
                 Estado = "Abierta"
             };
@@ -55,6 +77,40 @@ namespace SISTEMAACTUALIZADO.Services
             db.CajaTurnos.Add(nuevoTurno);
             db.SaveChanges();
             return nuevoTurno;
+        }
+
+        // Valida credenciales de cualquier usuario con rol Administrador
+        public bool ValidarCredencialesAdmin(string usuarioAdmin, string clave)
+        {
+            using var db = new AppDbContext();
+            return db.Usuarios.AsNoTracking().Any(u => 
+                u.NombreUsuario.ToLower() == usuarioAdmin.Trim().ToLower() && 
+                u.Clave == clave && 
+                u.Rol == "Administrador" && 
+                u.Estado);
+        }
+
+        // Extiende la vigencia del turno sumando horas adicionales
+        public bool ExtenderTurno(int turnoId, int horasExtras, string usuarioAdmin)
+        {
+            using var db = new AppDbContext();
+            var turno = db.CajaTurnos.Find(turnoId);
+            if (turno == null || turno.Estado != "Abierta") return false;
+
+            DateTime baseCalculo = turno.FechaLimite.HasValue && turno.FechaLimite.Value > DateTime.Now 
+                ? turno.FechaLimite.Value 
+                : DateTime.Now;
+
+            turno.FechaLimite = baseCalculo.AddHours(horasExtras);
+            turno.HorasExtendidas += horasExtras;
+            
+            string auditoria = $"[Extensión +{horasExtras}h autorizada por Admin '{usuarioAdmin}' el {DateTime.Now:dd/MM/yyyy HH:mm}] ";
+            turno.Observaciones = string.IsNullOrEmpty(turno.Observaciones) 
+                ? auditoria 
+                : turno.Observaciones + " " + auditoria;
+
+            db.SaveChanges();
+            return true;
         }
 
         public void CerrarTurno(int turnoId, decimal efectivoReal, string? observaciones)
@@ -74,6 +130,31 @@ namespace SISTEMAACTUALIZADO.Services
             turno.MontoEfectivoReal = efectivoReal;
             turno.Diferencia = efectivoReal - esperado;
             turno.Observaciones = observaciones ?? string.Empty;
+            turno.Estado = "Cerrada";
+
+            db.SaveChanges();
+        }
+
+        // Cierre forzado de rescate ejecutado por cualquier Administrador sobre caja abandonada
+        public void CerrarTurnoForzadoPorAdmin(int turnoId, decimal efectivoReal, string usuarioAdmin, string motivo)
+        {
+            using var db = new AppDbContext();
+            var turno = db.CajaTurnos.Find(turnoId);
+            if (turno == null) return;
+
+            var metricas = ObtenerMetricasResumenTurno(turnoId);
+            decimal esperado = turno.MontoInicial + metricas.VentasEfectivo;
+
+            string trazabilidad = $"[Cierre Forzado por Abandono] Turno de '{turno.Usuario}' cerrado por Admin '{usuarioAdmin}' el {DateTime.Now:dd/MM/yyyy HH:mm}. Motivo: {motivo}";
+
+            turno.FechaCierre = DateTime.Now;
+            turno.MontoEfectivoVentas = metricas.VentasEfectivo;
+            turno.MontoTarjetaVentas = metricas.VentasTarjetas;
+            turno.MontoTransferenciaVentas = metricas.VentasTransferencia;
+            turno.MontoCreditoComercial = metricas.VentasCreditoComercial;
+            turno.MontoEfectivoReal = efectivoReal;
+            turno.Diferencia = efectivoReal - esperado;
+            turno.Observaciones = string.IsNullOrEmpty(turno.Observaciones) ? trazabilidad : $"{turno.Observaciones} | {trazabilidad}";
             turno.Estado = "Cerrada";
 
             db.SaveChanges();
