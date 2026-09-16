@@ -20,11 +20,14 @@ namespace SISTEMAACTUALIZADO
         private static Dictionary<string, List<DetalleCarrito>> _carritosPorVendedor = new Dictionary<string, List<DetalleCarrito>>();
         private static Dictionary<string, Cliente?> _clientesPorVendedor = new Dictionary<string, Cliente?>();
         private Cliente? _clienteActual = null;
-        private int _listaClienteActivo = 1; // 1 = Consumidor Final
+        private int _listaClienteActivo = 1;
 
         private List<Producto> _productosCache = new List<Producto>();
         private ProductoService _productoService = new ProductoService();
         private VentaService _ventaService = new VentaService();
+
+        // Control de Venta en Espera / Edición
+        private int _idTveEnEdicion = 0;
 
         // Cabecera
         private TextBox txtBuscar = null!;
@@ -268,7 +271,7 @@ namespace SISTEMAACTUALIZADO
             pnlIzquierda.RowStyles.Add(new RowStyle(SizeType.Absolute, 70F));
             pnlIzquierda.RowStyles.Add(new RowStyle(SizeType.Percent, 100F));
 
-            // 1. Buscador y Vendedor
+            // 1. Buscador, Vendedor y Botón de Espera
             Panel pnlTopBar = new Panel 
             { 
                 Dock = DockStyle.Fill, 
@@ -276,33 +279,47 @@ namespace SISTEMAACTUALIZADO
                 Margin = new Padding(0, 0, 0, 4) 
             };
 
-            // MODIFICACIÓN AQUÍ: Aumentamos el ancho de 220 a 345 para que quepan el combo y el botón
-            Panel pnlVendedor = new Panel { Dock = DockStyle.Right, Width = 345, Height = 38, BackColor = Color.Transparent };
-            Label lblVendIcon = new Label { Text = "👤", Location = new Point(4, 7), Size = new Size(18, 20), Font = new Font("Segoe UI", 9.5F) };
+            FlowLayoutPanel flpAccionesSuperiores = new FlowLayoutPanel
+            {
+                Dock = DockStyle.Right,
+                AutoSize = true,
+                FlowDirection = FlowDirection.LeftToRight,
+                WrapContents = false,
+                BackColor = Color.Transparent,
+                Margin = new Padding(0)
+            };
+
+            Label lblVendIcon = new Label 
+            { 
+                Text = "👤", 
+                Size = new Size(20, 28), 
+                Font = new Font("Segoe UI", 10F), 
+                TextAlign = ContentAlignment.MiddleCenter, 
+                Margin = new Padding(0, 4, 2, 0) 
+            };
 
             cbVendedor = new ComboBox
             {
-                Location = new Point(26, 5),
-                Size = new Size(160, 28),
+                Size = new Size(130, 28),
                 DropDownStyle = ComboBoxStyle.DropDownList,
-                Font = new Font("Segoe UI", 9.5F, FontStyle.Bold)
+                Font = new Font("Segoe UI", 9F, FontStyle.Bold),
+                Margin = new Padding(0, 4, 6, 0)
             };
             cbVendedor.Items.AddRange(new string[] { "Bárbara", "Víctor", "Juan", "María" });
             if (!cbVendedor.Items.Contains(_vendedorActualNombre)) _vendedorActualNombre = _usuarioActual?.NombreCompleto ?? "Bárbara";
             cbVendedor.SelectedItem = cbVendedor.Items.Contains(_vendedorActualNombre) ? _vendedorActualNombre : "Bárbara";
             cbVendedor.SelectedIndexChanged += CbVendedor_SelectedIndexChanged;
 
-            // BOTÓN NUEVO: VER TICKETS DEL VENDEDOR SELECCIONADO
             Button btnVerMisTickets = new Button
             {
-                Text = "📋 Ver Tickets",
-                Location = new Point(194, 4),
-                Size = new Size(140, 30),
+                Text = "📋 Tickets",
+                Size = new Size(82, 30),
                 BackColor = Color.White,
                 ForeColor = Color.FromArgb(37, 99, 235),
                 FlatStyle = FlatStyle.Flat,
-                Font = new Font("Segoe UI", 8.5F, FontStyle.Bold),
-                Cursor = Cursors.Hand
+                Font = new Font("Segoe UI", 8F, FontStyle.Bold),
+                Cursor = Cursors.Hand,
+                Margin = new Padding(0, 3, 4, 0)
             };
             btnVerMisTickets.FlatAppearance.BorderColor = Color.FromArgb(191, 219, 254);
             btnVerMisTickets.Click += (s, e) =>
@@ -314,28 +331,40 @@ namespace SISTEMAACTUALIZADO
                 modalHistorial.ShowDialog(this);
             };
 
-            pnlVendedor.Controls.AddRange(new Control[] { lblVendIcon, cbVendedor, btnVerMisTickets });
+            Button btnVentasEnEspera = new Button
+            {
+                Text = "⏸️ Ventas en Espera",
+                Size = new Size(140, 30),
+                BackColor = Color.FromArgb(254, 243, 199),
+                ForeColor = Color.FromArgb(180, 83, 9),
+                FlatStyle = FlatStyle.Flat,
+                Font = new Font("Segoe UI", 8F, FontStyle.Bold),
+                Cursor = Cursors.Hand,
+                Margin = new Padding(0, 3, 0, 0)
+            };
+            btnVentasEnEspera.FlatAppearance.BorderColor = Color.FromArgb(253, 230, 138);
+            btnVentasEnEspera.Click += BtnVentasEnEspera_Click;
 
-            
+            flpAccionesSuperiores.Controls.AddRange(new Control[] { lblVendIcon, cbVendedor, btnVerMisTickets, btnVentasEnEspera });
 
             Panel pnlBusquedaBox = new Panel
             {
                 Dock = DockStyle.Left,
-                Width = 340,
+                Width = 260,
                 Height = 34,
                 BackColor = Color.White,
                 BorderStyle = BorderStyle.FixedSingle
             };
 
-            Label lblSearchIcon = new Label { Text = "🔍", Location = new Point(8, 7), AutoSize = true, Font = new Font("Segoe UI", 9.5F) };
+            Label lblSearchIcon = new Label { Text = "🔍", Location = new Point(6, 7), AutoSize = true, Font = new Font("Segoe UI", 9F) };
 
             Label lblF2Badge = new Label
             {
                 Text = "F2",
-                Font = new Font("Segoe UI", 7.5F, FontStyle.Bold),
+                Font = new Font("Segoe UI", 7F, FontStyle.Bold),
                 ForeColor = Color.FromArgb(100, 116, 139),
                 BackColor = Color.FromArgb(241, 245, 249),
-                Size = new Size(26, 20),
+                Size = new Size(24, 18),
                 Dock = DockStyle.Right,
                 TextAlign = ContentAlignment.MiddleCenter
             };
@@ -343,7 +372,7 @@ namespace SISTEMAACTUALIZADO
             txtBuscar = new TextBox
             {
                 Dock = DockStyle.Fill,
-                Font = new Font("Segoe UI", 9.5F),
+                Font = new Font("Segoe UI", 9F),
                 BorderStyle = BorderStyle.None,
                 BackColor = Color.White,
                 ForeColor = Color.FromArgb(15, 23, 42)
@@ -351,13 +380,13 @@ namespace SISTEMAACTUALIZADO
 
             txtBuscar.HandleCreated += (s, e) =>
             {
-                SendMessage(txtBuscar.Handle, EM_SETCUEBANNER, 1, "Buscar producto por nombre o código de barra...");
+                SendMessage(txtBuscar.Handle, EM_SETCUEBANNER, 1, "Buscar producto...");
             };
 
             txtBuscar.KeyDown += (s, e) => { if (e.KeyCode == Keys.Enter) { BuscarYAgregarProducto(); e.SuppressKeyPress = true; } };
             txtBuscar.TextChanged += (s, e) => { FiltrarProductosPorBusquedaInteligente(); };
 
-            Panel pnlTxtContainer = new Panel { Dock = DockStyle.Fill, Padding = new Padding(32, 6, 32, 0) };
+            Panel pnlTxtContainer = new Panel { Dock = DockStyle.Fill, Padding = new Padding(28, 6, 28, 0) };
             pnlTxtContainer.Controls.Add(txtBuscar);
 
             pnlBusquedaBox.Controls.Add(pnlTxtContainer);
@@ -365,7 +394,7 @@ namespace SISTEMAACTUALIZADO
             pnlBusquedaBox.Controls.Add(lblF2Badge);
 
             pnlTopBar.Controls.Add(pnlBusquedaBox);
-            pnlTopBar.Controls.Add(pnlVendedor);
+            pnlTopBar.Controls.Add(flpAccionesSuperiores);
 
             // 2. Sección Categorías y Subfamilias
             pnlCatSection = new Panel
@@ -745,7 +774,6 @@ namespace SISTEMAACTUALIZADO
             decimal precioVenta = ObtenerPrecioActivoProducto(prod);
             Color colorPrecio = prod.ListaDefectoPOS > 1 ? Color.FromArgb(2, 132, 199) : Color.FromArgb(0, 102, 255);
 
-            // Formato chileno con puntos en la tarjeta de producto
             Label lblPrecio = new Label
             {
                 Text = MonedaHelper.Formatear(precioVenta, conSigno: true),
@@ -1001,8 +1029,6 @@ namespace SISTEMAACTUALIZADO
                 };
 
                 Label lblNombre = new Label { Name = "lblNombre", Text = item.Nombre, Font = new Font("Segoe UI", 8.5F, FontStyle.Bold), ForeColor = Color.FromArgb(15, 23, 42), Location = new Point(6, 4), AutoSize = false, Size = new Size(110, 18) };
-                
-                // Formato chileno en precio unitario del item
                 Label lblPrecioU = new Label { Name = "lblPrecioU", Text = MonedaHelper.Formatear(item.PrecioUnitario, conSigno: true), Font = new Font("Segoe UI", 7.5F), ForeColor = Color.FromArgb(100, 116, 139), Location = new Point(6, 24), AutoSize = true };
 
                 var prodOriginal = _productosCache.FirstOrDefault(p => p.ProductoID == item.ProductoID);
@@ -1048,7 +1074,6 @@ namespace SISTEMAACTUALIZADO
                     ActualizarCarritoUI();
                 };
 
-                // Formato chileno en subtotal de línea
                 Label lblSubtotal = new Label { Name = "lblSubtotal", Text = MonedaHelper.Formatear(item.Subtotal, conSigno: true), Font = new Font("Segoe UI", 8.5F, FontStyle.Bold), ForeColor = Color.FromArgb(0, 102, 255), AutoSize = true };
 
                 Button btnDeleteRow = new Button { Name = "btnDeleteRow", Text = "✕", Size = new Size(20, 20), FlatStyle = FlatStyle.Flat, ForeColor = Color.FromArgb(156, 163, 175), Cursor = Cursors.Hand };
@@ -1102,6 +1127,7 @@ namespace SISTEMAACTUALIZADO
 
         private void LimpiarCarritoActual()
         {
+            _idTveEnEdicion = 0;
             var cart = ObtenerCarritoActivo();
             cart.Clear();
 
@@ -1128,6 +1154,100 @@ namespace SISTEMAACTUALIZADO
             }
         }
 
+        // ACCIÓN UNIFICADA DE PAUSA / RECUPERACIÓN
+        private void BtnVentasEnEspera_Click(object? sender, EventArgs e)
+        {
+            var cart = ObtenerCarritoActivo();
+            string vendedorNombre = cbVendedor.SelectedItem?.ToString() ?? _vendedorActualNombre;
+
+            // 1. CARRO CON PRODUCTOS: PAUSAR VENTA
+            if (cart.Count > 0)
+            {
+                string identificador = "";
+
+                // Solo pide identificador si el cliente NO tiene RUT registrado y es Consumidor Final
+                bool esConsumidorFinal = string.IsNullOrWhiteSpace(_clienteSeleccionadoRut) || 
+                                         _clienteSeleccionadoNombre.StartsWith("Consumidor Final", StringComparison.OrdinalIgnoreCase);
+
+                if (esConsumidorFinal)
+                {
+                    using (Form modalPrompt = new Form
+                    {
+                        Text = "Poner Venta en Espera",
+                        Size = new Size(360, 190),
+                        StartPosition = FormStartPosition.CenterParent,
+                        FormBorderStyle = FormBorderStyle.FixedDialog,
+                        MaximizeBox = false,
+                        MinimizeBox = false,
+                        BackColor = Color.White
+                    })
+                    {
+                        Label lbl = new Label { Text = "Referencia para Consumidor Final:", Location = new Point(20, 15), AutoSize = true, Font = new Font("Segoe UI", 9F, FontStyle.Bold) };
+                        TextBox txt = new TextBox { Text = "Cliente en sala", Location = new Point(20, 42), Size = new Size(300, 26), Font = new Font("Segoe UI", 10F) };
+                        Button btnOk = new Button { Text = "✔ Confirmar Pausa", Location = new Point(20, 85), Size = new Size(300, 38), BackColor = Color.FromArgb(245, 158, 11), ForeColor = Color.White, FlatStyle = FlatStyle.Flat, Font = new Font("Segoe UI", 9.5F, FontStyle.Bold), Cursor = Cursors.Hand };
+                        btnOk.FlatAppearance.BorderSize = 0;
+                        btnOk.Click += (s, ev) => { modalPrompt.DialogResult = DialogResult.OK; modalPrompt.Close(); };
+
+                        modalPrompt.Controls.AddRange(new Control[] { lbl, txt, btnOk });
+                        if (modalPrompt.ShowDialog(this) != DialogResult.OK) return;
+
+                        identificador = string.IsNullOrWhiteSpace(txt.Text) ? "Cliente en sala" : txt.Text.Trim();
+                    }
+                }
+
+                var cartCopia = cart.ToList();
+
+                try
+                {
+                    _ventaService.PonerVentaEnEspera(cartCopia, vendedorNombre, _clienteSeleccionadoNombre, _clienteSeleccionadoRut, identificador, _idTveEnEdicion);
+                    _idTveEnEdicion = 0;
+                    LimpiarCarritoActual();
+                    MessageBox.Show("Venta guardada en espera. Terminal libre.", "Venta Pausada", MessageBoxButtons.OK, MessageBoxIcon.Information);
+                }
+                catch (Exception ex)
+                {
+                    string detalle = ex.InnerException != null ? ex.InnerException.Message : ex.Message;
+                    MessageBox.Show($"Error al pausar venta:\n{detalle}", "Error", MessageBoxButtons.OK, MessageBoxIcon.Error);
+                }
+                return;
+            }
+
+            // 2. CARRO VACÍO: ABRIR PANEL DE VENTAS PAUSADAS
+            using var modal = new FormVentasEnEsperaModal(vendedorNombre);
+            if (modal.ShowDialog(this) == DialogResult.OK && modal.IdTveSeleccionado > 0)
+            {
+                var resultado = _ventaService.RecuperarVentaEnEspera(modal.IdTveSeleccionado, vendedorNombre);
+                if (!resultado.Exito)
+                {
+                    MessageBox.Show(resultado.Mensaje, "Aviso", MessageBoxButtons.OK, MessageBoxIcon.Warning);
+                    return;
+                }
+
+                _idTveEnEdicion = modal.IdTveSeleccionado;
+
+                cart.Clear();
+                cart.AddRange(resultado.Carrito);
+
+                // Reconstruir el cliente formal en memoria para no perder su RUT ni precios
+                using (var db = new AppDbContext())
+                {
+                    string rutLimpio = RutHelper.Limpiar(resultado.Rut);
+                    var clienteBD = db.Clientes.FirstOrDefault(c => c.IdCliente == resultado.IdCliente || (!string.IsNullOrEmpty(rutLimpio) && c.Rut == rutLimpio));
+                    AsignarClienteActivo(clienteBD);
+                }
+
+                // Si fue consumidor final con referencia, mantenemos el texto para mostrarlo en el botón
+                if (_clienteActual == null)
+                {
+                    _clienteSeleccionadoNombre = resultado.Cliente;
+                    btnCliente.Text = $"👤 {_clienteSeleccionadoNombre.Split(' ')[0]}";
+                }
+
+                ActualizarCarritoUI();
+            }
+        }
+
+        // ACCIÓN: ENVIAR TICKET A CAJA
         private void BtnGenerarTicket_Click(object? sender, EventArgs e)
         {
             var cart = ObtenerCarritoActivo();
@@ -1143,7 +1263,17 @@ namespace SISTEMAACTUALIZADO
 
             try
             {
-                int nroTicket = _ventaService.GenerarTicketVenta(cartCopia, vendedorNombre, _clienteSeleccionadoNombre, _clienteSeleccionadoRut);
+                int nroTicket;
+                if (_idTveEnEdicion > 0)
+                {
+                    nroTicket = _ventaService.ActualizarTicketExistenteACaja(_idTveEnEdicion, cartCopia, vendedorNombre, _clienteSeleccionadoNombre, _clienteSeleccionadoRut);
+                    _idTveEnEdicion = 0;
+                }
+                else
+                {
+                    nroTicket = _ventaService.GenerarTicketVenta(cartCopia, vendedorNombre, _clienteSeleccionadoNombre, _clienteSeleccionadoRut);
+                }
+
                 LimpiarCarritoActual();
 
                 FormPreVentaModal modalPreVenta = new FormPreVentaModal(nroTicket, vendedorNombre, _clienteSeleccionadoNombre, total, cartCopia);

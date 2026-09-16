@@ -2,6 +2,7 @@ using System;
 using System.Collections.Generic;
 using System.Drawing;
 using System.Drawing.Drawing2D;
+using System.Drawing.Printing;
 using System.Runtime.InteropServices;
 using System.Windows.Forms;
 using SISTEMAACTUALIZADO.Helpers;
@@ -23,12 +24,43 @@ namespace SISTEMAACTUALIZADO.Modals
         {
             InitializeComponent(nroTicket, vendedor, cliente, total, items);
 
-            if (autoImprimir)
+            if (autoImprimir && EsImpresoraFisica())
             {
                 this.Shown += (s, e) =>
                 {
-                    _printService.ImprimirTicketAtencion(nroTicket, vendedor, cliente, total, items);
+                    try
+                    {
+                        _printService.ImprimirTicketAtencion(nroTicket, vendedor, cliente, total, items);
+                    }
+                    catch
+                    {
+                        // Evita que un error de controlador corte el flujo de la aplicación
+                    }
                 };
+            }
+        }
+
+        private static bool EsImpresoraFisica()
+        {
+            try
+            {
+                PrinterSettings settings = new PrinterSettings();
+                string nombre = settings.PrinterName ?? "";
+
+                // Si la impresora predeterminada es un emulador de archivos, evitamos el disparo automático
+                if (nombre.Contains("PDF", StringComparison.OrdinalIgnoreCase) ||
+                    nombre.Contains("XPS", StringComparison.OrdinalIgnoreCase) ||
+                    nombre.Contains("OneNote", StringComparison.OrdinalIgnoreCase) ||
+                    string.IsNullOrWhiteSpace(nombre))
+                {
+                    return false;
+                }
+
+                return settings.IsValid;
+            }
+            catch
+            {
+                return false;
             }
         }
 
@@ -59,7 +91,7 @@ namespace SISTEMAACTUALIZADO.Modals
             };
 
             Label lblTitle = new Label { Text = "PRE-VENTA REGISTRADA", Location = new Point(78, 18), Font = new Font("Segoe UI", 13F, FontStyle.Bold), ForeColor = Color.FromArgb(6, 78, 59), AutoSize = true };
-            Label lblSubTitle = new Label { Text = "Ticket impreso y generado correctamente", Location = new Point(78, 42), Font = new Font("Segoe UI", 8.5F), ForeColor = Color.FromArgb(100, 116, 139), AutoSize = true };
+            Label lblSubTitle = new Label { Text = "Ticket generado correctamente para pago en caja", Location = new Point(78, 42), Font = new Font("Segoe UI", 8.5F), ForeColor = Color.FromArgb(100, 116, 139), AutoSize = true };
 
             // 1. Tarjeta Número de Ticket
             Panel pnlTicketCard = CrearTarjetaRedondeada(20, 75, 400, 68, Color.FromArgb(240, 253, 244), Color.FromArgb(220, 252, 231));
@@ -96,7 +128,7 @@ namespace SISTEMAACTUALIZADO.Modals
                 e.Graphics.DrawString("i", font, Brushes.White, new RectangleF(4, 4, 20, 20), sf);
             };
 
-            Label lblInstrucText = new Label { Text = $"Entregue el ticket impreso al cliente para pagar en CAJA\ncon el número #{nroTicket:D6}.", Location = new Point(48, 8), Font = new Font("Segoe UI", 8.5F, FontStyle.Bold), ForeColor = Color.FromArgb(30, 58, 138), AutoSize = true };
+            Label lblInstrucText = new Label { Text = $"Entregue el ticket al cliente para pagar en CAJA\ncon el número #{nroTicket:D6}.", Location = new Point(48, 8), Font = new Font("Segoe UI", 8.5F, FontStyle.Bold), ForeColor = Color.FromArgb(30, 58, 138), AutoSize = true };
             pnlInstrucCard.Controls.AddRange(new Control[] { pnlIconInfo, lblInstrucText });
 
             // 4. Botones
@@ -114,7 +146,14 @@ namespace SISTEMAACTUALIZADO.Modals
             btnReimprimir.FlatAppearance.BorderColor = Color.FromArgb(191, 219, 254);
             btnReimprimir.Click += (s, e) =>
             {
-                _printService.ImprimirTicketAtencion(nroTicket, vendedor, cliente, total, items);
+                try
+                {
+                    _printService.ImprimirTicketAtencion(nroTicket, vendedor, cliente, total, items);
+                }
+                catch (Exception ex)
+                {
+                    MessageBox.Show($"No se pudo enviar la impresión: {ex.Message}", "Aviso Impresora", MessageBoxButtons.OK, MessageBoxIcon.Information);
+                }
             };
 
             Button btnEntendido = new Button
