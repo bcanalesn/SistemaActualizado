@@ -16,6 +16,7 @@ namespace SISTEMAACTUALIZADO
         [System.Runtime.InteropServices.DllImport("user32.dll", CharSet = System.Runtime.InteropServices.CharSet.Auto)]
         private static extern int SendMessage(IntPtr hWnd, int msg, int wParam, [System.Runtime.InteropServices.MarshalAs(System.Runtime.InteropServices.UnmanagedType.LPWStr)] string lParam);
         private const int EM_SETCUEBANNER = 0x1501;
+        private readonly UsuarioService _usuarioService = new UsuarioService();
 
         private static Dictionary<string, List<DetalleCarrito>> _carritosPorVendedor = new Dictionary<string, List<DetalleCarrito>>();
         private static Dictionary<string, Cliente?> _clientesPorVendedor = new Dictionary<string, Cliente?>();
@@ -60,18 +61,48 @@ namespace SISTEMAACTUALIZADO
         private string _categoriaActivaNombre = "Todas";
         private string _familiaActivaNombre = "Todas";
 
-        private readonly List<(Color Fondo, Color Texto, Color Borde, string Icono)> _paletaColores = new List<(Color, Color, Color, string)>
+        private readonly List<(Color Fondo, Color Texto, Color Borde)> _paletaColores = new List<(Color, Color, Color)>
         {
-            (Color.FromArgb(240, 249, 255), Color.FromArgb(2, 132, 199), Color.FromArgb(3, 105, 161), "🥛"),
-            (Color.FromArgb(254, 242, 242), Color.FromArgb(220, 38, 38), Color.FromArgb(185, 28, 28), "🥩"),
-            (Color.FromArgb(255, 247, 237), Color.FromArgb(217, 119, 6), Color.FromArgb(180, 83, 9), "🌾"),
-            (Color.FromArgb(240, 253, 244), Color.FromArgb(22, 163, 74), Color.FromArgb(21, 128, 61), "🥤"),
-            (Color.FromArgb(250, 245, 255), Color.FromArgb(147, 51, 234), Color.FromArgb(126, 34, 206), "🧹"),
-            (Color.FromArgb(255, 247, 237), Color.FromArgb(234, 88, 12), Color.FromArgb(194, 65, 12), "🍟"),
-            (Color.FromArgb(254, 242, 242), Color.FromArgb(180, 83, 9), Color.FromArgb(146, 64, 14), "🍞"),
-            (Color.FromArgb(236, 254, 255), Color.FromArgb(8, 145, 178), Color.FromArgb(14, 116, 144), "❄️"),
-            (Color.FromArgb(240, 253, 244), Color.FromArgb(22, 163, 74), Color.FromArgb(21, 128, 61), "🍏"),
-            (Color.FromArgb(253, 242, 248), Color.FromArgb(219, 39, 119), Color.FromArgb(190, 24, 93), "🐾")
+            // 1. Azul Cielo
+            (Color.FromArgb(240, 249, 255), Color.FromArgb(2, 132, 199), Color.FromArgb(3, 105, 161)),
+            // 2. Rojo Carmesí
+            (Color.FromArgb(254, 242, 242), Color.FromArgb(220, 38, 38), Color.FromArgb(185, 28, 28)),
+            // 3. Ámbar / Dorado
+            (Color.FromArgb(255, 251, 235), Color.FromArgb(217, 119, 6), Color.FromArgb(180, 83, 9)),
+            // 4. Verde Esmeralda
+            (Color.FromArgb(240, 253, 244), Color.FromArgb(22, 163, 74), Color.FromArgb(21, 128, 61)),
+            // 5. Púrpura Intenso
+            (Color.FromArgb(250, 245, 255), Color.FromArgb(147, 51, 234), Color.FromArgb(126, 34, 206)),
+            // 6. Naranja Coral
+            (Color.FromArgb(255, 247, 237), Color.FromArgb(234, 88, 12), Color.FromArgb(194, 65, 12)),
+            // 7. Marrón Cálido
+            (Color.FromArgb(254, 242, 242), Color.FromArgb(180, 83, 9), Color.FromArgb(146, 64, 14)),
+            // 8. Cian / Turquesa
+            (Color.FromArgb(236, 254, 255), Color.FromArgb(8, 145, 178), Color.FromArgb(14, 116, 144)),
+            // 9. Verde Lima
+            (Color.FromArgb(247, 254, 231), Color.FromArgb(101, 163, 13), Color.FromArgb(77, 124, 15)),
+            // 10. Rosa Fucsia
+            (Color.FromArgb(253, 242, 248), Color.FromArgb(219, 39, 119), Color.FromArgb(190, 24, 93)),
+            // 11. Índigo Profundo
+            (Color.FromArgb(238, 242, 255), Color.FromArgb(79, 70, 229), Color.FromArgb(67, 56, 202)),
+            // 12. Verde Teal
+            (Color.FromArgb(240, 253, 250), Color.FromArgb(13, 148, 136), Color.FromArgb(15, 118, 110)),
+            // 13. Violeta Pastel
+            (Color.FromArgb(245, 243, 255), Color.FromArgb(124, 58, 237), Color.FromArgb(109, 40, 217)),
+            // 14. Rosa Palo / Salmón
+            (Color.FromArgb(255, 241, 242), Color.FromArgb(225, 29, 72), Color.FromArgb(190, 18, 60)),
+            // 15. Amarillo Ocre
+            (Color.FromArgb(254, 252, 232), Color.FromArgb(202, 138, 4), Color.FromArgb(161, 98, 7)),
+            // 16. Azul Marino Claro
+            (Color.FromArgb(239, 246, 255), Color.FromArgb(37, 99, 235), Color.FromArgb(29, 78, 216)),
+            // 17. Menta Suave
+            (Color.FromArgb(236, 253, 245), Color.FromArgb(5, 150, 105), Color.FromArgb(4, 120, 87)),
+            // 18. Pizarra / Gris Elegante
+            (Color.FromArgb(241, 245, 249), Color.FromArgb(71, 85, 105), Color.FromArgb(51, 65, 85)),
+            // 19. Magenta
+            (Color.FromArgb(253, 244, 255), Color.FromArgb(192, 38, 211), Color.FromArgb(162, 28, 175)),
+            // 20. Cobre Metálico
+            (Color.FromArgb(255, 248, 240), Color.FromArgb(194, 65, 12), Color.FromArgb(154, 52, 18))
         };
 
         public FormVenta(Usuario? usuario = null)
@@ -86,6 +117,7 @@ namespace SISTEMAACTUALIZADO
             {
                 if (this.Visible)
                 {
+                    CargarListaVendedoresBD();
                     CargarCategoriasDesdeBD();
                     CargarProductosDesdeBD();
 
@@ -305,9 +337,7 @@ namespace SISTEMAACTUALIZADO
                 Font = new Font("Segoe UI", 9F, FontStyle.Bold),
                 Margin = new Padding(0, 4, 6, 0)
             };
-            cbVendedor.Items.AddRange(new string[] { "Bárbara", "Víctor", "Juan", "María" });
-            if (!cbVendedor.Items.Contains(_vendedorActualNombre)) _vendedorActualNombre = _usuarioActual?.NombreCompleto ?? "Bárbara";
-            cbVendedor.SelectedItem = cbVendedor.Items.Contains(_vendedorActualNombre) ? _vendedorActualNombre : "Bárbara";
+            CargarListaVendedoresBD();
             cbVendedor.SelectedIndexChanged += CbVendedor_SelectedIndexChanged;
 
             Button btnVerMisTickets = new Button
@@ -484,8 +514,9 @@ namespace SISTEMAACTUALIZADO
         {
             flowCategorias.Controls.Clear();
 
+            // Botón "Todas" fijo en su azul distintivo
             flowCategorias.Controls.Add(CrearBotonCategoria(
-                "Todas", "▦",
+                "Todas",
                 Color.FromArgb(239, 246, 255),
                 Color.FromArgb(37, 99, 235),
                 Color.FromArgb(29, 78, 216),
@@ -494,21 +525,20 @@ namespace SISTEMAACTUALIZADO
 
             var categoriasBD = _productoService.ObtenerCategoriasRegistradas();
 
-            int colorIndex = 0;
             foreach (var cat in categoriasBD)
             {
                 if (cat.Equals("Todas", StringComparison.OrdinalIgnoreCase)) continue;
 
-                var estilo = _paletaColores[colorIndex % _paletaColores.Count];
+                // Hash determinista: asegura que la misma categoría tenga siempre el mismo color
+                int colorHash = Math.Abs(cat.Trim().ToLowerInvariant().GetHashCode());
+                var estilo = _paletaColores[colorHash % _paletaColores.Count];
                 bool seleccionada = _categoriaActivaNombre.Equals(cat, StringComparison.OrdinalIgnoreCase);
 
                 flowCategorias.Controls.Add(CrearBotonCategoria(
-                    cat, estilo.Icono,
+                    cat,
                     estilo.Fondo, estilo.Texto, estilo.Borde,
                     seleccionada
                 ));
-
-                colorIndex++;
             }
 
             AjustarAnchoYAlturaCategorias();
@@ -619,18 +649,19 @@ namespace SISTEMAACTUALIZADO
             }
         }
 
-        private Button CrearBotonCategoria(string nombreCategoria, string icono, Color back, Color fore, Color colorBordeFuerte, bool seleccionada)
+        private Button CrearBotonCategoria(string nombreCategoria, Color back, Color fore, Color colorBordeFuerte, bool seleccionada)
         {
             Button btn = new Button
             {
                 Name = "cat_" + nombreCategoria.Replace(" ", "_"),
-                Text = $"{icono} {nombreCategoria}",
+                Text = nombreCategoria, // Solo el texto limpio
                 Height = 36,
                 Width = 120,
                 BackColor = back,
                 ForeColor = fore,
                 FlatStyle = FlatStyle.Flat,
                 Font = new Font("Segoe UI", 8.5F, FontStyle.Bold),
+                TextAlign = ContentAlignment.MiddleCenter,
                 Cursor = Cursors.Hand,
                 Margin = new Padding(0, 0, 6, 6),
                 Tag = new CategoriaVisualInfo
@@ -1142,6 +1173,39 @@ namespace SISTEMAACTUALIZADO
 
             CargarProductosDesdeBD();
         }
+        private void CargarListaVendedoresBD()
+        {
+            cbVendedor.Items.Clear();
+            var usuariosVenta = _usuarioService.ObtenerUsuariosParaVenta();
+
+            foreach (var u in usuariosVenta)
+            {
+                // Usa el nombre de pila o nombre completo
+                string display = !string.IsNullOrWhiteSpace(u.NombreCompleto) ? u.NombreCompleto : u.NombreUsuario;
+                cbVendedor.Items.Add(display);
+            }
+
+            if (cbVendedor.Items.Count == 0)
+            {
+                cbVendedor.Items.Add(_usuarioActual?.NombreCompleto ?? "Vendedor");
+            }
+
+            // Seleccionar por defecto al usuario con sesión iniciada
+            string usuarioSesion = _usuarioActual?.NombreCompleto ?? _usuarioActual?.NombreUsuario ?? "";
+            int indexSesion = -1;
+
+            for (int i = 0; i < cbVendedor.Items.Count; i++)
+            {
+                if (cbVendedor.Items[i]?.ToString()?.Equals(usuarioSesion, StringComparison.OrdinalIgnoreCase) == true)
+                {
+                    indexSesion = i;
+                    break;
+                }
+            }
+
+            cbVendedor.SelectedIndex = indexSesion >= 0 ? indexSesion : 0;
+            _vendedorActualNombre = cbVendedor.SelectedItem?.ToString() ?? "Vendedor";
+        }
 
         private void BtnCliente_Click(object? sender, EventArgs e)
         {
@@ -1179,7 +1243,8 @@ namespace SISTEMAACTUALIZADO
                         FormBorderStyle = FormBorderStyle.FixedDialog,
                         MaximizeBox = false,
                         MinimizeBox = false,
-                        BackColor = Color.White
+                        BackColor = Color.White,
+                        KeyPreview = true // <-- Captura eventos de teclado
                     })
                     {
                         Label lbl = new Label { Text = "Referencia para Consumidor Final:", Location = new Point(20, 15), AutoSize = true, Font = new Font("Segoe UI", 9F, FontStyle.Bold) };
@@ -1187,6 +1252,19 @@ namespace SISTEMAACTUALIZADO
                         Button btnOk = new Button { Text = "✔ Confirmar Pausa", Location = new Point(20, 85), Size = new Size(300, 38), BackColor = Color.FromArgb(245, 158, 11), ForeColor = Color.White, FlatStyle = FlatStyle.Flat, Font = new Font("Segoe UI", 9.5F, FontStyle.Bold), Cursor = Cursors.Hand };
                         btnOk.FlatAppearance.BorderSize = 0;
                         btnOk.Click += (s, ev) => { modalPrompt.DialogResult = DialogResult.OK; modalPrompt.Close(); };
+
+                        // 1. Asigna el botón de aceptación por defecto para la tecla Enter
+                        modalPrompt.AcceptButton = btnOk;
+
+                        // 2. Ejecuta inmediatamente si se presiona Enter dentro del TextBox
+                        txt.KeyDown += (s, ev) =>
+                        {
+                            if (ev.KeyCode == Keys.Enter)
+                            {
+                                btnOk.PerformClick();
+                                ev.SuppressKeyPress = true;
+                            }
+                        };
 
                         modalPrompt.Controls.AddRange(new Control[] { lbl, txt, btnOk });
                         if (modalPrompt.ShowDialog(this) != DialogResult.OK) return;

@@ -23,7 +23,7 @@ namespace SISTEMAACTUALIZADO
         private Button btnFolios = new Button();
         private Button btnCompras = new Button();
         private Button btnClientes = new Button();
-        private Button btnCuentasPorCobrar = new Button(); // <-- NUEVO BOTÓN
+        private Button btnCuentasPorCobrar = new Button();
         private Button btnProductos = new Button();
         private Button btnUsuarios = new Button();
         private Button btnReportes = new Button();
@@ -42,8 +42,22 @@ namespace SISTEMAACTUALIZADO
             InitializeComponent();
             AplicarPermisosPorRol();
 
-            // Inicio lógico: Abrir Control de Caja primero
-            AbrirFormEnContent(new FormCaja(_usuarioActual), "Apertura y Cierre de Caja", btnCaja);
+            // Pantalla inicial según el rol del usuario
+            string rol = _usuarioActual?.Rol ?? "Administrador";
+
+            if (rol.Equals("Vendedor", StringComparison.OrdinalIgnoreCase))
+            {
+                AbrirFormEnContent(new FormVenta(_usuarioActual), "Punto de Venta DTE", btnVentas);
+            }
+            else if (rol.Equals("Bodeguero", StringComparison.OrdinalIgnoreCase))
+            {
+                AbrirFormEnContent(new FormCompras(), "Recepción de Compras e Incremento de Stock", btnCompras);
+            }
+            else
+            {
+                // Administrador, Supervisor y Cajero inician en Control de Caja
+                AbrirFormEnContent(new FormCaja(_usuarioActual), "Apertura y Cierre de Caja", btnCaja);
+            }
         }
 
         private void InitializeComponent()
@@ -67,7 +81,7 @@ namespace SISTEMAACTUALIZADO
             this.pnlSidebar.Width = 240;
             this.pnlSidebar.BackColor = Color.FromArgb(24, 28, 36);
 
-            // Logotipo
+            // Logotipo Superior Fijo
             this.lblLogo.Text = "⚡ POS SYSTEM";
             this.lblLogo.Dock = DockStyle.Top;
             this.lblLogo.Height = 70;
@@ -75,53 +89,57 @@ namespace SISTEMAACTUALIZADO
             this.lblLogo.ForeColor = Color.White;
             this.lblLogo.TextAlign = ContentAlignment.MiddleCenter;
 
-            Panel pnlNav = new Panel
+            // Contenedor Central Desplazable de Vistas
+            FlowLayoutPanel pnlNav = new FlowLayoutPanel
             {
                 Dock = DockStyle.Fill,
                 BackColor = Color.Transparent,
-                AutoScroll = true
+                AutoScroll = true,
+                FlowDirection = FlowDirection.TopDown,
+                WrapContents = false,
+                Padding = new Padding(0, 4, 0, 4)
             };
 
-            // Posicionamiento de botones
-            int yPos = 10;
-            int espaciado = 48;
+            ConfigurarBotonSidebar(this.btnCaja, "💵  Control de Caja");
+            ConfigurarBotonSidebar(this.btnVentas, "🛒  Punto de Venta");
+            ConfigurarBotonSidebar(this.btnLibroVentas, "📚  Libro Ventas LVE");
+            ConfigurarBotonSidebar(this.btnLibroCompras, "📕  Libro de Compras");
+            ConfigurarBotonSidebar(this.btnFolios, "📄  Control de Folios");
+            ConfigurarBotonSidebar(this.btnCompras, "📥  Recepción Compras");
+            ConfigurarBotonSidebar(this.btnClientes, "👥  Clientes");
+            ConfigurarBotonSidebar(this.btnCuentasPorCobrar, "💳  Cuentas por Cobrar");
+            ConfigurarBotonSidebar(this.btnProductos, "📦  Productos");
+            ConfigurarBotonSidebar(this.btnUsuarios, "👤  Usuarios");
+            ConfigurarBotonSidebar(this.btnReportes, "📊  Reportes");
+            ConfigurarBotonSidebar(this.btnConfiguracion, "⚙️  Configuración");
 
-            ConfigurarBotonSidebar(this.btnCaja, "💵  Control de Caja", yPos); yPos += espaciado;
-            ConfigurarBotonSidebar(this.btnVentas, "🛒  Punto de Venta", yPos); yPos += espaciado;
-            ConfigurarBotonSidebar(this.btnLibroVentas, "📚  Libro Ventas LVE", yPos); yPos += espaciado;
-            ConfigurarBotonSidebar(this.btnLibroCompras, "📕  Libro de Compras", yPos); yPos += espaciado;
-            ConfigurarBotonSidebar(this.btnFolios, "📄  Control de Folios", yPos); yPos += espaciado;
-            ConfigurarBotonSidebar(this.btnCompras, "📥  Recepción Compras", yPos); yPos += espaciado;
-            ConfigurarBotonSidebar(this.btnClientes, "👥  Clientes", yPos); yPos += espaciado;
-            ConfigurarBotonSidebar(this.btnCuentasPorCobrar, "💳  Cuentas por Cobrar", yPos); yPos += espaciado;
-            ConfigurarBotonSidebar(this.btnProductos, "📦  Productos", yPos); yPos += espaciado;
-            ConfigurarBotonSidebar(this.btnUsuarios, "👤  Usuarios", yPos); yPos += espaciado;
-            ConfigurarBotonSidebar(this.btnReportes, "📊  Reportes", yPos);
-            ConfigurarBotonSidebar(this.btnConfiguracion, "⚙️  Configuración", yPos);
-            
-
-            pnlNav.Controls.Add(this.btnConfiguracion);
-            pnlNav.Controls.Add(this.btnReportes);
-            pnlNav.Controls.Add(this.btnUsuarios);
-            pnlNav.Controls.Add(this.btnProductos);
-            pnlNav.Controls.Add(this.btnCuentasPorCobrar);
-            pnlNav.Controls.Add(this.btnClientes);
-            pnlNav.Controls.Add(this.btnCompras);
-            pnlNav.Controls.Add(this.btnFolios);
-            pnlNav.Controls.Add(this.btnLibroCompras);
-            pnlNav.Controls.Add(this.btnLibroVentas);
-            pnlNav.Controls.Add(this.btnVentas);
+            // Orden natural de arriba hacia abajo
             pnlNav.Controls.Add(this.btnCaja);
+            pnlNav.Controls.Add(this.btnVentas);
+            pnlNav.Controls.Add(this.btnLibroVentas);
+            pnlNav.Controls.Add(this.btnLibroCompras);
+            pnlNav.Controls.Add(this.btnFolios);
+            pnlNav.Controls.Add(this.btnCompras);
+            pnlNav.Controls.Add(this.btnClientes);
+            pnlNav.Controls.Add(this.btnCuentasPorCobrar);
+            pnlNav.Controls.Add(this.btnProductos);
+            pnlNav.Controls.Add(this.btnUsuarios);
+            pnlNav.Controls.Add(this.btnReportes);
+            pnlNav.Controls.Add(this.btnConfiguracion);
 
+            // Contenedor Fijo Inferior (Cerrar Sesión y Salir)
             Panel pnlBottomNav = new Panel
             {
                 Dock = DockStyle.Bottom,
-                Height = 115,
+                Height = 98,
                 BackColor = Color.Transparent
             };
 
-            ConfigurarBotonSidebar(this.btnCerrarSesion, "🔒  Cerrar Sesión", 10);
-            ConfigurarBotonSidebar(this.btnSalir, "🚪  Salir", 60);
+            ConfigurarBotonInferior(this.btnCerrarSesion, "🔒  Cerrar Sesión", 6);
+            ConfigurarBotonInferior(this.btnSalir, "🚪  Salir", 50);
+
+            pnlBottomNav.Controls.Add(this.btnCerrarSesion);
+            pnlBottomNav.Controls.Add(this.btnSalir);
 
             // Eventos de Navegación
             this.btnCaja.Click += (s, e) => AbrirFormEnContent(new FormCaja(_usuarioActual), "Apertura y Cierre de Caja", btnCaja);
@@ -149,9 +167,7 @@ namespace SISTEMAACTUALIZADO
 
             this.btnSalir.Click += (s, e) => Application.Exit();
 
-            pnlBottomNav.Controls.Add(this.btnCerrarSesion);
-            pnlBottomNav.Controls.Add(this.btnSalir);
-
+            // Ensamblaje del Sidebar en orden estricto de capas
             this.pnlSidebar.Controls.Add(pnlNav);
             this.pnlSidebar.Controls.Add(pnlBottomNav);
             this.pnlSidebar.Controls.Add(this.lblLogo);
@@ -195,31 +211,107 @@ namespace SISTEMAACTUALIZADO
             this.Controls.Add(this.pnlSidebar);
 
             this.ResumeLayout(false);
+
+            // Asegura que al iniciar el scroll esté en el primer ítem superior
+            pnlNav.AutoScrollPosition = Point.Empty;
         }
 
         private void AplicarPermisosPorRol()
         {
-            if (_usuarioActual != null && _usuarioActual.Rol.Equals("Cajero", StringComparison.OrdinalIgnoreCase))
+            string rol = _usuarioActual?.Rol ?? "Administrador";
+
+            // 1. VENDEDOR: Únicamente Punto de Venta
+            if (rol.Equals("Vendedor", StringComparison.OrdinalIgnoreCase))
             {
-                btnUsuarios.Visible = false;
-                btnReportes.Visible = false;
-                btnFolios.Visible = false;
+                btnCaja.Visible = false;
+                btnVentas.Visible = true;
                 btnLibroVentas.Visible = false;
                 btnLibroCompras.Visible = false;
+                btnFolios.Visible = false;
                 btnCompras.Visible = false;
+                btnClientes.Visible = false;
                 btnCuentasPorCobrar.Visible = false;
+                btnProductos.Visible = false;
+                btnUsuarios.Visible = false;
+                btnReportes.Visible = false;
                 btnConfiguracion.Visible = false;
+                return;
             }
+
+            // 2. BODEGUERO: Únicamente Recepción de Compras
+            if (rol.Equals("Bodeguero", StringComparison.OrdinalIgnoreCase))
+            {
+                btnCaja.Visible = false;
+                btnVentas.Visible = false;
+                btnLibroVentas.Visible = false;
+                btnLibroCompras.Visible = false;
+                btnFolios.Visible = false;
+                btnCompras.Visible = true;
+                btnClientes.Visible = false;
+                btnCuentasPorCobrar.Visible = false;
+                btnProductos.Visible = false;
+                btnUsuarios.Visible = false;
+                btnReportes.Visible = false;
+                btnConfiguracion.Visible = false;
+                return;
+            }
+
+            // 3. CAJERO: Control de Caja y Punto de Venta
+            if (rol.Equals("Cajero", StringComparison.OrdinalIgnoreCase))
+            {
+                btnCaja.Visible = true;
+                btnVentas.Visible = true;
+                btnLibroVentas.Visible = false;
+                btnLibroCompras.Visible = false;
+                btnFolios.Visible = false;
+                btnCompras.Visible = false;
+                btnClientes.Visible = false;
+                btnCuentasPorCobrar.Visible = false;
+                btnProductos.Visible = false;
+                btnUsuarios.Visible = false;
+                btnReportes.Visible = false;
+                btnConfiguracion.Visible = false;
+                return;
+            }
+
+            // 4. ADMINISTRADOR Y SUPERVISOR: Acceso total a todas las vistas
+            btnCaja.Visible = true;
+            btnVentas.Visible = true;
+            btnLibroVentas.Visible = true;
+            btnLibroCompras.Visible = true;
+            btnFolios.Visible = true;
+            btnCompras.Visible = true;
+            btnClientes.Visible = true;
+            btnCuentasPorCobrar.Visible = true;
+            btnProductos.Visible = true;
+            btnUsuarios.Visible = true;
+            btnReportes.Visible = true;
+            btnConfiguracion.Visible = true;
         }
 
-        private void ConfigurarBotonSidebar(Button btn, string texto, int top)
+        private void ConfigurarBotonSidebar(Button btn, string texto)
+        {
+            btn.Text = texto;
+            btn.Size = new Size(220, 38);
+            btn.Margin = new Padding(10, 2, 10, 2);
+            btn.FlatStyle = FlatStyle.Flat;
+            btn.FlatAppearance.BorderSize = 0;
+            btn.Font = new Font("Segoe UI", 9.5F, FontStyle.Bold);
+            btn.ForeColor = Color.FromArgb(160, 174, 192);
+            btn.BackColor = Color.Transparent;
+            btn.TextAlign = ContentAlignment.MiddleLeft;
+            btn.Padding = new Padding(12, 0, 0, 0);
+            btn.Cursor = Cursors.Hand;
+        }
+
+        private void ConfigurarBotonInferior(Button btn, string texto, int top)
         {
             btn.Text = texto;
             btn.Location = new Point(10, top);
-            btn.Size = new Size(215, 42);
+            btn.Size = new Size(220, 38);
             btn.FlatStyle = FlatStyle.Flat;
             btn.FlatAppearance.BorderSize = 0;
-            btn.Font = new Font("Segoe UI", 10F, FontStyle.Bold);
+            btn.Font = new Font("Segoe UI", 9.5F, FontStyle.Bold);
             btn.ForeColor = Color.FromArgb(160, 174, 192);
             btn.BackColor = Color.Transparent;
             btn.TextAlign = ContentAlignment.MiddleLeft;

@@ -23,6 +23,7 @@ namespace SISTEMAACTUALIZADO
 
         // Temporizador de vigilancia de fecha límite en segundo plano
         private System.Windows.Forms.Timer? _timerVigilante;
+        private bool _cargandoTickets = false;
         private bool _modalArqueoAbierto = false;
 
         private Button btnAbrirCaja = null!;
@@ -922,7 +923,8 @@ namespace SISTEMAACTUALIZADO
                 FormBorderStyle = FormBorderStyle.FixedDialog,
                 MaximizeBox = false,
                 MinimizeBox = false,
-                BackColor = Color.White
+                BackColor = Color.White,
+                KeyPreview = true
             };
 
             Label lblM = new Label { Text = "Monto Inicial de Caja ($):", Location = new Point(20, 16), AutoSize = true, Font = new Font("Segoe UI", 9F, FontStyle.Bold) };
@@ -964,6 +966,17 @@ namespace SISTEMAACTUALIZADO
                 else
                 {
                     MessageBox.Show("Ingrese un monto numérico válido.", "Monto Inválido", MessageBoxButtons.OK, MessageBoxIcon.Warning);
+                }
+            };
+
+            modalApertura.AcceptButton = btnA;
+
+            txtM.KeyDown += (sa, ea) =>
+            {
+                if (ea.KeyCode == Keys.Enter)
+                {
+                    btnA.PerformClick();
+                    ea.SuppressKeyPress = true;
                 }
             };
 
@@ -1381,7 +1394,8 @@ namespace SISTEMAACTUALIZADO
                 FormBorderStyle = FormBorderStyle.FixedDialog,
                 MaximizeBox = false,
                 MinimizeBox = false,
-                BackColor = Color.White
+                BackColor = Color.White,
+                KeyPreview = true // Habilita la captura previa de teclas
             };
 
             Label lblT = new Label 
@@ -1493,6 +1507,23 @@ namespace SISTEMAACTUALIZADO
                 modalMixto.Close();
             };
 
+            // 1. Asignar como botón de confirmación predeterminado
+            modalMixto.AcceptButton = btnAplicar;
+
+            // 2. Manejador de Enter para que responda desde cualquier TextBox
+            KeyEventHandler enterHandler = (s, e) =>
+            {
+                if (e.KeyCode == Keys.Enter)
+                {
+                    btnAplicar.PerformClick();
+                    e.SuppressKeyPress = true;
+                }
+            };
+
+            txtEf.KeyDown += enterHandler;
+            txtTar.KeyDown += enterHandler;
+            txtTrans.KeyDown += enterHandler;
+
             modalMixto.Controls.AddRange(new Control[] { lblT, lblEf, txtEf, lblTar, txtTar, lblTrans, txtTrans, lblEstadoSuma, btnAplicar });
 
             if (modalMixto.ShowDialog(this) != DialogResult.OK)
@@ -1538,6 +1569,8 @@ namespace SISTEMAACTUALIZADO
         {
             try
             {
+                _cargandoTickets = true;
+
                 var pendientes = _cajaService.ObtenerTicketsPendientes(filtro);
                 dgvTicketsPendientes.DataSource = null;
                 dgvTicketsPendientes.DataSource = pendientes;
@@ -1568,6 +1601,8 @@ namespace SISTEMAACTUALIZADO
 
                 if (pendientes.Count > 0)
                 {
+                    _ticketSeleccionado = pendientes[0];
+
                     dgvTicketsPendientes.ClearSelection();
                     dgvTicketsPendientes.Rows[0].Selected = true;
 
@@ -1577,12 +1612,12 @@ namespace SISTEMAACTUALIZADO
                         dgvTicketsPendientes.CurrentCell = dgvTicketsPendientes.Rows[0].Cells[primeraColVisible.Index];
                     }
 
-                    _ticketSeleccionado = pendientes[0];
                     btnCobrarTicket.Enabled = true;
                     btnAnularTicket.Enabled = true;
                     lblTotalCobrar.Text = MonedaHelper.Formatear(_ticketSeleccionado.Total, conSigno: true);
 
                     var detalles = _cajaService.ObtenerDetallesTicket(_ticketSeleccionado.idTve);
+                    dgvDetalleTicket.DataSource = null;
                     dgvDetalleTicket.DataSource = detalles;
                     ActualizarDatosCobroSegunTicket();
                 }
@@ -1592,10 +1627,16 @@ namespace SISTEMAACTUALIZADO
                 }
             }
             catch { }
+            finally
+            {
+                _cargandoTickets = false;
+            }
         }
 
         private void DgvTicketsPendientes_SelectionChanged(object? sender, EventArgs e)
         {
+            if (_cargandoTickets) return;
+
             if (dgvTicketsPendientes.CurrentRow?.DataBoundItem is TVE2607 ticket)
             {
                 _ticketSeleccionado = ticket;
@@ -1653,8 +1694,9 @@ namespace SISTEMAACTUALIZADO
                 {
                     _cajaService.AnularTicket(_ticketSeleccionado.idTve, _turnoActual?.CajaTurnoID);
                     MessageBox.Show($"Ticket N° {_ticketSeleccionado.nroDTE} anulado con éxito.", "Éxito", MessageBoxButtons.OK, MessageBoxIcon.Information);
+                    
+                    // Recarga la lista seleccionando automáticamente el siguiente disponible
                     CargarTicketsPendientes();
-                    LimpiarSeleccionVista();
                 }
                 catch (Exception ex)
                 {

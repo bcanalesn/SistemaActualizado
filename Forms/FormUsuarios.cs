@@ -384,7 +384,8 @@ namespace SISTEMAACTUALIZADO
                 FormBorderStyle = FormBorderStyle.FixedDialog, 
                 MaximizeBox = false, 
                 MinimizeBox = false, 
-                BackColor = Color.White 
+                BackColor = Color.White,
+                KeyPreview = true // 1. Captura de teclas en el formulario modal
             };
 
             Label lblTitle = new Label { Text = esNuevo ? "👤 Crear Cuenta de Usuario" : "✏️ Editar Usuario", Location = new Point(25, 18), Font = new Font("Segoe UI", 12F, FontStyle.Bold), AutoSize = true, ForeColor = Color.FromArgb(15, 23, 42) }; 
@@ -400,8 +401,8 @@ namespace SISTEMAACTUALIZADO
 
             Label lblRol = new Label { Text = "Rol / Nivel de Acceso:", Location = new Point(25, 228), AutoSize = true, Font = new Font("Segoe UI", 9F, FontStyle.Bold) }; 
             ComboBox cbRol = new ComboBox { Location = new Point(25, 248), Size = new Size(330, 28), DropDownStyle = ComboBoxStyle.DropDownList, Font = new Font("Segoe UI", 9.5F) }; 
-            cbRol.Items.AddRange(new string[] { "Administrador", "Cajero" }); 
-            cbRol.SelectedItem = string.IsNullOrEmpty(u.Rol) ? "Cajero" : u.Rol; 
+            cbRol.Items.AddRange(new string[] { "Administrador", "Cajero", "Vendedor", "Supervisor", "Bodeguero" }); 
+            cbRol.SelectedItem = string.IsNullOrEmpty(u.Rol) ? "Vendedor" : u.Rol; 
 
             Label lblHoras = new Label { Text = "Horas de Turno Asignadas (Jornada):", Location = new Point(25, 286), AutoSize = true, Font = new Font("Segoe UI", 9F, FontStyle.Bold) };
             NumericUpDown numHoras = new NumericUpDown
@@ -428,7 +429,7 @@ namespace SISTEMAACTUALIZADO
                 u.NombreUsuario = txtUser.Text.Trim(); 
                 u.NombreCompleto = txtNombre.Text.Trim(); 
                 u.Clave = txtPass.Text.Trim(); 
-                u.Rol = cbRol.SelectedItem?.ToString() ?? "Cajero"; 
+                u.Rol = cbRol.SelectedItem?.ToString() ?? "Vendedor"; 
                 u.HorasTurno = (int)numHoras.Value;
 
                 try
@@ -444,6 +445,25 @@ namespace SISTEMAACTUALIZADO
                     MessageBox.Show($"Error al guardar usuario: {ex.Message}", "Error DB", MessageBoxButtons.OK, MessageBoxIcon.Error); 
                 }
             };
+
+            // 2. Establecer el botón Guardar como acción por defecto para Enter
+            modal.AcceptButton = btnGuardar;
+
+            // 3. Capturar Enter en cualquier campo de texto o selector numérico
+            KeyEventHandler enterHandler = (s, e) =>
+            {
+                if (e.KeyCode == Keys.Enter)
+                {
+                    btnGuardar.PerformClick();
+                    e.SuppressKeyPress = true;
+                }
+            };
+
+            txtUser.KeyDown += enterHandler;
+            txtNombre.KeyDown += enterHandler;
+            txtPass.KeyDown += enterHandler;
+            cbRol.KeyDown += enterHandler;
+            numHoras.KeyDown += enterHandler;
 
             modal.Controls.AddRange(new Control[] { lblTitle, lblUser, txtUser, lblNombre, txtNombre, lblPass, txtPass, lblRol, cbRol, lblHoras, numHoras, btnGuardar }); 
             modal.ShowDialog(); 

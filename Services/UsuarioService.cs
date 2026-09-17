@@ -58,5 +58,15 @@ namespace SISTEMAACTUALIZADO.Services
                 db.SaveChanges();
             }
         }
+        public List<Usuario> ObtenerUsuariosParaVenta()
+        {
+            using var db = new AppDbContext();
+            // Retorna a todos los usuarios activos (Administradores, Cajeros y Vendedores) ordenados alfabéticamente
+            return db.Usuarios
+                .AsNoTracking()
+                .Where(u => u.Estado && (u.Rol == "Vendedor" || u.Rol == "Cajero"))
+                .OrderBy(u => u.NombreCompleto != "" ? u.NombreCompleto : u.NombreUsuario)
+                .ToList();
+        }
     }
 }
