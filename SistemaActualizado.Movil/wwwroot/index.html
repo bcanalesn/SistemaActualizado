@@ -1,0 +1,312 @@
+<!DOCTYPE html>
+<html lang="es">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0, maximum-scale=1.0, user-scalable=no">
+    <title>POS Móvil</title>
+    <style>
+        :root {
+            --primary: #2563eb;
+            --success: #16a34a;
+            --bg: #f8fafc;
+            --surface: #ffffff;
+            --text: #0f172a;
+            --muted: #64748b;
+            --border: #e2e8f0;
+        }
+
+        * { box-sizing: border-box; font-family: -apple-system, BlinkMacSystemFont, "Segoe UI", Roboto, sans-serif; margin: 0; padding: 0; -webkit-tap-highlight-color: transparent; }
+        body { background: var(--bg); color: var(--text); padding-bottom: 70px; }
+
+        /* VISTAS */
+        .pantalla { display: none; padding: 16px; min-height: 100vh; }
+        .activa { display: block; }
+
+        /* PANTALLA 1: PIN LOGIN */
+        .pin-container { max-width: 320px; margin: 40px auto 0; text-align: center; }
+        .pin-display { font-size: 32px; letter-spacing: 12px; height: 50px; margin-bottom: 20px; display: flex; align-items: center; justify-content: center; }
+        .teclado-grid { display: grid; grid-template-columns: repeat(3, 1fr); gap: 12px; }
+        .btn-tecla { background: var(--surface); border: 1px solid var(--border); font-size: 24px; font-weight: 600; padding: 18px 0; border-radius: 12px; box-shadow: 0 1px 3px rgba(0,0,0,0.05); }
+        .btn-tecla:active { background: #e2e8f0; }
+
+        /* HEADER SUPERIOR */
+        .topbar { display: flex; justify-content: space-between; align-items: center; margin-bottom: 16px; }
+        .topbar h2 { font-size: 18px; font-weight: 700; }
+        .badge-user { font-size: 13px; color: var(--primary); font-weight: 600; }
+
+        /* PANTALLA 2: PRODUCTOS */
+        .search-box { width: 100%; padding: 14px 16px; border: 1px solid var(--border); border-radius: 10px; font-size: 16px; margin-bottom: 14px; outline: none; background: #fff; }
+        .lista-productos { display: flex; flex-direction: column; gap: 10px; }
+        .item-card { background: var(--surface); border: 1px solid var(--border); border-radius: 12px; padding: 12px 14px; display: flex; justify-content: space-between; align-items: center; }
+        .item-info .item-name { font-weight: 600; font-size: 15px; }
+        .item-info .item-price { color: var(--primary); font-weight: 700; font-size: 14px; margin-top: 2px; }
+        .item-info .item-stock { font-size: 12px; color: var(--muted); }
+        .btn-add { background: var(--primary); color: #fff; border: none; width: 40px; height: 40px; border-radius: 8px; font-size: 20px; font-weight: bold; }
+        .btn-add:active { background: #1d4ed8; }
+
+        /* PANTALLA 3: CARRITO */
+        .cart-card { background: var(--surface); border: 1px solid var(--border); border-radius: 12px; padding: 12px 14px; margin-bottom: 10px; display: flex; justify-content: space-between; align-items: center; }
+        .cart-controles { display: flex; align-items: center; gap: 10px; }
+        .btn-qty { width: 32px; height: 32px; border-radius: 6px; border: 1px solid var(--border); background: #f1f5f9; font-weight: bold; font-size: 16px; }
+        .total-box { background: #fff; border-top: 2px dashed var(--border); padding: 16px; margin-top: 14px; border-radius: 12px; display: flex; justify-content: space-between; font-size: 18px; font-weight: 800; }
+        .btn-checkout { width: 100%; background: var(--success); color: #fff; border: none; padding: 16px; font-size: 16px; font-weight: 700; border-radius: 12px; margin-top: 16px; }
+        .btn-checkout:active { background: #15803d; }
+
+        /* MODAL EXITO TICKET */
+        .modal-ticket { position: fixed; top: 0; left: 0; width: 100%; height: 100%; background: rgba(0,0,0,0.5); display: none; align-items: center; justify-content: center; padding: 20px; }
+        .modal-ticket.show { display: flex; }
+        .modal-body { background: #fff; border-radius: 16px; padding: 24px; text-align: center; width: 100%; max-width: 320px; }
+        .ticket-badge { font-size: 32px; font-weight: 900; color: var(--success); margin: 12px 0; }
+
+        /* BARRA INFERIOR DE NAVEGACION */
+        .bottom-nav { position: fixed; bottom: 0; left: 0; width: 100%; height: 60px; background: var(--surface); border-top: 1px solid var(--border); display: flex; justify-content: space-around; align-items: center; }
+        .nav-btn { background: none; border: none; color: var(--muted); font-size: 14px; font-weight: 600; display: flex; flex-direction: column; align-items: center; gap: 4px; }
+        .nav-btn.active { color: var(--primary); }
+    </style>
+</head>
+<body>
+
+    <!-- 1. LOGIN PIN -->
+    <div id="vistaPin" class="pantalla activa">
+        <div class="pin-container">
+            <h2 style="margin-bottom: 6px;">POS Móvil</h2>
+            <p style="color: var(--muted); font-size: 14px; margin-bottom: 24px;">Ingrese su PIN de Vendedor</p>
+            <div id="pinDisplay" class="pin-display">••••••</div>
+            <div class="teclado-grid">
+                <button class="btn-tecla" onclick="teclear('1')">1</button>
+                <button class="btn-tecla" onclick="teclear('2')">2</button>
+                <button class="btn-tecla" onclick="teclear('3')">3</button>
+                <button class="btn-tecla" onclick="teclear('4')">4</button>
+                <button class="btn-tecla" onclick="teclear('5')">5</button>
+                <button class="btn-tecla" onclick="teclear('6')">6</button>
+                <button class="btn-tecla" onclick="teclear('7')">7</button>
+                <button class="btn-tecla" onclick="teclear('8')">8</button>
+                <button class="btn-tecla" onclick="teclear('9')">9</button>
+                <button class="btn-tecla" onclick="borrarPin()">⌫</button>
+                <button class="btn-tecla" onclick="teclear('0')">0</button>
+                <button class="btn-tecla" style="color: var(--primary);" onclick="validarPin()">✔</button>
+            </div>
+        </div>
+    </div>
+
+    <!-- 2. CATÁLOGO / PRODUCTOS -->
+    <div id="vistaProductos" class="pantalla">
+        <div class="topbar">
+            <h2>Catálogo</h2>
+            <span id="lblVendedor" class="badge-user"></span>
+        </div>
+        <input type="text" id="txtBuscar" class="search-box" placeholder="Buscar por nombre o código..." oninput="buscarProductos()">
+        <div id="listaProd" class="lista-productos"></div>
+    </div>
+
+    <!-- 3. CARRITO -->
+    <div id="vistaCarrito" class="pantalla">
+        <div class="topbar">
+            <h2>Carrito</h2>
+            <button onclick="limpiarCarro()" style="background:none; border:none; color:#ef4444; font-size:13px; font-weight:600;">Vaciar</button>
+        </div>
+        <div id="listaCarro"></div>
+        <div class="total-box">
+            <span>TOTAL</span>
+            <span id="lblTotal">$0</span>
+        </div>
+        <button class="btn-checkout" onclick="enviarACaja()">🎟️ ENVIAR A CAJA</button>
+    </div>
+
+    <!-- MODAL TICKET GENERADO -->
+    <div id="modalExito" class="modal-ticket">
+        <div class="modal-body">
+            <h3>¡Ticket Generado!</h3>
+            <p style="color:var(--muted); font-size:13px; margin-top:4px;">Diríjase a Caja con este número:</p>
+            <div id="modalNumTicket" class="ticket-badge">#000000</div>
+            <button class="btn-checkout" style="margin-top:8px; padding:12px;" onclick="cerrarModalExito()">Aceptar</button>
+        </div>
+    </div>
+
+    <!-- BARRA NAVEGACION (SOLO TRAS LOGUEO) -->
+    <nav id="navBar" class="bottom-nav" style="display: none;">
+        <button id="navProd" class="nav-btn active" onclick="cambiarVista('vistaProductos')">📦 Productos</button>
+        <button id="navCart" class="nav-btn" onclick="cambiarVista('vistaCarrito')">🛒 Carrito (<span id="cantCarro">0</span>)</button>
+        <button class="nav-btn" onclick="cerrarSesion()">🔒 Salir</button>
+    </nav>
+
+    <script>
+        let pinActual = "";
+        let vendedorActivo = "";
+        let carrito = [];
+
+        function teclear(num) {
+            if (pinActual.length < 6) {
+                pinActual += num;
+                actualizarPinDisplay();
+            }
+        }
+
+        function borrarPin() {
+            pinActual = pinActual.slice(0, -1);
+            actualizarPinDisplay();
+        }
+
+        function actualizarPinDisplay() {
+            document.getElementById('pinDisplay').innerText = pinActual ? "•".repeat(pinActual.length) : "••••••";
+        }
+
+        async function validarPin() {
+            if (!pinActual) return;
+            const res = await fetch('/api/login-pin', {
+                method: 'POST',
+                headers: {'Content-Type': 'application/json'},
+                body: JSON.stringify({ pin: pinActual })
+            });
+            const data = await res.json();
+            if (data.ok) {
+                vendedorActivo = data.vendedor;
+                document.getElementById('lblVendedor').innerText = "👤 " + vendedorActivo.split(' ')[0];
+                document.getElementById('navBar').style.display = 'flex';
+                cambiarVista('vistaProductos');
+                buscarProductos();
+            } else {
+                alert("PIN incorrecto");
+                pinActual = "";
+                actualizarPinDisplay();
+            }
+        }
+
+        function cambiarVista(vistaId) {
+            document.querySelectorAll('.pantalla').forEach(p => p.classList.remove('activa'));
+            document.getElementById(vistaId).classList.add('activa');
+
+            document.getElementById('navProd').classList.toggle('active', vistaId === 'vistaProductos');
+            document.getElementById('navCart').classList.toggle('active', vistaId === 'vistaCarrito');
+            if (vistaId === 'vistaCarrito') renderCarrito();
+        }
+
+        async function buscarProductos() {
+            const q = document.getElementById('txtBuscar').value;
+            const res = await fetch(`/api/productos?q=${encodeURIComponent(q)}`);
+            const productos = await res.json();
+
+            const contenedor = document.getElementById('listaProd');
+            contenedor.innerHTML = "";
+
+            productos.forEach(p => {
+                const card = document.createElement('div');
+                card.className = 'item-card';
+                card.innerHTML = `
+                    <div class="item-info">
+                        <div class="item-name">${p.nombre}</div>
+                        <div class="item-price">$ ${Number(p.precio).toLocaleString('es-CL')}</div>
+                        <div class="item-stock">Stock: ${p.stock} un.</div>
+                    </div>
+                    <button class="btn-add" onclick="agregarAlCarro(${p.productoID}, '${p.nombre.replace(/'/g, "\\'")}', ${p.precio})">+</button>
+                `;
+                contenedor.appendChild(card);
+            });
+        }
+
+        function agregarAlCarro(id, nombre, precio) {
+            const item = carrito.find(c => c.productoId === id);
+            if (item) {
+                item.cantidad++;
+            } else {
+                carrito.push({ productoId: id, nombre, precio, cantidad: 1 });
+            }
+            actualizarBadgeCarro();
+        }
+
+        function renderCarrito() {
+            const contenedor = document.getElementById('listaCarro');
+            contenedor.innerHTML = "";
+            let total = 0;
+
+            if (carrito.length === 0) {
+                contenedor.innerHTML = `<div style="text-align:center; padding:40px 0; color:var(--muted);">El carrito está vacío</div>`;
+                document.getElementById('lblTotal').innerText = "$0";
+                return;
+            }
+
+            carrito.forEach(item => {
+                const subtotal = item.precio * item.cantidad;
+                total += subtotal;
+                const card = document.createElement('div');
+                card.className = 'cart-card';
+                card.innerHTML = `
+                    <div>
+                        <div style="font-weight:600; font-size:14px;">${item.nombre}</div>
+                        <div style="font-size:13px; color:var(--primary); font-weight:700;">$ ${subtotal.toLocaleString('es-CL')}</div>
+                    </div>
+                    <div class="cart-controles">
+                        <button class="btn-qty" onclick="modificarCantidad(${item.productoId}, -1)">-</button>
+                        <span style="font-weight:bold; font-size:14px; min-width:18px; text-align:center;">${item.cantidad}</span>
+                        <button class="btn-qty" onclick="modificarCantidad(${item.productoId}, 1)">+</button>
+                    </div>
+                `;
+                contenedor.appendChild(card);
+            });
+
+            document.getElementById('lblTotal').innerText = `$ ${total.toLocaleString('es-CL')}`;
+        }
+
+        function modificarCantidad(id, delta) {
+            const item = carrito.find(c => c.productoId === id);
+            if (!item) return;
+            item.cantidad += delta;
+            if (item.cantidad <= 0) {
+                carrito = carrito.filter(c => c.productoId !== id);
+            }
+            renderCarrito();
+            actualizarBadgeCarro();
+        }
+
+        function actualizarBadgeCarro() {
+            const cantTotal = carrito.reduce((acc, c) => acc + c.cantidad, 0);
+            document.getElementById('cantCarro').innerText = cantTotal;
+        }
+
+        function limpiarCarro() {
+            carrito = [];
+            actualizarBadgeCarro();
+            renderCarrito();
+        }
+
+        async function enviarACaja() {
+            if (carrito.length === 0) {
+                alert("Agregue productos antes de enviar a caja.");
+                return;
+            }
+
+            const res = await fetch('/api/enviar-caja', {
+                method: 'POST',
+                headers: {'Content-Type': 'application/json'},
+                body: JSON.stringify({
+                    vendedor: vendedorActivo,
+                    items: carrito
+                })
+            });
+
+            const data = await res.json();
+            if (data.ok) {
+                document.getElementById('modalNumTicket').innerText = `#${String(data.nroTicket).padStart(6, '0')}`;
+                document.getElementById('modalExito').classList.add('show');
+                limpiarCarro();
+            } else {
+                alert("Error al enviar a caja: " + data.mensaje);
+            }
+        }
+
+        function cerrarModalExito() {
+            document.getElementById('modalExito').classList.remove('show');
+            cambiarVista('vistaProductos');
+        }
+
+        function cerrarSesion() {
+            pinActual = "";
+            vendedorActivo = "";
+            limpiarCarro();
+            actualizarPinDisplay();
+            document.getElementById('navBar').style.display = 'none';
+            cambiarVista('vistaPin');
+        }
+    </script>
+</body>
+</html>
