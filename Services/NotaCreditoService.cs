@@ -43,6 +43,7 @@ namespace SISTEMAACTUALIZADO.Services
                     .ToList();
 
                 int emitidas = 0;
+                DateTime ahora = DateTime.Now;
 
                 foreach (var ventaOrigen in ventasOrigen)
                 {
@@ -57,9 +58,10 @@ namespace SISTEMAACTUALIZADO.Services
                         nmbLocal = ventaOrigen.nmbLocal,
                         iddocDTE = 61,
                         Documento = "Nota de Crédito Electrónica",
-                        nroDTE = (int)(DateTime.Now.Ticks % 100000),
-                        FecDoc = DateTime.Now,
-                        HoraDoc = DateTime.Now.ToString("HH:mm:ss"),
+                        NroTicket = ventaOrigen.NroTicket > 0 ? ventaOrigen.NroTicket : ventaOrigen.nroDTE,
+                        FechaTicket = ventaOrigen.FechaTicket ?? ventaOrigen.FecDoc,
+                        nroDTE = (int)(ahora.Ticks % 100000),
+                        FecDoc = ahora,
                         SubTotal = ventaOrigen.SubTotal,
                         Descuento = ventaOrigen.Descuento,
                         Neto = ventaOrigen.Neto,
@@ -71,6 +73,7 @@ namespace SISTEMAACTUALIZADO.Services
                         idREF = ventaOrigen.idTve,
                         nroREF = ventaOrigen.nroDTE,
                         codigoREF = codigoREF,
+                        FechaREF = ventaOrigen.FecDoc,
                         UserDTE = ventaOrigen.UserDTE,
                         Vendedor = ventaOrigen.Vendedor,
                         status = "Emitido"
@@ -90,8 +93,8 @@ namespace SISTEMAACTUALIZADO.Services
                             iddocDTE = 61,
                             Documento = "Nota de Crédito Electrónica",
                             NroDTE = ncHeader.nroDTE,
-                            FecMoV = DateTime.Now,
-                            HoraMoV = DateTime.Now.ToString("HH:mm:ss"),
+                            FecMoV = ahora,
+                            HoraMoV = ahora.ToString("HH:mm:ss"),
                             IdProducto = item.IdProducto,
                             NmbProducto = item.NmbProducto,
                             Cantidad = item.Cantidad,

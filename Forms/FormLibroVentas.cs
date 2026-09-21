@@ -2,6 +2,8 @@ using System;
 using System.Collections.Generic;
 using System.Drawing;
 using System.Drawing.Drawing2D;
+using System.Diagnostics;
+using System.Drawing.Printing;
 using System.IO;
 using System.Linq;
 using System.Text;
@@ -34,7 +36,9 @@ namespace SISTEMAACTUALIZADO
         private Button btnBuscar = null!;
         private Button btnLimpiar = null!;
         private Button btnExportarCSV = null!;
-        private Button btnImprimirF29Top = null!;
+        private Button btnExportarPdf = null!;
+        private int _filaImpresionActual = 0;
+        private int _nroPaginaPdf = 1;
 
         // Filtros Rápidos
         private Button btnFiltroHoy = null!;
@@ -240,15 +244,15 @@ namespace SISTEMAACTUALIZADO
                 BackColor = Color.Transparent
             };
 
-            btnImprimirF29Top = CrearBoton("🖨️  Imprimir F29", Color.FromArgb(15, 23, 42), Color.White, new Size(125, 28), 6);
-            btnImprimirF29Top.Margin = new Padding(6, 2, 0, 0);
-            btnImprimirF29Top.Click += (s, e) => MessageBox.Show("Generando reporte F29 oficial para impresión...", "Imprimir F29", MessageBoxButtons.OK, MessageBoxIcon.Information);
+            btnExportarPdf = CrearBoton("📄  Exportar PDF", Color.FromArgb(254, 242, 242), Color.FromArgb(220, 38, 38), new Size(130, 28), 6);
+            btnExportarPdf.Margin = new Padding(6, 2, 0, 0);
+            btnExportarPdf.Click += (s, e) => GenerarReportePdf();
 
             btnExportarCSV = CrearBoton("📥  Exportar CSV", Color.FromArgb(240, 253, 244), Color.FromArgb(22, 101, 52), new Size(125, 28), 6);
             btnExportarCSV.Margin = new Padding(0, 2, 0, 0);
             btnExportarCSV.Click += BtnExportarCSV_Click;
 
-            flowBotonesDerecha.Controls.AddRange(new Control[] { btnImprimirF29Top, btnExportarCSV });
+            flowBotonesDerecha.Controls.AddRange(new Control[] { btnExportarPdf, btnExportarCSV });
 
             pnlFila2Acciones.Controls.Add(flowBotonesDerecha);
             pnlFila2Acciones.Controls.Add(flowFiltrosRapidos);
@@ -688,6 +692,182 @@ namespace SISTEMAACTUALIZADO
                     MessageBox.Show($"Error al exportar CSV: {ex.Message}", "Error de Exportación", MessageBoxButtons.OK, MessageBoxIcon.Error);
                 }
             }
+        }
+
+        private void GenerarReportePdf()
+        {
+            if (_ventasCargadas.Count == 0)
+            {
+                MessageBox.Show("No hay registros para generar el informe PDF en este período.", "Aviso", MessageBoxButtons.OK, MessageBoxIcon.Information);
+                return;
+            }
+
+            using SaveFileDialog sfd = new SaveFileDialog
+            {
+                Filter = "Documento PDF (*.pdf)|*.pdf",
+                FileName = $"Reporte_Libro_Ventas_{dtpDesde.Value:yyyyMMdd}_{dtpHasta.Value:yyyyMMdd}.pdf"
+            };
+
+            if (sfd.ShowDialog() == DialogResult.OK)
+            {
+                try
+                {
+                    _filaImpresionActual = 0;
+                    _nroPaginaPdf = 1;
+
+                    PrintDocument doc = new PrintDocument();
+                    doc.DefaultPageSettings.Landscape = true;
+                    doc.DefaultPageSettings.Margins = new Margins(40, 40, 40, 40);
+                    doc.PrinterSettings.PrinterName = "Microsoft Print to PDF";
+                    doc.PrinterSettings.PrintToFile = true;
+                    doc.PrinterSettings.PrintFileName = sfd.FileName;
+
+                    doc.PrintPage += Doc_PrintPage;
+                    doc.Print();
+
+                    var res = MessageBox.Show("Reporte PDF generado exitosamente.\n\n¿Desea abrir el archivo generado ahora?", "Exportación PDF", MessageBoxButtons.YesNo, MessageBoxIcon.Information);
+                    if (res == DialogResult.Yes)
+                    {
+                        Process.Start(new ProcessStartInfo { FileName = sfd.FileName, UseShellExecute = true });
+                    }
+                }
+                catch (Exception ex)
+                {
+                    MessageBox.Show($"Error al generar el PDF: {ex.Message}", "Error PDF", MessageBoxButtons.OK, MessageBoxIcon.Error);
+                }
+            }
+        }
+
+        private void Doc_PrintPage(object sender, PrintPageEventArgs e)
+        {
+            Graphics g = e.Graphics!;
+            int left = e.MarginBounds.Left;
+            int right = e.MarginBounds.Right;
+            int top = e.MarginBounds.Top;
+            int width = e.MarginBounds.Width;
+            int y = top;
+
+            // Encabezado y KPIs en la primera página
+            if (_nroPaginaPdf == 1)
+            {
+                using Font fontTit = new Font("Segoe UI", 16, FontStyle.Bold);
+                using Font fontSub = new Font("Segoe UI", 9, FontStyle.Regular);
+                using Brush brushTit = new SolidBrush(Color.FromArgb(15, 23, 42));
+                using Brush brushSub = new SolidBrush(Color.FromArgb(100, 116, 139));
+
+                g.DrawString("SISTEMA POS MODERNO - LIBRO DE VENTAS (LVE)", fontTit, brushTit, left, y);
+                y += 24;
+
+                string rango = $"Período: {dtpDesde.Value:dd/MM/yyyy} al {dtpHasta.Value:dd/MM/yyyy}  |  Emitido: {DateTime.Now:dd/MM/yyyy HH:mm}";
+                g.DrawString(rango, fontSub, brushSub, left, y);
+                y += 22;
+
+                decimal totalVentas = _ventasCargadas.Sum(v => v.Total);
+                decimal totalNeto = _ventasCargadas.Sum(v => v.Neto);
+                decimal totalIva = _ventasCargadas.Sum(v => v.IvA);
+                int cantDoc = _ventasCargadas.Count;
+                int boletas = _ventasCargadas.Count(v => v.Documento.Contains("Boleta"));
+                int facturas = _ventasCargadas.Count(v => v.Documento.Contains("Factura"));
+
+                Rectangle kpiRect = new Rectangle(left, y, width, 32);
+                using Brush bgKpi = new SolidBrush(Color.FromArgb(241, 245, 249));
+                using Pen penKpi = new Pen(Color.FromArgb(203, 213, 225));
+                g.FillRectangle(bgKpi, kpiRect);
+                g.DrawRectangle(penKpi, kpiRect);
+
+                using Font fontKpi = new Font("Segoe UI", 8.5F, FontStyle.Bold);
+                using Brush brushKpi = new SolidBrush(Color.FromArgb(30, 41, 59));
+                string resumenTexto = $"Documentos: {cantDoc} (Boletas: {boletas}, Facturas: {facturas})   |   Neto: ${totalNeto:N0}   |   Débito Fiscal IVA: ${totalIva:N0}   |   TOTAL VENTAS: ${totalVentas:N0}";
+                g.DrawString(resumenTexto, fontKpi, brushKpi, left + 10, y + 8);
+                y += 42;
+            }
+
+            // Encabezados de Columnas
+            int[] colWidths = new int[] { 170, 75, 120, 240, 110, 100, 95, 110 };
+            string[] headers = new string[] { "TIPO DOCUMENTO", "FOLIO", "FECHA EMISIÓN", "RAZÓN SOCIAL", "RUT", "NETO", "IVA (19%)", "TOTAL" };
+
+            Rectangle headerRect = new Rectangle(left, y, width, 24);
+            using Brush bgHead = new SolidBrush(Color.FromArgb(15, 23, 42));
+            g.FillRectangle(bgHead, headerRect);
+
+            using Font fontHeader = new Font("Segoe UI", 8F, FontStyle.Bold);
+            using Brush brushHeadTxt = new SolidBrush(Color.White);
+
+            int curX = left;
+            for (int i = 0; i < headers.Length; i++)
+            {
+                StringFormat sf = new StringFormat
+                {
+                    Alignment = (i >= 5) ? StringAlignment.Far : (i == 1 || i == 2 ? StringAlignment.Center : StringAlignment.Near),
+                    LineAlignment = StringAlignment.Center
+                };
+                g.DrawString(headers[i], fontHeader, brushHeadTxt, new RectangleF(curX + 4, y, colWidths[i] - 8, 24), sf);
+                curX += colWidths[i];
+            }
+            y += 26;
+
+            using Font fontRow = new Font("Segoe UI", 8F, FontStyle.Regular);
+            using Font fontRowBold = new Font("Segoe UI", 8F, FontStyle.Bold);
+            using Brush brushText = new SolidBrush(Color.FromArgb(15, 23, 42));
+            using Brush brushAlt = new SolidBrush(Color.FromArgb(248, 250, 252));
+            using Pen penLine = new Pen(Color.FromArgb(226, 232, 240));
+
+            // Dibujar filas con salto de página automático
+            while (_filaImpresionActual < _ventasCargadas.Count)
+            {
+                if (y + 24 > e.MarginBounds.Bottom - 30)
+                {
+                    e.HasMorePages = true;
+                    _nroPaginaPdf++;
+                    return;
+                }
+
+                var v = _ventasCargadas[_filaImpresionActual];
+
+                if (_filaImpresionActual % 2 == 1)
+                {
+                    g.FillRectangle(brushAlt, new Rectangle(left, y, width, 22));
+                }
+                g.DrawLine(penLine, left, y + 22, right, y + 22);
+
+                curX = left;
+                string rut = string.IsNullOrEmpty(v.RuT) ? "-" : v.RuT;
+                string razon = string.IsNullOrEmpty(v.RazonSocial) ? "Consumidor Final" : v.RazonSocial;
+
+                string[] rowValores = new string[]
+                {
+                    v.Documento,
+                    v.nroDTE.ToString(),
+                    v.FecDoc.ToString("dd/MM/yyyy HH:mm"),
+                    razon,
+                    rut,
+                    $"${v.Neto:N0}",
+                    $"${v.IvA:N0}",
+                    $"${v.Total:N0}"
+                };
+
+                for (int i = 0; i < rowValores.Length; i++)
+                {
+                    StringFormat sf = new StringFormat
+                    {
+                        Alignment = (i >= 5) ? StringAlignment.Far : (i == 1 || i == 2 ? StringAlignment.Center : StringAlignment.Near),
+                        LineAlignment = StringAlignment.Center,
+                        Trimming = StringTrimming.EllipsisCharacter
+                    };
+                    Font f = (i == 1 || i == 7) ? fontRowBold : fontRow;
+                    g.DrawString(rowValores[i], f, brushText, new RectangleF(curX + 4, y, colWidths[i] - 8, 22), sf);
+                    curX += colWidths[i];
+                }
+
+                y += 22;
+                _filaImpresionActual++;
+            }
+
+            using Font fontFoot = new Font("Segoe UI", 7.5F, FontStyle.Italic);
+            using Brush brushFoot = new SolidBrush(Color.FromArgb(148, 163, 184));
+            g.DrawString($"Página {_nroPaginaPdf}  -  Sistema POS Moderno", fontFoot, brushFoot, left, e.MarginBounds.Bottom - 14);
+
+            e.HasMorePages = false;
         }
 
         private void BtnNotaCredito_Click(object? sender, EventArgs e)

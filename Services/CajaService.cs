@@ -181,6 +181,7 @@ namespace SISTEMAACTUALIZADO.Services
         }
 
         // 3. PROCESAR COBRO: Actualiza FecDoc/HoraDoc al instante de cobro y asigna el Cajero y Turno
+        // 3. PROCESAR COBRO: Preserva NroTicket/FechaTicket y registra nroDTE y FecDoc oficial
         public int ProcesarCobroTicket(TVE2607 ticket, string tipoDoc, string medioPago, decimal vuelto, int turnoId, string cajeroUsuario)
         {
             if (ticket == null) throw new ArgumentNullException(nameof(ticket));
@@ -210,12 +211,19 @@ namespace SISTEMAACTUALIZADO.Services
                 (!string.IsNullOrEmpty(rutLimpio) && (c.Rut == rutLimpio || c.Rut == ticket.RuT)));
 
             DateTime ahora = DateTime.Now;
+
+            // Asegurar que si el ticket no tenía guardado su NroTicket, conserve el original
+            if (ticketBd.NroTicket <= 0)
+            {
+                ticketBd.NroTicket = ticketBd.nroDTE;
+                ticketBd.FechaTicket = ticketBd.FecDoc;
+            }
+
             ticketBd.CajaTurnoID = turnoId;
             ticketBd.iddocDTE = iddoc;
             ticketBd.Documento = tipoDoc;
-            ticketBd.nroDTE = folioOficial;
-            ticketBd.FecDoc = ahora;
-            ticketBd.HoraDoc = ahora.ToString("HH:mm:ss");
+            ticketBd.nroDTE = folioOficial; // Folio fiscal DTE (SII)
+            ticketBd.FecDoc = ahora;         // Fecha y hora exacta de cobro
             ticketBd.UserDTE = cajeroUsuario;
             ticketBd.MedioPago = medioPago;
             ticketBd.Vuelto = vuelto;
@@ -241,7 +249,6 @@ namespace SISTEMAACTUALIZADO.Services
                     throw new InvalidOperationException("No se puede emitir Factura Electrónica sin un cliente formal registrado. Seleccione o cree un cliente con RUT, Giro y Dirección.");
                 }
 
-                // Boleta a consumidor final genérico
                 ticketBd.Idcliente = 0;
                 ticketBd.RuT = "";
                 ticketBd.RazonSocial = "Consumidor Final";
@@ -263,13 +270,14 @@ namespace SISTEMAACTUALIZADO.Services
 
             db.SaveChanges();
 
-            // 4. Copiar los datos reales al objeto en memoria para la impresión inmediata
+            // 4. Copiar los datos reales al objeto en memoria
             ticket.CajaTurnoID = ticketBd.CajaTurnoID;
             ticket.iddocDTE = ticketBd.iddocDTE;
             ticket.Documento = ticketBd.Documento;
+            ticket.NroTicket = ticketBd.NroTicket;
+            ticket.FechaTicket = ticketBd.FechaTicket;
             ticket.nroDTE = ticketBd.nroDTE;
             ticket.FecDoc = ticketBd.FecDoc;
-            ticket.HoraDoc = ticketBd.HoraDoc;
             ticket.UserDTE = ticketBd.UserDTE;
             ticket.MedioPago = ticketBd.MedioPago;
             ticket.Vuelto = ticketBd.Vuelto;

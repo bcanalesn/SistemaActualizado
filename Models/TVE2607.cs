@@ -10,14 +10,20 @@ namespace SISTEMAACTUALIZADO.Models
     {
         [Key]
         public int idTve { get; set; }
-        public int? CajaTurnoID { get; set; } // Enlaza la venta al turno de caja exacto
+        public int? CajaTurnoID { get; set; }
         public int idLocal { get; set; } = 1;
         public string nmbLocal { get; set; } = "Local Principal";
         public int iddocDTE { get; set; } = 39;
         public string Documento { get; set; } = "Boleta Electrónica";
+
+        // Columnas nuevas de Preventa
+        public int NroTicket { get; set; }
+        public DateTime? FechaTicket { get; set; }
+
         public int nroDTE { get; set; }
         public int nroInT { get; set; }
         public DateTime FecDoc { get; set; } = DateTime.Now;
+
         public decimal SubTotal { get; set; }
         public decimal Descuento { get; set; }
         public decimal Neto { get; set; }
@@ -26,8 +32,9 @@ namespace SISTEMAACTUALIZADO.Models
         public decimal Impto3 { get; set; }
         public decimal IvA { get; set; }
         public decimal Total { get; set; }
-        public string UserDTE { get; set; } = "barbara"; // Cajero que cobró
-        public string Vendedor { get; set; } = "Barbara"; // Vendedor de preventa en mesón
+
+        public string UserDTE { get; set; } = "barbara";
+        public string Vendedor { get; set; } = "Barbara";
         public int nroZ { get; set; }
         public string Url { get; set; } = string.Empty;
         public int nPAX { get; set; } = 1;
@@ -45,12 +52,11 @@ namespace SISTEMAACTUALIZADO.Models
         public string Fono1 { get; set; } = string.Empty;
         public string Fono2 { get; set; } = string.Empty;
         public string email { get; set; } = string.Empty;
-        public string status { get; set; } = "1";
+        public string status { get; set; } = "Pendiente";
         public int? idREF { get; set; }
         public int? nroREF { get; set; }
         public string? codigoREF { get; set; }
         public DateTime? FechaREF { get; set; }
-        public string HoraDoc { get; set; } = DateTime.Now.ToString("HH:mm:ss");
         public string MedioPago { get; set; } = "Efectivo";
         public decimal Vuelto { get; set; } = 0;
 

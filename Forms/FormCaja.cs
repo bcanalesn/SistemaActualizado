@@ -574,7 +574,8 @@ namespace SISTEMAACTUALIZADO
                 FormBorderStyle = FormBorderStyle.FixedDialog,
                 MaximizeBox = false,
                 MinimizeBox = false,
-                BackColor = Color.White
+                BackColor = Color.White,
+                KeyPreview = true
             };
 
             Label lblT = new Label { Text = "🔑 AUTORIZACIÓN DE SUPERVISOR", Location = new Point(20, 16), AutoSize = true, Font = new Font("Segoe UI", 10F, FontStyle.Bold), ForeColor = Color.FromArgb(37, 99, 235) };
@@ -614,6 +615,22 @@ namespace SISTEMAACTUALIZADO
                 }
             };
 
+            // Asignación de tecla Enter al botón de concesión
+            modal.AcceptButton = btnAut;
+
+            KeyEventHandler enterExtHandler = (s, e) =>
+            {
+                if (e.KeyCode == Keys.Enter)
+                {
+                    btnAut.PerformClick();
+                    e.SuppressKeyPress = true;
+                }
+            };
+
+            txtU.KeyDown += enterExtHandler;
+            txtP.KeyDown += enterExtHandler;
+            cbH.KeyDown += enterExtHandler;
+
             modal.Controls.AddRange(new Control[] { lblT, lblSub, lblU, txtU, lblP, txtP, lblH, cbH, btnAut });
             modal.ShowDialog(this);
         }
@@ -632,7 +649,8 @@ namespace SISTEMAACTUALIZADO
                 FormBorderStyle = FormBorderStyle.FixedDialog,
                 MaximizeBox = false,
                 MinimizeBox = false,
-                BackColor = Color.White
+                BackColor = Color.White,
+                KeyPreview = true
             };
 
             Label lblT = new Label { Text = "🛡️ RESCATE DE TURNOS ABANDONADOS", Location = new Point(20, 14), AutoSize = true, Font = new Font("Segoe UI", 11F, FontStyle.Bold), ForeColor = Color.FromArgb(220, 38, 38) };
@@ -699,6 +717,23 @@ namespace SISTEMAACTUALIZADO
                 modal.Close();
                 VerificarEstadoTurnoYBloqueo();
             };
+
+            // Asignación de tecla Enter al botón de cierre forzado
+            modal.AcceptButton = btnCerrarForzado;
+
+            KeyEventHandler enterForzadoHandler = (s, e) =>
+            {
+                if (e.KeyCode == Keys.Enter)
+                {
+                    btnCerrarForzado.PerformClick();
+                    e.SuppressKeyPress = true;
+                }
+            };
+
+            cbTurnos.KeyDown += enterForzadoHandler;
+            txtU.KeyDown += enterForzadoHandler;
+            txtP.KeyDown += enterForzadoHandler;
+            txtEf.KeyDown += enterForzadoHandler;
 
             modal.Controls.AddRange(new Control[] { lblT, lblSel, cbTurnos, lblInfo, lblU, txtU, lblP, txtP, lblE, txtEf, lblM, txtMotivo, btnCerrarForzado });
             modal.ShowDialog(this);
@@ -903,6 +938,37 @@ namespace SISTEMAACTUALIZADO
                     MessageBoxButtons.OK, 
                     MessageBoxIcon.Information
                 );
+            };
+
+            // Asignación de tecla Enter al botón de confirmación
+            modalCierre.AcceptButton = btnConfirmar;
+
+            txtEfectivoReal.KeyDown += (s, ev) =>
+            {
+                if (ev.KeyCode == Keys.Enter)
+                {
+                    decimal real = MonedaHelper.Limpiar(txtEfectivoReal.Text);
+                    decimal dif = real - efectivoEsperado;
+
+                    if (dif != 0 && string.IsNullOrWhiteSpace(txtObs.Text))
+                    {
+                        txtObs.Focus();
+                    }
+                    else
+                    {
+                        btnConfirmar.PerformClick();
+                    }
+                    ev.SuppressKeyPress = true;
+                }
+            };
+
+            txtObs.KeyDown += (s, ev) =>
+            {
+                if (ev.KeyCode == Keys.Enter)
+                {
+                    btnConfirmar.PerformClick();
+                    ev.SuppressKeyPress = true;
+                }
             };
 
             modalCierre.Controls.AddRange(new Control[] { lblT, lblSubFecha, lblPrompt, txtEfectivoReal, lblResultadoDif, lblObs, txtObs, btnConfirmar });

@@ -10,91 +10,95 @@ namespace SISTEMAACTUALIZADO.Services
 {
     public class VentaService
     {
-        // 1. GENERACIÓN DE TICKET DIRECTO A CAJA (Descuenta stock inmediatamente)
+        // 1. GENERACIÓN DE TICKET DIRECTO A CAJA
         public int GenerarTicketVenta(List<DetalleCarrito> carrito, string vendedor, string clienteNombre, string clienteRut)
         {
-            using (var db = new AppDbContext())
+            using var db = new AppDbContext();
+            DateTime ahora = DateTime.Now;
+            int ultimoNroInT = db.TVE2607.Max(v => (int?)v.nroInT) ?? 0;
+            int siguienteNroInT = ultimoNroInT + 1;
+            int nroTicketAtencion = (int)(ahora.Ticks % 1000000);
+
+            string rutLimpio = RutHelper.Limpiar(clienteRut ?? "");
+            var clienteDb = db.Clientes.FirstOrDefault(c => !string.IsNullOrEmpty(rutLimpio) && (c.Rut == rutLimpio || c.Rut == clienteRut));
+
+            decimal subtotal = carrito.Sum(c => c.Subtotal);
+            decimal neto = Math.Round(subtotal / 1.19m, 0);
+
+            var nuevaVenta = new TVE2607
             {
-                int ultimoNroInT = db.TVE2607.Max(v => (int?)v.nroInT) ?? 0;
-                int siguienteNroInT = ultimoNroInT + 1;
+                idLocal = 1,
+                nmbLocal = "Local Principal",
+                iddocDTE = 0,
+                Documento = "Ticket de Atención",
+                NroTicket = nroTicketAtencion,
+                FechaTicket = ahora,
+                nroDTE = nroTicketAtencion, // Mientras sea preventa
+                nroInT = siguienteNroInT,
+                FecDoc = ahora,
+                SubTotal = subtotal,
+                Descuento = 0,
+                Neto = neto,
+                IvA = subtotal - neto,
+                Total = subtotal,
+                UserDTE = vendedor,
+                Vendedor = vendedor,
+                Idcliente = clienteDb?.IdCliente ?? 0,
+                RuT = clienteDb != null ? RutHelper.Formatear(clienteDb.Rut) : "",
+                RazonSocial = clienteDb?.RazonSocial ?? "Consumidor Final",
+                Giro = clienteDb?.Giro ?? "",
+                Direccion = clienteDb?.Direccion ?? "",
+                nComuna = clienteDb?.Comuna ?? "",
+                nCiudad = clienteDb?.Ciudad ?? "",
+                Fono1 = clienteDb?.Telefono ?? "",
+                email = clienteDb?.Email ?? "",
+                status = "Pendiente"
+            };
 
-                int nroTicketAtencion = (int)(DateTime.Now.Ticks % 1000000);
+            db.TVE2607.Add(nuevaVenta);
+            db.SaveChanges();
 
-                string rutLimpio = RutHelper.Limpiar(clienteRut ?? "");
-                var clienteDb = db.Clientes.FirstOrDefault(c => !string.IsNullOrEmpty(rutLimpio) && (c.Rut == rutLimpio || c.Rut == clienteRut));
-
-                var nuevaVenta = new TVE2607
+            foreach (var item in carrito)
+            {
+                var detalle = new TVD2607
                 {
+                    idTve = nuevaVenta.idTve,
                     idLocal = 1,
-                    nmbLocal = "Local Principal",
                     iddocDTE = 0,
                     Documento = "Ticket de Atención",
-                    nroDTE = nroTicketAtencion,
-                    nroInT = siguienteNroInT,
-                    FecDoc = DateTime.Now,
-                    SubTotal = carrito.Sum(c => c.Subtotal),
-                    Descuento = 0,
-                    Neto = Math.Round(carrito.Sum(c => c.Subtotal) / 1.19m, 0),
-                    IvA = carrito.Sum(c => c.Subtotal) - Math.Round(carrito.Sum(c => c.Subtotal) / 1.19m, 0),
-                    Total = carrito.Sum(c => c.Subtotal),
-                    UserDTE = vendedor,
-                    Vendedor = vendedor,
-                    Idcliente = clienteDb?.IdCliente ?? 0,
-                    RuT = clienteDb != null ? RutHelper.Formatear(clienteDb.Rut) : "",
-                    RazonSocial = clienteDb?.RazonSocial ?? "Consumidor Final",
-                    Giro = clienteDb?.Giro ?? "",
-                    Direccion = clienteDb?.Direccion ?? "",
-                    nComuna = clienteDb?.Comuna ?? "",
-                    nCiudad = clienteDb?.Ciudad ?? "",
-                    Fono1 = clienteDb?.Telefono ?? "",
-                    email = clienteDb?.Email ?? "",
-                    status = "Pendiente"
+                    NroDTE = nroTicketAtencion,
+                    NroInT = siguienteNroInT,
+                    FecMoV = ahora,
+                    HoraMoV = ahora.ToString("HH:mm:ss"),
+                    IdProducto = item.ProductoID,
+                    NmbProducto = item.Nombre,
+                    Cantidad = item.Cantidad,
+                    Precio = item.PrecioUnitario,
+                    SubTotal = item.Subtotal,
+                    nmbVendedor = vendedor,
+                    Unidad = "UN"
                 };
 
-                db.TVE2607.Add(nuevaVenta);
-                db.SaveChanges();
+                db.TVD2607.Add(detalle);
 
-                foreach (var item in carrito)
+                var prodBD = db.Productos.FirstOrDefault(p => p.ProductoID == item.ProductoID);
+                if (prodBD != null)
                 {
-                    var detalle = new TVD2607
-                    {
-                        idTve = nuevaVenta.idTve,
-                        idLocal = 1,
-                        iddocDTE = 0,
-                        Documento = "Ticket de Atención",
-                        NroDTE = nroTicketAtencion,
-                        NroInT = siguienteNroInT,
-                        FecMoV = DateTime.Now,
-                        HoraMoV = DateTime.Now.ToString("HH:mm:ss"),
-                        IdProducto = item.ProductoID,
-                        NmbProducto = item.Nombre,
-                        Cantidad = item.Cantidad,
-                        Precio = item.PrecioUnitario,
-                        SubTotal = item.Subtotal,
-                        nmbVendedor = vendedor,
-                        Unidad = "UN"
-                    };
-
-                    db.TVD2607.Add(detalle);
-
-                    var prodBD = db.Productos.FirstOrDefault(p => p.ProductoID == item.ProductoID);
-                    if (prodBD != null)
-                    {
-                        prodBD.Stock -= item.Cantidad;
-                        if (prodBD.Stock < 0) prodBD.Stock = 0;
-                    }
+                    prodBD.Stock -= item.Cantidad;
+                    if (prodBD.Stock < 0) prodBD.Stock = 0;
                 }
-
-                db.SaveChanges();
-                return nroTicketAtencion;
             }
+
+            db.SaveChanges();
+            return nroTicketAtencion;
         }
 
-        // 2. VENTAS EN ESPERA: GUARDAR EN PAUSA (PRESERVA RAZÓN SOCIAL Y NO TOCA STOCK)
+        // 2. VENTAS EN ESPERA: GUARDAR EN PAUSA
         public int PonerVentaEnEspera(List<DetalleCarrito> carrito, string vendedor, string clienteNombre, string clienteRut, string identificador, int idTveExistente = 0)
         {
             using var db = new AppDbContext();
             TVE2607? venta = null;
+            DateTime ahora = DateTime.Now;
 
             if (idTveExistente > 0)
             {
@@ -107,25 +111,18 @@ namespace SISTEMAACTUALIZADO.Services
             string nombreBaseLimpio = System.Text.RegularExpressions.Regex.Replace(clienteNombre ?? "Consumidor Final", @"\s*\([^)]*\)", "").Trim();
             if (string.IsNullOrWhiteSpace(nombreBaseLimpio)) nombreBaseLimpio = "Consumidor Final";
 
-            string razonSocialFinal;
-            if (!string.IsNullOrEmpty(rutLimpio) && clienteDb != null)
-            {
-                razonSocialFinal = clienteDb.RazonSocial;
-            }
-            else
-            {
-                razonSocialFinal = !string.IsNullOrWhiteSpace(identificador) 
-                    ? $"{nombreBaseLimpio} ({identificador.Trim()})" 
-                    : nombreBaseLimpio;
-            }
+            string razonSocialFinal = (!string.IsNullOrEmpty(rutLimpio) && clienteDb != null)
+                ? clienteDb.RazonSocial
+                : (!string.IsNullOrWhiteSpace(identificador) ? $"{nombreBaseLimpio} ({identificador.Trim()})" : nombreBaseLimpio);
 
             decimal subtotal = carrito.Sum(c => c.Subtotal);
+            decimal neto = Math.Round(subtotal / 1.19m, 0);
 
             if (venta == null)
             {
                 int ultimoNroInT = db.TVE2607.Max(v => (int?)v.nroInT) ?? 0;
                 int siguienteNroInT = ultimoNroInT + 1;
-                int nroTicket = (int)(DateTime.Now.Ticks % 1000000);
+                int nroTicket = (int)(ahora.Ticks % 1000000);
 
                 venta = new TVE2607
                 {
@@ -133,13 +130,15 @@ namespace SISTEMAACTUALIZADO.Services
                     nmbLocal = "Local Principal",
                     iddocDTE = 0,
                     Documento = "Venta en Espera",
+                    NroTicket = nroTicket,
+                    FechaTicket = ahora,
                     nroDTE = nroTicket,
                     nroInT = siguienteNroInT,
-                    FecDoc = DateTime.Now,
+                    FecDoc = ahora,
                     SubTotal = subtotal,
                     Descuento = 0,
-                    Neto = Math.Round(subtotal / 1.19m, 0),
-                    IvA = subtotal - Math.Round(subtotal / 1.19m, 0),
+                    Neto = neto,
+                    IvA = subtotal - neto,
                     Total = subtotal,
                     UserDTE = vendedor,
                     Vendedor = vendedor,
@@ -159,13 +158,13 @@ namespace SISTEMAACTUALIZADO.Services
             else
             {
                 venta.SubTotal = subtotal;
-                venta.Neto = Math.Round(subtotal / 1.19m, 0);
-                venta.IvA = subtotal - venta.Neto;
+                venta.Neto = neto;
+                venta.IvA = subtotal - neto;
                 venta.Total = subtotal;
                 venta.UserDTE = vendedor;
                 venta.Vendedor = vendedor;
                 venta.RazonSocial = razonSocialFinal;
-                venta.FecDoc = DateTime.Now;
+                venta.FecDoc = ahora;
                 venta.status = "EnEspera";
 
                 var detallesAntiguos = db.TVD2607.Where(d => d.idTve == venta.idTve).ToList();
@@ -184,8 +183,8 @@ namespace SISTEMAACTUALIZADO.Services
                     Documento = "Venta en Espera",
                     NroDTE = venta.nroDTE,
                     NroInT = venta.nroInT,
-                    FecMoV = DateTime.Now,
-                    HoraMoV = DateTime.Now.ToString("HH:mm:ss"),
+                    FecMoV = ahora,
+                    HoraMoV = ahora.ToString("HH:mm:ss"),
                     IdProducto = item.ProductoID,
                     NmbProducto = item.Nombre,
                     Cantidad = item.Cantidad,
@@ -201,7 +200,7 @@ namespace SISTEMAACTUALIZADO.Services
             return venta.idTve;
         }
 
-        // 3. CONSULTAR VENTAS EN ESPERA ACTIVAS DEL DÍA
+        // 3. CONSULTAR VENTAS EN ESPERA
         public List<TVE2607> ObtenerVentasEnEspera()
         {
             using var db = new AppDbContext();
@@ -216,7 +215,7 @@ namespace SISTEMAACTUALIZADO.Services
                 .ToList();
         }
 
-        // 4. RECUPERAR VENTA CON CONTROL ESTRICTO DE PROPIEDAD
+        // 4. RECUPERAR VENTA
         public (bool Exito, string Mensaje, List<DetalleCarrito> Carrito, string Rut, string Cliente, int IdCliente) RecuperarVentaEnEspera(int idTve, string vendedorActual)
         {
             using var db = new AppDbContext();
@@ -224,7 +223,6 @@ namespace SISTEMAACTUALIZADO.Services
             if (venta == null) 
                 return (false, "La venta seleccionada ya no existe.", new List<DetalleCarrito>(), "", "", 0);
 
-            // Verificación de dueño
             if (!string.Equals(venta.Vendedor, vendedorActual, StringComparison.OrdinalIgnoreCase))
             {
                 return (false, $"Esta venta fue iniciada por '{venta.Vendedor}'. Solo dicho vendedor puede reanudarla.", new List<DetalleCarrito>(), "", "", 0);
@@ -240,23 +238,18 @@ namespace SISTEMAACTUALIZADO.Services
             db.SaveChanges();
 
             var detalles = db.TVD2607.Where(d => d.idTve == idTve).ToList();
-            var carrito = new List<DetalleCarrito>();
-
-            foreach (var d in detalles)
+            var carrito = detalles.Select(d => new DetalleCarrito
             {
-                carrito.Add(new DetalleCarrito
-                {
-                    ProductoID = d.IdProducto,
-                    Nombre = d.NmbProducto ?? "Producto",
-                    PrecioUnitario = d.Precio,
-                    Cantidad = d.Cantidad
-                });
-            }
+                ProductoID = d.IdProducto,
+                Nombre = d.NmbProducto ?? "Producto",
+                PrecioUnitario = d.Precio,
+                Cantidad = d.Cantidad
+            }).ToList();
 
             return (true, "OK", carrito, venta.RuT ?? "", venta.RazonSocial ?? "Consumidor Final", venta.Idcliente);
         }
 
-        // 5. ENVIAR A CAJA VENTA PREVIAMENTE EN ESPERA (DESCUENTA STOCK DEFINITIVO)
+        // 5. ENVIAR A CAJA VENTA EN ESPERA
         public int ActualizarTicketExistenteACaja(int idTve, List<DetalleCarrito> carrito, string vendedor, string clienteNombre, string clienteRut)
         {
             using var db = new AppDbContext();
@@ -266,17 +259,21 @@ namespace SISTEMAACTUALIZADO.Services
                 return GenerarTicketVenta(carrito, vendedor, clienteNombre, clienteRut);
             }
 
+            DateTime ahora = DateTime.Now;
             string rutLimpio = RutHelper.Limpiar(clienteRut ?? "");
             var clienteDb = db.Clientes.FirstOrDefault(c => !string.IsNullOrEmpty(rutLimpio) && (c.Rut == rutLimpio || c.Rut == clienteRut));
 
             decimal subtotal = carrito.Sum(c => c.Subtotal);
+            decimal neto = Math.Round(subtotal / 1.19m, 0);
+
             venta.SubTotal = subtotal;
-            venta.Neto = Math.Round(subtotal / 1.19m, 0);
-            venta.IvA = subtotal - venta.Neto;
+            venta.Neto = neto;
+            venta.IvA = subtotal - neto;
             venta.Total = subtotal;
             venta.UserDTE = vendedor;
             venta.Vendedor = vendedor;
-            venta.FecDoc = DateTime.Now;
+            venta.FecDoc = ahora;
+            if (!venta.FechaTicket.HasValue) venta.FechaTicket = ahora;
             venta.Documento = "Ticket de Atención";
             venta.status = "Pendiente";
 
@@ -301,8 +298,8 @@ namespace SISTEMAACTUALIZADO.Services
                     Documento = "Ticket de Atención",
                     NroDTE = venta.nroDTE,
                     NroInT = venta.nroInT,
-                    FecMoV = DateTime.Now,
-                    HoraMoV = DateTime.Now.ToString("HH:mm:ss"),
+                    FecMoV = ahora,
+                    HoraMoV = ahora.ToString("HH:mm:ss"),
                     IdProducto = item.ProductoID,
                     NmbProducto = item.Nombre,
                     Cantidad = item.Cantidad,
@@ -322,10 +319,10 @@ namespace SISTEMAACTUALIZADO.Services
             }
 
             db.SaveChanges();
-            return venta.nroDTE;
+            return venta.NroTicket > 0 ? venta.NroTicket : venta.nroDTE;
         }
 
-        // 6. DESCARTAR VENTA EN ESPERA
+        // 6. DESCARTAR VENTA
         public void CancelarVentaEnEspera(int idTve)
         {
             using var db = new AppDbContext();
@@ -336,7 +333,7 @@ namespace SISTEMAACTUALIZADO.Services
             db.SaveChanges();
         }
 
-        // 7. CONSULTAS Y HISTORIAL
+        // 7. CONSULTAS
         public List<TVD2607> ObtenerDetallesVenta(int idTve)
         {
             using var db = new AppDbContext();
@@ -371,6 +368,7 @@ namespace SISTEMAACTUALIZADO.Services
             {
                 string q = busqueda.Trim().ToLower();
                 query = query.Where(v => v.nroDTE.ToString().Contains(q) ||
+                                        v.NroTicket.ToString().Contains(q) ||
                                         (v.RazonSocial != null && v.RazonSocial.ToLower().Contains(q)) ||
                                         (v.RuT != null && v.RuT.ToLower().Contains(q)));
             }
@@ -380,8 +378,8 @@ namespace SISTEMAACTUALIZADO.Services
                 .Select(v => new TicketVendedorDTO
                 {
                     IdTve = v.idTve,
-                    NroTicket = v.nroDTE,
-                    FechaHora = v.FecDoc,
+                    NroTicket = v.NroTicket > 0 ? v.NroTicket : v.nroDTE,
+                    FechaHora = v.FechaTicket ?? v.FecDoc,
                     Cliente = string.IsNullOrWhiteSpace(v.RazonSocial) ? "Consumidor Final" : v.RazonSocial,
                     Total = v.Total,
                     EstadoBD = v.status ?? "",
