@@ -723,6 +723,7 @@ namespace SISTEMAACTUALIZADO
                     var prod = _productosCache.FirstOrDefault(p => p.ProductoID == item.ProductoID);
                     if (prod != null)
                     {
+                        item.PrecioLista1 = prod.PrecioUnitario; // <-- Guarda el precio de Lista 1
                         item.PrecioUnitario = _productoService.ObtenerPrecioProductoConCliente(prod, _listaClienteActivo, item.Cantidad, clienteId);
                         prod.Stock -= item.Cantidad;
                         if (prod.Stock < 0) prod.Stock = 0;
@@ -1007,6 +1008,7 @@ namespace SISTEMAACTUALIZADO
                         if (itemExistente != null)
                         {
                             itemExistente.Cantidad = nuevaCantidad;
+                            itemExistente.PrecioLista1 = prod.PrecioUnitario;
                             itemExistente.PrecioUnitario = precioFinal;
                         }
                         else
@@ -1015,6 +1017,7 @@ namespace SISTEMAACTUALIZADO
                             {
                                 ProductoID = prod.ProductoID,
                                 Nombre = prod.Nombre,
+                                PrecioLista1 = prod.PrecioUnitario,
                                 PrecioUnitario = precioFinal,
                                 Cantidad = nuevaCantidad
                             });
@@ -1121,10 +1124,14 @@ namespace SISTEMAACTUALIZADO
 
             lblCantItemsBadge.Text = totalItemsCount.ToString();
 
-            decimal subtotal = cart.Sum(c => c.Subtotal);
-            lblSubtotalValue.Text = MonedaHelper.Formatear(subtotal, conSigno: true);
-            lblDescuentoValue.Text = "$ 0";
-            lblTotalValue.Text = MonedaHelper.Formatear(subtotal, conSigno: true);
+            decimal subtotalBruto = cart.Sum(c => c.SubtotalLista1);
+            decimal totalPagar = cart.Sum(c => c.Subtotal);
+            decimal ahorroDescuento = subtotalBruto - totalPagar;
+            if (ahorroDescuento < 0) ahorroDescuento = 0;
+
+            lblSubtotalValue.Text = MonedaHelper.Formatear(subtotalBruto, conSigno: true);
+            lblDescuentoValue.Text = ahorroDescuento > 0 ? $"-{MonedaHelper.Formatear(ahorroDescuento, conSigno: true)}" : "$ 0";
+            lblTotalValue.Text = MonedaHelper.Formatear(totalPagar, conSigno: true);
 
             ReajustarAnchoFilasCarrito();
         }

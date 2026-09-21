@@ -22,8 +22,13 @@ namespace SISTEMAACTUALIZADO.Services
             string rutLimpio = RutHelper.Limpiar(clienteRut ?? "");
             var clienteDb = db.Clientes.FirstOrDefault(c => !string.IsNullOrEmpty(rutLimpio) && (c.Rut == rutLimpio || c.Rut == clienteRut));
 
-            decimal subtotal = carrito.Sum(c => c.Subtotal);
-            decimal neto = Math.Round(subtotal / 1.19m, 0);
+            decimal totalCobrado = carrito.Sum(c => c.Subtotal);
+            decimal subtotalLista1 = carrito.Sum(c => c.SubtotalLista1);
+            decimal descuentoGlobal = subtotalLista1 - totalCobrado;
+            if (descuentoGlobal < 0) descuentoGlobal = 0;
+
+            decimal neto = Math.Round(totalCobrado / 1.19m, 0);
+            decimal iva = totalCobrado - neto;
 
             var nuevaVenta = new TVE2607
             {
@@ -33,14 +38,14 @@ namespace SISTEMAACTUALIZADO.Services
                 Documento = "Ticket de Atención",
                 NroTicket = nroTicketAtencion,
                 FechaTicket = ahora,
-                nroDTE = nroTicketAtencion, // Mientras sea preventa
+                nroDTE = nroTicketAtencion,
                 nroInT = siguienteNroInT,
                 FecDoc = ahora,
-                SubTotal = subtotal,
-                Descuento = 0,
-                Neto = neto,
-                IvA = subtotal - neto,
-                Total = subtotal,
+                SubTotal = subtotalLista1,    // Monto original Lista 1
+                Descuento = descuentoGlobal,  // Descuento comercial aplicado
+                Neto = neto,                  // Afecto real
+                IvA = iva,                    // IVA 19%
+                Total = totalCobrado,         // Monto real que ingresa a caja
                 UserDTE = vendedor,
                 Vendedor = vendedor,
                 Idcliente = clienteDb?.IdCliente ?? 0,
@@ -115,8 +120,13 @@ namespace SISTEMAACTUALIZADO.Services
                 ? clienteDb.RazonSocial
                 : (!string.IsNullOrWhiteSpace(identificador) ? $"{nombreBaseLimpio} ({identificador.Trim()})" : nombreBaseLimpio);
 
-            decimal subtotal = carrito.Sum(c => c.Subtotal);
-            decimal neto = Math.Round(subtotal / 1.19m, 0);
+            decimal totalCobrado = carrito.Sum(c => c.Subtotal);
+            decimal subtotalLista1 = carrito.Sum(c => c.SubtotalLista1);
+            decimal descuentoGlobal = subtotalLista1 - totalCobrado;
+            if (descuentoGlobal < 0) descuentoGlobal = 0;
+
+            decimal neto = Math.Round(totalCobrado / 1.19m, 0);
+            decimal iva = totalCobrado - neto;
 
             if (venta == null)
             {
@@ -135,11 +145,11 @@ namespace SISTEMAACTUALIZADO.Services
                     nroDTE = nroTicket,
                     nroInT = siguienteNroInT,
                     FecDoc = ahora,
-                    SubTotal = subtotal,
-                    Descuento = 0,
+                    SubTotal = subtotalLista1,
+                    Descuento = descuentoGlobal,
                     Neto = neto,
-                    IvA = subtotal - neto,
-                    Total = subtotal,
+                    IvA = iva,
+                    Total = totalCobrado,
                     UserDTE = vendedor,
                     Vendedor = vendedor,
                     Idcliente = clienteDb?.IdCliente ?? 0,
@@ -157,10 +167,11 @@ namespace SISTEMAACTUALIZADO.Services
             }
             else
             {
-                venta.SubTotal = subtotal;
+                venta.SubTotal = subtotalLista1;
+                venta.Descuento = descuentoGlobal;
                 venta.Neto = neto;
-                venta.IvA = subtotal - neto;
-                venta.Total = subtotal;
+                venta.IvA = iva;
+                venta.Total = totalCobrado;
                 venta.UserDTE = vendedor;
                 venta.Vendedor = vendedor;
                 venta.RazonSocial = razonSocialFinal;
@@ -263,13 +274,18 @@ namespace SISTEMAACTUALIZADO.Services
             string rutLimpio = RutHelper.Limpiar(clienteRut ?? "");
             var clienteDb = db.Clientes.FirstOrDefault(c => !string.IsNullOrEmpty(rutLimpio) && (c.Rut == rutLimpio || c.Rut == clienteRut));
 
-            decimal subtotal = carrito.Sum(c => c.Subtotal);
-            decimal neto = Math.Round(subtotal / 1.19m, 0);
+            decimal totalCobrado = carrito.Sum(c => c.Subtotal);
+            decimal subtotalLista1 = carrito.Sum(c => c.SubtotalLista1);
+            decimal descuentoGlobal = subtotalLista1 - totalCobrado;
+            if (descuentoGlobal < 0) descuentoGlobal = 0;
 
-            venta.SubTotal = subtotal;
+            decimal neto = Math.Round(totalCobrado / 1.19m, 0);
+
+            venta.SubTotal = subtotalLista1;
+            venta.Descuento = descuentoGlobal;
             venta.Neto = neto;
-            venta.IvA = subtotal - neto;
-            venta.Total = subtotal;
+            venta.IvA = totalCobrado - neto;
+            venta.Total = totalCobrado;
             venta.UserDTE = vendedor;
             venta.Vendedor = vendedor;
             venta.FecDoc = ahora;
