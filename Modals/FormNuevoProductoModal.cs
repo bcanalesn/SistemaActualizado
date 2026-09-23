@@ -14,10 +14,7 @@ namespace SISTEMAACTUALIZADO.Modals
 {
     public class FormNuevoProductoModal : Form
     {
-        [DllImport("user32.DLL", EntryPoint = "ReleaseCapture")]
-        private extern static void ReleaseCapture();
-        [DllImport("user32.DLL", EntryPoint = "SendMessage")]
-        private extern static void SendMessage(IntPtr hWnd, int wMsg, int wParam, int lParam);
+        
 
         private readonly ProductoService _productoService = new ProductoService();
 
@@ -62,80 +59,53 @@ namespace SISTEMAACTUALIZADO.Modals
 
         private void InitializeComponent()
         {
-            this.FormBorderStyle = FormBorderStyle.None;
+            // Ventana nativa ampliada para evitar compresión y scrolls cruzados
+            this.FormBorderStyle = FormBorderStyle.FixedDialog;
             this.StartPosition = FormStartPosition.CenterParent;
-            this.Size = new Size(680, 780);
-            this.BackColor = Color.FromArgb(248, 250, 252);
+            this.MaximizeBox = false;
+            this.MinimizeBox = false;
+            this.ShowInTaskbar = false;
+            this.Text = _productoAEditar == null ? "Registrar Nuevo Producto" : "Editar Producto";
+            this.Size = new Size(720, 780); // <-- Ancho y alto con holgura
+            this.BackColor = Color.White;
             this.Font = new Font("Segoe UI", 9F, FontStyle.Regular, GraphicsUnit.Point);
 
             Panel pnlBorde = new Panel
             {
                 Dock = DockStyle.Fill,
-                Padding = new Padding(24, 16, 24, 20),
+                Padding = new Padding(20, 12, 20, 14),
                 BackColor = Color.White
             };
-            pnlBorde.Paint += (s, e) =>
-            {
-                e.Graphics.SmoothingMode = SmoothingMode.AntiAlias;
-                ControlPaint.DrawBorder(e.Graphics, pnlBorde.ClientRectangle, Color.FromArgb(226, 232, 240), ButtonBorderStyle.Solid);
-            };
-
-            Panel pnlHeader = new Panel { Dock = DockStyle.Top, Height = 44, BackColor = Color.Transparent };
-            pnlHeader.MouseDown += (s, e) => { ReleaseCapture(); SendMessage(this.Handle, 0x112, 0xf012, 0); };
-
-            Label lblTitulo = new Label
-            {
-                Text = _productoAEditar == null ? "📦 Registrar Nuevo Producto" : "✏️ Editar Producto",
-                Font = new Font("Segoe UI", 14F, FontStyle.Bold),
-                ForeColor = Color.FromArgb(30, 41, 59),
-                Dock = DockStyle.Left,
-                TextAlign = ContentAlignment.MiddleLeft,
-                AutoSize = true
-            };
-            lblTitulo.MouseDown += (s, e) => { ReleaseCapture(); SendMessage(this.Handle, 0x112, 0xf012, 0); };
-
-            Button btnCerrar = new Button
-            {
-                Text = "✕",
-                Size = new Size(32, 32),
-                Dock = DockStyle.Right,
-                FlatStyle = FlatStyle.Flat,
-                Font = new Font("Segoe UI", 11F, FontStyle.Bold),
-                ForeColor = Color.FromArgb(148, 163, 184),
-                Cursor = Cursors.Hand
-            };
-            btnCerrar.FlatAppearance.BorderSize = 0;
-            btnCerrar.Click += (s, e) => this.Close();
-
-            pnlHeader.Controls.Add(lblTitulo);
-            pnlHeader.Controls.Add(btnCerrar);
 
             FlowLayoutPanel flow = new FlowLayoutPanel
             {
                 Dock = DockStyle.Fill,
                 FlowDirection = FlowDirection.TopDown,
                 WrapContents = false,
-                Padding = new Padding(0, 6, 0, 0),
-                AutoScroll = true
+                Padding = new Padding(0, 4, 10, 0),
+                AutoScroll = true // Solo scroll vertical cuando sea necesario
             };
 
-            txtCodigoBarra = new TextBox { Width = 295, Font = new Font("Segoe UI", 10F) };
-            txtNombre = new TextBox { Width = 295, Font = new Font("Segoe UI", 10F) };
-            Panel pnlFila1 = new Panel { Size = new Size(610, 56) };
-            pnlFila1.Controls.Add(CrearCampo("|||||| Código de Barra / SKU", txtCodigoBarra, 0, 295));
-            pnlFila1.Controls.Add(CrearCampo("📦 Nombre del Producto", txtNombre, 315, 295));
+            // Fila 1: Código de Barra y Nombre
+            txtCodigoBarra = new TextBox { Width = 300, Font = new Font("Segoe UI", 10F) };
+            txtNombre = new TextBox { Width = 310, Font = new Font("Segoe UI", 10F) };
+            Panel pnlFila1 = new Panel { Size = new Size(630, 56) };
+            pnlFila1.Controls.Add(CrearCampo("|||||| Código de Barra / SKU", txtCodigoBarra, 0, 300));
+            pnlFila1.Controls.Add(CrearCampo("📦 Nombre del Producto", txtNombre, 320, 310));
 
-            cbCategoria = new ComboBox { Width = 295, Font = new Font("Segoe UI", 9.5F), DropDownStyle = ComboBoxStyle.DropDown };
-            cbFamilia = new ComboBox { Width = 295, Font = new Font("Segoe UI", 9.5F), DropDownStyle = ComboBoxStyle.DropDown };
-            Panel pnlFila2 = new Panel { Size = new Size(610, 56) };
-            pnlFila2.Controls.Add(CrearCampo("Categoría", cbCategoria, 0, 295));
-            pnlFila2.Controls.Add(CrearCampo("Familia de Producto", cbFamilia, 315, 295));
+            // Fila 2: Categoría y Familia
+            cbCategoria = new ComboBox { Width = 300, Font = new Font("Segoe UI", 9.5F), DropDownStyle = ComboBoxStyle.DropDown };
+            cbFamilia = new ComboBox { Width = 310, Font = new Font("Segoe UI", 9.5F), DropDownStyle = ComboBoxStyle.DropDown };
+            Panel pnlFila2 = new Panel { Size = new Size(630, 56) };
+            pnlFila2.Controls.Add(CrearCampo("Categoría", cbCategoria, 0, 300));
+            pnlFila2.Controls.Add(CrearCampo("Familia de Producto", cbFamilia, 320, 310));
 
-            Panel pnlCardCosto = CrearCardPanel(610, 68);
+            // Tarjeta Costo Neto
+            Panel pnlCardCosto = CrearCardPanel(630, 68);
             Label lblIconCosto = new Label { Text = "$", Font = new Font("Segoe UI", 11F, FontStyle.Bold), ForeColor = Color.FromArgb(71, 85, 105), Location = new Point(14, 14), Size = new Size(24, 24), TextAlign = ContentAlignment.MiddleCenter, BackColor = Color.FromArgb(241, 245, 249) };
             Label lblTitCosto = new Label { Text = "Costo Neto Base ($)", Font = new Font("Segoe UI", 8.5F, FontStyle.Bold), ForeColor = Color.FromArgb(51, 65, 85), Location = new Point(46, 10), AutoSize = true };
             Label lblSubCosto = new Label { Text = "Costo en pesos sin IVA.", Font = new Font("Segoe UI", 7.5F), ForeColor = Color.FromArgb(148, 163, 184), Location = new Point(46, 46), AutoSize = true };
-            txtPrecioCosto = new TextBox { Location = new Point(46, 26), Width = 540, Font = new Font("Segoe UI", 9.5F, FontStyle.Bold), Text = "0" };
+            txtPrecioCosto = new TextBox { Location = new Point(46, 26), Width = 560, Font = new Font("Segoe UI", 9.5F, FontStyle.Bold), Text = "0" };
             txtPrecioCosto.KeyPress += (s, e) => { if (!char.IsControl(e.KeyChar) && !char.IsDigit(e.KeyChar)) e.Handled = true; };
             txtPrecioCosto.TextChanged += (s, e) => 
             { 
@@ -144,23 +114,24 @@ namespace SISTEMAACTUALIZADO.Modals
             };
             pnlCardCosto.Controls.AddRange(new Control[] { lblIconCosto, lblTitCosto, txtPrecioCosto, lblSubCosto });
 
-            Panel pnlCardModalidad = CrearCardPanel(610, 165);
+            // Tarjeta Modalidad de Precio
+            Panel pnlCardModalidad = CrearCardPanel(630, 165);
             Label lblTitMod = new Label { Text = "🏷️ Modalidad de Precio en Punto de Venta (POS)", Font = new Font("Segoe UI", 9.5F, FontStyle.Bold), ForeColor = Color.FromArgb(30, 41, 59), Location = new Point(14, 10), AutoSize = true };
 
-            pnlCardListaFija = new Panel { Location = new Point(14, 34), Size = new Size(280, 118), BackColor = Color.FromArgb(248, 250, 252), BorderStyle = BorderStyle.FixedSingle, Cursor = Cursors.Hand };
+            pnlCardListaFija = new Panel { Location = new Point(14, 34), Size = new Size(290, 118), BackColor = Color.FromArgb(239, 246, 255), BorderStyle = BorderStyle.FixedSingle, Cursor = Cursors.Hand };
             rbModoListaFija = new RadioButton { Text = "Lista Fija", Location = new Point(12, 10), AutoSize = true, Font = new Font("Segoe UI", 9F, FontStyle.Bold), Checked = true };
-            Label lblDescFija = new Label { Text = "El producto se vende siempre en la misma\nlista de precios.", Location = new Point(32, 32), Size = new Size(235, 30), Font = new Font("Segoe UI", 7.5F), ForeColor = Color.FromArgb(100, 116, 139) };
-            cbListaPrecioPOS = new ComboBox { Location = new Point(12, 72), Size = new Size(254, 24), DropDownStyle = ComboBoxStyle.DropDownList, Font = new Font("Segoe UI", 8.5F) };
+            Label lblDescFija = new Label { Text = "El producto se vende siempre en la misma\nlista de precios.", Location = new Point(32, 32), Size = new Size(245, 30), Font = new Font("Segoe UI", 7.5F), ForeColor = Color.FromArgb(100, 116, 139) };
+            cbListaPrecioPOS = new ComboBox { Location = new Point(12, 72), Size = new Size(264, 24), DropDownStyle = ComboBoxStyle.DropDownList, Font = new Font("Segoe UI", 8.5F) };
             LlenarComboListas(cbListaPrecioPOS);
             cbListaPrecioPOS.SelectedIndex = 0;
             cbListaPrecioPOS.SelectedIndexChanged += (s, e) => RecalcularPrecioSegunLista();
             pnlCardListaFija.Controls.AddRange(new Control[] { rbModoListaFija, lblDescFija, cbListaPrecioPOS });
 
-            pnlCardEscala = new Panel { Location = new Point(306, 34), Size = new Size(290, 118), BackColor = Color.White, BorderStyle = BorderStyle.FixedSingle, Cursor = Cursors.Hand };
+            pnlCardEscala = new Panel { Location = new Point(318, 34), Size = new Size(298, 118), BackColor = Color.White, BorderStyle = BorderStyle.FixedSingle, Cursor = Cursors.Hand };
             rbModoEscala = new RadioButton { Text = "Venta por Escala / Rango de Cantidades", Location = new Point(12, 10), AutoSize = true, Font = new Font("Segoe UI", 9F, FontStyle.Bold) };
-            Label lblDescEsc = new Label { Text = "El precio cambia según la cantidad comprada.", Location = new Point(32, 32), Size = new Size(245, 16), Font = new Font("Segoe UI", 7.5F), ForeColor = Color.FromArgb(100, 116, 139) };
+            Label lblDescEsc = new Label { Text = "El precio cambia según la cantidad comprada.", Location = new Point(32, 32), Size = new Size(250, 16), Font = new Font("Segoe UI", 7.5F), ForeColor = Color.FromArgb(100, 116, 139) };
             Label lblTitCantTr = new Label { Text = "Selecciona la cantidad de tramos:", Location = new Point(12, 54), AutoSize = true, Font = new Font("Segoe UI", 8F, FontStyle.Bold), ForeColor = Color.FromArgb(71, 85, 105) };
-            cbCantidadTramos = new ComboBox { Location = new Point(12, 72), Size = new Size(264, 24), DropDownStyle = ComboBoxStyle.DropDownList, Font = new Font("Segoe UI", 8.5F), Enabled = false };
+            cbCantidadTramos = new ComboBox { Location = new Point(12, 72), Size = new Size(272, 24), DropDownStyle = ComboBoxStyle.DropDownList, Font = new Font("Segoe UI", 8.5F), Enabled = false };
             cbCantidadTramos.Items.AddRange(new object[] { "2 tramos", "3 tramos", "4 tramos", "5 tramos" });
             cbCantidadTramos.SelectedIndex = 0;
             cbCantidadTramos.SelectedIndexChanged += (s, e) => RegenerarFilasTramos(cbCantidadTramos.SelectedIndex + 2);
@@ -173,19 +144,20 @@ namespace SISTEMAACTUALIZADO.Modals
             pnlCardListaFija.Click += (s, e) => SeleccionarModo(escala: false);
             pnlCardEscala.Click += (s, e) => SeleccionarModo(escala: true);
 
-            pnlSeccionTramos = CrearCardPanel(610, 205);
+            // Tarjeta de Tramos
+            pnlSeccionTramos = CrearCardPanel(630, 205);
             Label lblTitSecTr = new Label { Text = "📊 Configurar Tramos de Cantidad y Lista de Precios", Font = new Font("Segoe UI", 9F, FontStyle.Bold), ForeColor = Color.FromArgb(30, 41, 59), Location = new Point(14, 10), AutoSize = true };
 
-            Panel pnlHeaderGrid = new Panel { Location = new Point(14, 32), Size = new Size(580, 24), BackColor = Color.Transparent };
+            Panel pnlHeaderGrid = new Panel { Location = new Point(14, 32), Size = new Size(600, 24), BackColor = Color.Transparent };
             pnlHeaderGrid.Controls.Add(new Label { Text = "Tramo", Location = new Point(4, 4), Size = new Size(45, 18), Font = new Font("Segoe UI", 8F, FontStyle.Bold), ForeColor = Color.FromArgb(100, 116, 139) });
             pnlHeaderGrid.Controls.Add(new Label { Text = "Desde (unidades)", Location = new Point(70, 4), Size = new Size(110, 18), Font = new Font("Segoe UI", 8F, FontStyle.Bold), ForeColor = Color.FromArgb(100, 116, 139) });
             pnlHeaderGrid.Controls.Add(new Label { Text = "Hasta (unidades)", Location = new Point(230, 4), Size = new Size(110, 18), Font = new Font("Segoe UI", 8F, FontStyle.Bold), ForeColor = Color.FromArgb(100, 116, 139) });
-            pnlHeaderGrid.Controls.Add(new Label { Text = "Lista de Precios", Location = new Point(360, 4), Size = new Size(180, 18), Font = new Font("Segoe UI", 8F, FontStyle.Bold), ForeColor = Color.FromArgb(100, 116, 139) });
+            pnlHeaderGrid.Controls.Add(new Label { Text = "Lista de Precios", Location = new Point(370, 4), Size = new Size(200, 18), Font = new Font("Segoe UI", 8F, FontStyle.Bold), ForeColor = Color.FromArgb(100, 116, 139) });
 
             flpFilasTramos = new FlowLayoutPanel
             {
                 Location = new Point(14, 58),
-                Size = new Size(580, 138),
+                Size = new Size(600, 138),
                 AutoScroll = true,
                 FlowDirection = FlowDirection.TopDown,
                 WrapContents = false
@@ -193,38 +165,41 @@ namespace SISTEMAACTUALIZADO.Modals
 
             pnlSeccionTramos.Controls.AddRange(new Control[] { lblTitSecTr, pnlHeaderGrid, flpFilasTramos });
 
-            Panel pnlFilaPrecios = new Panel { Size = new Size(610, 60) };
+            // Fila Precios y Stock
+            Panel pnlFilaPrecios = new Panel { Size = new Size(630, 60) };
             txtPrecioUnitario = new TextBox { Width = 230, Font = new Font("Segoe UI", 10F, FontStyle.Bold), Text = "0" };
             txtPrecioUnitario.KeyPress += (s, e) => { if (!char.IsControl(e.KeyChar) && !char.IsDigit(e.KeyChar)) e.Handled = true; };
             txtPrecioUnitario.TextChanged += (s, e) => MonedaHelper.AplicarMascaraEnVivo(txtPrecioUnitario);
 
-            txtStockActual = new TextBox { Width = 150, Font = new Font("Segoe UI", 10F, FontStyle.Bold), Text = "0" };
+            txtStockActual = new TextBox { Width = 170, Font = new Font("Segoe UI", 10F, FontStyle.Bold), Text = "0" };
             txtStockActual.KeyPress += (s, e) => { if (!char.IsControl(e.KeyChar) && !char.IsDigit(e.KeyChar)) e.Handled = true; };
 
-            txtStockMinimo = new TextBox { Width = 150, Font = new Font("Segoe UI", 10F), Text = "5" };
+            txtStockMinimo = new TextBox { Width = 170, Font = new Font("Segoe UI", 10F), Text = "5" };
             txtStockMinimo.KeyPress += (s, e) => { if (!char.IsControl(e.KeyChar) && !char.IsDigit(e.KeyChar)) e.Handled = true; };
 
             pnlFilaPrecios.Controls.Add(CrearCampo("💲 Precio Venta Base POS (IVA Inc.)", txtPrecioUnitario, 0, 230));
-            pnlFilaPrecios.Controls.Add(CrearCampo("📦 Stock Actual (Editable)", txtStockActual, 245, 150));
-            pnlFilaPrecios.Controls.Add(CrearCampo("🔔 Stock Mínimo Alerta", txtStockMinimo, 410, 150));
+            pnlFilaPrecios.Controls.Add(CrearCampo("📦 Stock Actual (Editable)", txtStockActual, 250, 170));
+            pnlFilaPrecios.Controls.Add(CrearCampo("🔔 Stock Mínimo Alerta", txtStockMinimo, 440, 170));
 
-            Panel pnlCardFoto = CrearCardPanel(610, 74);
+            // Tarjeta Foto
+            Panel pnlCardFoto = CrearCardPanel(630, 74);
             Label lblTitFoto = new Label { Text = "🖼️ Foto del Producto", Font = new Font("Segoe UI", 8.5F, FontStyle.Bold), ForeColor = Color.FromArgb(71, 85, 105), Location = new Point(14, 6), AutoSize = true };
             pbFoto = new PictureBox { Location = new Point(14, 24), Size = new Size(42, 42), BorderStyle = BorderStyle.FixedSingle, SizeMode = PictureBoxSizeMode.Zoom, BackColor = Color.FromArgb(248, 250, 252) };
-            Button btnCargarFoto = new Button { Text = "📤 Seleccionar imagen", Location = new Point(64, 28), Size = new Size(150, 32), BackColor = Color.FromArgb(239, 246, 255), ForeColor = Color.FromArgb(29, 78, 216), FlatStyle = FlatStyle.Flat, Font = new Font("Segoe UI", 8.5F, FontStyle.Bold), Cursor = Cursors.Hand };
+            Button btnCargarFoto = new Button { Text = "📤 Seleccionar imagen", Location = new Point(64, 28), Size = new Size(160, 32), BackColor = Color.FromArgb(239, 246, 255), ForeColor = Color.FromArgb(29, 78, 216), FlatStyle = FlatStyle.Flat, Font = new Font("Segoe UI", 8.5F, FontStyle.Bold), Cursor = Cursors.Hand };
             btnCargarFoto.FlatAppearance.BorderColor = Color.FromArgb(191, 219, 254);
             btnCargarFoto.Click += BtnCargarFoto_Click;
 
-            Button btnQuitarFoto = new Button { Text = "🗑️ Quitar", Location = new Point(220, 28), Size = new Size(80, 32), BackColor = Color.FromArgb(254, 242, 242), ForeColor = Color.FromArgb(220, 38, 38), FlatStyle = FlatStyle.Flat, Font = new Font("Segoe UI", 8.5F, FontStyle.Bold), Cursor = Cursors.Hand };
+            Button btnQuitarFoto = new Button { Text = "🗑️ Quitar", Location = new Point(232, 28), Size = new Size(80, 32), BackColor = Color.FromArgb(254, 242, 242), ForeColor = Color.FromArgb(220, 38, 38), FlatStyle = FlatStyle.Flat, Font = new Font("Segoe UI", 8.5F, FontStyle.Bold), Cursor = Cursors.Hand };
             btnQuitarFoto.FlatAppearance.BorderColor = Color.FromArgb(254, 202, 202);
             btnQuitarFoto.Click += (s, e) => { _rutaImagenSeleccionada = string.Empty; pbFoto.Image?.Dispose(); pbFoto.Image = null; };
 
-            Label lblFormatos = new Label { Text = "Formatos permitidos: JPG, PNG. Máx. 2MB.", Location = new Point(310, 36), AutoSize = true, Font = new Font("Segoe UI", 7.5F), ForeColor = Color.FromArgb(148, 163, 184) };
+            Label lblFormatos = new Label { Text = "Formatos permitidos: JPG, PNG. Máx. 2MB.", Location = new Point(325, 36), AutoSize = true, Font = new Font("Segoe UI", 7.5F), ForeColor = Color.FromArgb(148, 163, 184) };
             pnlCardFoto.Controls.AddRange(new Control[] { lblTitFoto, pbFoto, btnCargarFoto, btnQuitarFoto, lblFormatos });
 
             flow.Controls.AddRange(new Control[] { pnlFila1, pnlFila2, pnlCardCosto, pnlCardModalidad, pnlSeccionTramos, pnlFilaPrecios, pnlCardFoto });
 
-            Panel pnlBotones = new Panel { Dock = DockStyle.Bottom, Height = 52, BackColor = Color.Transparent };
+            // Botones de acción inferiores
+            Panel pnlBotones = new Panel { Dock = DockStyle.Bottom, Height = 50, BackColor = Color.Transparent, Padding = new Padding(0, 6, 0, 0) };
             Button btnGuardar = new Button
             {
                 Text = "💾 Guardar Cambios",
@@ -234,7 +209,7 @@ namespace SISTEMAACTUALIZADO.Modals
                 FlatStyle = FlatStyle.Flat,
                 Font = new Font("Segoe UI", 9.5F, FontStyle.Bold),
                 Cursor = Cursors.Hand,
-                Location = new Point(430, 6)
+                Location = new Point(475, 4)
             };
             btnGuardar.FlatAppearance.BorderSize = 0;
             btnGuardar.Click += BtnGuardar_Click;
@@ -248,14 +223,16 @@ namespace SISTEMAACTUALIZADO.Modals
                 FlatStyle = FlatStyle.Flat,
                 Font = new Font("Segoe UI", 9.5F, FontStyle.Bold),
                 Cursor = Cursors.Hand,
-                Location = new Point(310, 6)
+                Location = new Point(355, 4)
             };
-            btnCancelar.FlatAppearance.BorderColor = Color.FromArgb(226, 232, 240);
+            btnCancelar.FlatAppearance.BorderSize = 0;
             btnCancelar.Click += (s, e) => this.Close();
+
+            this.CancelButton = btnCancelar;
 
             pnlBotones.Controls.AddRange(new Control[] { btnGuardar, btnCancelar });
 
-            pnlBorde.Controls.AddRange(new Control[] { flow, pnlBotones, pnlHeader });
+            pnlBorde.Controls.AddRange(new Control[] { flow, pnlBotones });
             this.Controls.Add(pnlBorde);
 
             RegenerarFilasTramos(2);
@@ -444,7 +421,11 @@ namespace SISTEMAACTUALIZADO.Modals
             if (costo <= 0) return;
 
             var margenes = ProductoService.ObtenerMargenesConfigurados();
-            decimal precioL1 = ProductoService.CalcularPrecioVenta(costo, margenes[0]);
+            decimal margenL1 = (_productoAEditar != null && _productoAEditar.MargenGanancia > 0) 
+                ? _productoAEditar.MargenGanancia 
+                : margenes[0];
+
+            decimal precioL1 = ProductoService.CalcularPrecioVenta(costo, margenL1);
             txtPrecioUnitario.Text = MonedaHelper.Formatear(precioL1);
         }
 
@@ -490,14 +471,29 @@ namespace SISTEMAACTUALIZADO.Modals
                 productoGuardar.Nombre = nombre;
                 productoGuardar.Categoria = cbCategoria.Text.Trim();
                 productoGuardar.NFamilia = cbFamilia.Text.Trim();
-                productoGuardar.PrecioCosto = costo;
                 productoGuardar.ListaDefectoPOS = listaSeleccionada;
-                productoGuardar.PrecioUnitario = pvp;
                 productoGuardar.Stock = stockActual;
                 productoGuardar.StockMinimo = stockMin > 0 ? stockMin : 5;
                 productoGuardar.ImagenPath = _rutaImagenSeleccionada;
                 productoGuardar.Estado = true;
                 productoGuardar.FchUpd = DateTime.Now;
+
+                // Recalcula en cascada de Lista 1 a Lista 10 según la matriz de márgenes
+                if (costo > 0)
+                {
+                    ProductoService.AplicarNuevoCostoYRecalcularListas(productoGuardar, costo);
+
+                    // Si el usuario fijó un precio manual en la caja de texto (L1), se respeta
+                    if (pvp > 0)
+                    {
+                        productoGuardar.PrecioUnitario = pvp;
+                    }
+                }
+                else
+                {
+                    productoGuardar.PrecioCosto = 0;
+                    productoGuardar.PrecioUnitario = pvp;
+                }
 
                 var tramos = _filasTramos.Select(f => new TramoEscalaDTO
                 {

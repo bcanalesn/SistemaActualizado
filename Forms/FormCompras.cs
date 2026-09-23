@@ -96,6 +96,13 @@ namespace SISTEMAACTUALIZADO
             this.Dock = DockStyle.Fill;
             this.FormBorderStyle = FormBorderStyle.None;
 
+            // 1. Instanciar PRIMERO los ListBox para evitar el NullReferenceException al configurar eventos
+            lstSugerenciasProveedores = new ListBox { Size = new Size(320, 130), Font = new Font("Segoe UI", 9F), Visible = false, BorderStyle = BorderStyle.FixedSingle };
+            lstSugerenciasProveedores.Click += LstSugerenciasProveedores_Click;
+
+            lstSugerenciasProductos = new ListBox { Size = new Size(320, 130), Font = new Font("Segoe UI", 9F), Visible = false, BorderStyle = BorderStyle.FixedSingle };
+            lstSugerenciasProductos.Click += LstSugerenciasProductos_Click;
+
             Panel pnlMain = new Panel { Dock = DockStyle.Fill, Padding = new Padding(16, 12, 16, 16), AutoScroll = true };
 
             Panel pnlDerecha = CrearPanelResumenLateral();
@@ -115,12 +122,6 @@ namespace SISTEMAACTUALIZADO
 
             pnlMain.Controls.Add(pnlIzquierda);
             pnlMain.Controls.Add(pnlDerecha);
-
-            lstSugerenciasProveedores = new ListBox { Size = new Size(320, 130), Font = new Font("Segoe UI", 9F), Visible = false, BorderStyle = BorderStyle.FixedSingle };
-            lstSugerenciasProveedores.Click += LstSugerenciasProveedores_Click;
-
-            lstSugerenciasProductos = new ListBox { Size = new Size(320, 130), Font = new Font("Segoe UI", 9F), Visible = false, BorderStyle = BorderStyle.FixedSingle };
-            lstSugerenciasProductos.Click += LstSugerenciasProductos_Click;
 
             pnlMain.Controls.Add(lstSugerenciasProductos);
             pnlMain.Controls.Add(lstSugerenciasProveedores);
@@ -359,6 +360,16 @@ namespace SISTEMAACTUALIZADO
             txtCantidadRecibida = new TextBox { Text = "1", Font = new Font("Segoe UI", 9F, FontStyle.Bold), TextAlign = HorizontalAlignment.Center };
             txtCantidadRecibida.KeyPress += (s, e) => { if (!char.IsControl(e.KeyChar) && !char.IsDigit(e.KeyChar)) e.Handled = true; };
             Panel pnlCant = EnvolverConLabel("CANT. RECIBIDA", txtCantidadRecibida);
+            txtCantidadRecibida.KeyDown += (s, e) =>
+            {
+                if (e.KeyCode == Keys.Enter)
+                {
+                    txtPrecioCosto.Focus();
+                    txtPrecioCosto.SelectAll();
+                    e.Handled = true;
+                    e.SuppressKeyPress = true;
+                }
+            };
 
             Panel pnlCosto = new Panel { Dock = DockStyle.Fill, Padding = new Padding(6, 0, 6, 0) };
             Label lcost = new Label { Text = "COSTO NETO ($)", Dock = DockStyle.Top, AutoSize = true, Font = new Font("Segoe UI", 7.5F, FontStyle.Bold), ForeColor = Color.FromArgb(100, 116, 139) };
@@ -373,6 +384,15 @@ namespace SISTEMAACTUALIZADO
             pnlCosto.Controls.Add(lblCostoAnterior);
             pnlCosto.Controls.Add(txtPrecioCosto);
             pnlCosto.Controls.Add(lcost);
+            txtPrecioCosto.KeyDown += (s, e) =>
+            {
+                if (e.KeyCode == Keys.Enter)
+                {
+                    e.Handled = true;
+                    e.SuppressKeyPress = true;
+                    BtnAgregarMercaderia_Click(this, EventArgs.Empty);
+                }
+            };
 
             txtPvpSugerido = new TextBox { Font = new Font("Segoe UI", 9F, FontStyle.Bold), ReadOnly = true, BackColor = Color.FromArgb(248, 250, 252), ForeColor = Color.FromArgb(16, 185, 129) };
             Panel pnlPvp = EnvolverConLabel("PRECIO VENTA (L1)", txtPvpSugerido);
@@ -418,6 +438,16 @@ namespace SISTEMAACTUALIZADO
 
             txtDescripcionGasto = new TextBox { Font = new Font("Segoe UI", 9F), PlaceholderText = "Ej: Materiales reparación escritorio recepción" };
             Panel pnlDesc = EnvolverConLabel("DESCRIPCIÓN DEL GASTO", txtDescripcionGasto);
+            txtDescripcionGasto.KeyDown += (s, e) =>
+            {
+                if (e.KeyCode == Keys.Enter)
+                {
+                    txtMontoNetoGasto.Focus();
+                    txtMontoNetoGasto.SelectAll();
+                    e.Handled = true;
+                    e.SuppressKeyPress = true;
+                }
+            };
 
             cbCategoriaGasto = new ComboBox { DropDownStyle = ComboBoxStyle.DropDownList, Font = new Font("Segoe UI", 9F) };
             cbCategoriaGasto.Items.AddRange(new string[] { "Mantención de activos", "Materiales de oficina", "Insumos y Aseo", "Servicios Básicos", "Mobiliario y Equipamiento", "Gastos Operacionales Varios" });
@@ -428,6 +458,15 @@ namespace SISTEMAACTUALIZADO
             txtMontoNetoGasto.KeyPress += (s, e) => { if (!char.IsControl(e.KeyChar) && !char.IsDigit(e.KeyChar)) e.Handled = true; };
             txtMontoNetoGasto.TextChanged += (s, e) => MonedaHelper.AplicarMascaraEnVivo(txtMontoNetoGasto);
             Panel pnlMonto = EnvolverConLabel("MONTO NETO ($)", txtMontoNetoGasto);
+            txtMontoNetoGasto.KeyDown += (s, e) =>
+            {
+                if (e.KeyCode == Keys.Enter)
+                {
+                    e.Handled = true;
+                    e.SuppressKeyPress = true;
+                    BtnAgregarGasto_Click(this, EventArgs.Empty);
+                }
+            };
 
             Panel pnlBtnAddG = new Panel { Dock = DockStyle.Fill, Padding = new Padding(6, 0, 0, 0) };
             Label lblEspacioBtnAddG = new Label { Text = " ", Dock = DockStyle.Top, AutoSize = true, Font = new Font("Segoe UI", 7.5F) };
@@ -855,9 +894,25 @@ namespace SISTEMAACTUALIZADO
 
         private void ConfigurarEventosBuscadorProveedor()
         {
-            txtBuscarProveedor.GotFocus += (s, e) => { if (txtBuscarProveedor.Text == PLACEHOLDER_PROV) { txtBuscarProveedor.Text = ""; txtBuscarProveedor.ForeColor = Color.FromArgb(15, 23, 42); txtBuscarProveedor.Font = new Font("Segoe UI", 9F); } };
-            txtBuscarProveedor.LostFocus += (s, e) => { if (string.IsNullOrWhiteSpace(txtBuscarProveedor.Text)) ResetearBuscadorProveedor(); };
-            txtBuscarProveedor.TextChanged += (s, e) => {
+            txtBuscarProveedor.GotFocus += (s, e) => 
+            { 
+                if (txtBuscarProveedor.Text == PLACEHOLDER_PROV) 
+                { 
+                    txtBuscarProveedor.Text = ""; 
+                    txtBuscarProveedor.ForeColor = Color.FromArgb(15, 23, 42); 
+                    txtBuscarProveedor.Font = new Font("Segoe UI", 9F); 
+                } 
+            };
+
+            txtBuscarProveedor.LostFocus += (s, e) => 
+            { 
+                // Si el foco no pasó a la lista de sugerencias, restaurar si está vacío
+                if (!lstSugerenciasProveedores.Focused && string.IsNullOrWhiteSpace(txtBuscarProveedor.Text)) 
+                    ResetearBuscadorProveedor(); 
+            };
+
+            txtBuscarProveedor.TextChanged += (s, e) => 
+            {
                 if (txtBuscarProveedor.Text == PLACEHOLDER_PROV) return;
                 string q = txtBuscarProveedor.Text.Trim().ToLower();
                 if (q.Length >= 1)
@@ -865,12 +920,83 @@ namespace SISTEMAACTUALIZADO
                     var f = _proveedoresCache.Where(p => p.RazonSocial.ToLower().Contains(q) || p.Rut.ToLower().Contains(q)).Take(6).ToList();
                     lstSugerenciasProveedores.DataSource = f.Count > 0 ? f : null;
                     lstSugerenciasProveedores.DisplayMember = "RazonSocial";
-                    if (f.Count > 0) PosicionarListaSugerencias(lstSugerenciasProveedores, txtBuscarProveedor);
+                    if (f.Count > 0)
+                    {
+                        PosicionarListaSugerencias(lstSugerenciasProveedores, txtBuscarProveedor);
+                        lstSugerenciasProveedores.SelectedIndex = 0;
+                    }
                     lstSugerenciasProveedores.Visible = f.Count > 0;
                     lstSugerenciasProveedores.BringToFront();
                 }
-                else lstSugerenciasProveedores.Visible = false;
+                else 
+                {
+                    lstSugerenciasProveedores.Visible = false;
+                }
             };
+
+            // Navegación con teclado y selección con Enter
+            txtBuscarProveedor.KeyDown += (s, e) =>
+            {
+                if (lstSugerenciasProveedores.Visible && lstSugerenciasProveedores.Items.Count > 0)
+                {
+                    if (e.KeyCode == Keys.Down)
+                    {
+                        if (lstSugerenciasProveedores.SelectedIndex < lstSugerenciasProveedores.Items.Count - 1)
+                            lstSugerenciasProveedores.SelectedIndex++;
+                        e.Handled = true;
+                        e.SuppressKeyPress = true;
+                    }
+                    else if (e.KeyCode == Keys.Up)
+                    {
+                        if (lstSugerenciasProveedores.SelectedIndex > 0)
+                            lstSugerenciasProveedores.SelectedIndex--;
+                        e.Handled = true;
+                        e.SuppressKeyPress = true;
+                    }
+                    else if (e.KeyCode == Keys.Enter)
+                    {
+                        e.Handled = true;
+                        e.SuppressKeyPress = true;
+                        ConfirmarSeleccionProveedor();
+                    }
+                    else if (e.KeyCode == Keys.Escape)
+                    {
+                        lstSugerenciasProveedores.Visible = false;
+                        e.Handled = true;
+                        e.SuppressKeyPress = true;
+                    }
+                }
+                else if (e.KeyCode == Keys.Enter)
+                {
+                    txtNroDocumento.Focus();
+                    e.Handled = true;
+                    e.SuppressKeyPress = true;
+                }
+            };
+
+            lstSugerenciasProveedores.KeyDown += (s, e) =>
+            {
+                if (e.KeyCode == Keys.Enter)
+                {
+                    e.Handled = true;
+                    e.SuppressKeyPress = true;
+                    ConfirmarSeleccionProveedor();
+                }
+            };
+        }
+
+        private void ConfirmarSeleccionProveedor()
+        {
+            if (lstSugerenciasProveedores.SelectedItem is Proveedor p)
+            {
+                _proveedorSeleccionado = p;
+                txtBuscarProveedor.Text = $"{p.RazonSocial} ({p.Rut})";
+                txtBuscarProveedor.Font = new Font("Segoe UI", 9F, FontStyle.Bold);
+                txtBuscarProveedor.ForeColor = Color.FromArgb(37, 99, 235);
+                lstSugerenciasProveedores.Visible = false;
+                txtNroDocumento.Focus();
+                txtNroDocumento.SelectAll();
+            }
         }
 
         private void ResetearBuscadorProveedor()
@@ -884,22 +1010,29 @@ namespace SISTEMAACTUALIZADO
 
         private void LstSugerenciasProveedores_Click(object? sender, EventArgs e)
         {
-            if (lstSugerenciasProveedores.SelectedItem is Proveedor p)
-            {
-                _proveedorSeleccionado = p;
-                txtBuscarProveedor.Text = $"{p.RazonSocial} ({p.Rut})";
-                txtBuscarProveedor.Font = new Font("Segoe UI", 9F, FontStyle.Bold);
-                txtBuscarProveedor.ForeColor = Color.FromArgb(37, 99, 235);
-                lstSugerenciasProveedores.Visible = false;
-                txtNroDocumento.Focus();
-            }
+            ConfirmarSeleccionProveedor();
         }
 
         private void ConfigurarEventosBuscadorProducto()
         {
-            txtBuscarProducto.GotFocus += (s, e) => { if (txtBuscarProducto.Text == PLACEHOLDER_PROD) { txtBuscarProducto.Text = ""; txtBuscarProducto.ForeColor = Color.FromArgb(15, 23, 42); txtBuscarProducto.Font = new Font("Segoe UI", 9F); } };
-            txtBuscarProducto.LostFocus += (s, e) => { if (string.IsNullOrWhiteSpace(txtBuscarProducto.Text)) ResetearBuscadorProducto(); };
-            txtBuscarProducto.TextChanged += (s, e) => {
+            txtBuscarProducto.GotFocus += (s, e) => 
+            { 
+                if (txtBuscarProducto.Text == PLACEHOLDER_PROD) 
+                { 
+                    txtBuscarProducto.Text = ""; 
+                    txtBuscarProducto.ForeColor = Color.FromArgb(15, 23, 42); 
+                    txtBuscarProducto.Font = new Font("Segoe UI", 9F); 
+                } 
+            };
+
+            txtBuscarProducto.LostFocus += (s, e) => 
+            { 
+                if (!lstSugerenciasProductos.Focused && string.IsNullOrWhiteSpace(txtBuscarProducto.Text)) 
+                    ResetearBuscadorProducto(); 
+            };
+
+            txtBuscarProducto.TextChanged += (s, e) => 
+            {
                 if (txtBuscarProducto.Text == PLACEHOLDER_PROD) return;
                 string q = txtBuscarProducto.Text.Trim().ToLower();
                 if (q.Length >= 1)
@@ -907,27 +1040,66 @@ namespace SISTEMAACTUALIZADO
                     var f = _productosCache.Where(p => p.Nombre.ToLower().Contains(q) || p.CodigoBarra.ToLower().Contains(q)).Take(6).ToList();
                     lstSugerenciasProductos.DataSource = f.Count > 0 ? f : null;
                     lstSugerenciasProductos.DisplayMember = "Nombre";
-                    if (f.Count > 0) PosicionarListaSugerencias(lstSugerenciasProductos, txtBuscarProducto);
+                    if (f.Count > 0)
+                    {
+                        PosicionarListaSugerencias(lstSugerenciasProductos, txtBuscarProducto);
+                        lstSugerenciasProductos.SelectedIndex = 0;
+                    }
                     lstSugerenciasProductos.Visible = f.Count > 0;
                     lstSugerenciasProductos.BringToFront();
                 }
-                else lstSugerenciasProductos.Visible = false;
+                else 
+                {
+                    lstSugerenciasProductos.Visible = false;
+                }
+            };
+
+            // Navegación con teclado y selección con Enter
+            txtBuscarProducto.KeyDown += (s, e) =>
+            {
+                if (lstSugerenciasProductos.Visible && lstSugerenciasProductos.Items.Count > 0)
+                {
+                    if (e.KeyCode == Keys.Down)
+                    {
+                        if (lstSugerenciasProductos.SelectedIndex < lstSugerenciasProductos.Items.Count - 1)
+                            lstSugerenciasProductos.SelectedIndex++;
+                        e.Handled = true;
+                        e.SuppressKeyPress = true;
+                    }
+                    else if (e.KeyCode == Keys.Up)
+                    {
+                        if (lstSugerenciasProductos.SelectedIndex > 0)
+                            lstSugerenciasProductos.SelectedIndex--;
+                        e.Handled = true;
+                        e.SuppressKeyPress = true;
+                    }
+                    else if (e.KeyCode == Keys.Enter)
+                    {
+                        e.Handled = true;
+                        e.SuppressKeyPress = true;
+                        ConfirmarSeleccionProducto();
+                    }
+                    else if (e.KeyCode == Keys.Escape)
+                    {
+                        lstSugerenciasProductos.Visible = false;
+                        e.Handled = true;
+                        e.SuppressKeyPress = true;
+                    }
+                }
+            };
+
+            lstSugerenciasProductos.KeyDown += (s, e) =>
+            {
+                if (e.KeyCode == Keys.Enter)
+                {
+                    e.Handled = true;
+                    e.SuppressKeyPress = true;
+                    ConfirmarSeleccionProducto();
+                }
             };
         }
 
-        private void ResetearBuscadorProducto()
-        {
-            _productoSeleccionado = null;
-            txtBuscarProducto.Text = PLACEHOLDER_PROD;
-            txtBuscarProducto.Font = new Font("Segoe UI", 8.5F, FontStyle.Italic);
-            txtBuscarProducto.ForeColor = Color.FromArgb(148, 163, 184);
-            lstSugerenciasProductos.Visible = false;
-            txtPrecioCosto.Text = "0";
-            lblCostoAnterior.Text = "Costo Ant: $ 0";
-            txtPvpSugerido.Text = "0";
-        }
-
-        private void LstSugerenciasProductos_Click(object? sender, EventArgs e)
+        private void ConfirmarSeleccionProducto()
         {
             if (lstSugerenciasProductos.SelectedItem is Producto p)
             {
@@ -944,6 +1116,23 @@ namespace SISTEMAACTUALIZADO
                 txtCantidadRecibida.Focus();
                 txtCantidadRecibida.SelectAll();
             }
+        }
+
+        private void ResetearBuscadorProducto()
+        {
+            _productoSeleccionado = null;
+            txtBuscarProducto.Text = PLACEHOLDER_PROD;
+            txtBuscarProducto.Font = new Font("Segoe UI", 8.5F, FontStyle.Italic);
+            txtBuscarProducto.ForeColor = Color.FromArgb(148, 163, 184);
+            lstSugerenciasProductos.Visible = false;
+            txtPrecioCosto.Text = "0";
+            lblCostoAnterior.Text = "Costo Ant: $ 0";
+            txtPvpSugerido.Text = "0";
+        }
+
+        private void LstSugerenciasProductos_Click(object? sender, EventArgs e)
+        {
+            ConfirmarSeleccionProducto();
         }
 
         private void CalcularPreviewPrecioVenta()

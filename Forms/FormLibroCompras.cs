@@ -414,48 +414,34 @@ namespace SISTEMAACTUALIZADO.Forms
             dgvLibro.DefaultCellStyle.Font = new Font("Segoe UI", 8.5F);
 
             dgvLibro.Columns.Clear();
-            dgvLibro.Columns.Add("TipoDoc", "TIPO DTE");
-            dgvLibro.Columns.Add("Folio", "N° FOLIO");
-            dgvLibro.Columns.Add("Fecha", "FECHA EMISIÓN");
-            dgvLibro.Columns.Add("Proveedor", "PROVEEDOR / RAZÓN SOCIAL");
-            dgvLibro.Columns.Add("Rut", "RUT");
-            dgvLibro.Columns.Add("Neto", "NETO");
-            dgvLibro.Columns.Add("Iva", "IVA (19%)");
-            dgvLibro.Columns.Add("Total", "TOTAL");
-            dgvLibro.Columns.Add("Estado", "ESTADO");
 
-            dgvLibro.Columns["TipoDoc"].Width = 85;
-            dgvLibro.Columns["TipoDoc"].DefaultCellStyle.Alignment = DataGridViewContentAlignment.MiddleCenter;
-            dgvLibro.Columns["TipoDoc"].DefaultCellStyle.ForeColor = Color.FromArgb(37, 99, 235);
-            dgvLibro.Columns["TipoDoc"].DefaultCellStyle.Font = new Font("Segoe UI", 8.5F, FontStyle.Bold);
+            void AgregarColumna(string name, string header, int width, DataGridViewContentAlignment align, string format = "", Color? fore = null, bool bold = false, bool fill = false)
+            {
+                var col = new DataGridViewTextBoxColumn
+                {
+                    Name = name,
+                    HeaderText = header,
+                    Width = width
+                };
+                col.HeaderCell.Style.Alignment = align;
+                col.DefaultCellStyle.Alignment = align;
+                if (!string.IsNullOrEmpty(format)) col.DefaultCellStyle.Format = format;
+                if (fore.HasValue) col.DefaultCellStyle.ForeColor = fore.Value;
+                if (bold) col.DefaultCellStyle.Font = new Font("Segoe UI", 8.5F, FontStyle.Bold);
+                if (fill) col.AutoSizeMode = DataGridViewAutoSizeColumnMode.Fill;
 
-            dgvLibro.Columns["Folio"].Width = 100;
-            dgvLibro.Columns["Folio"].DefaultCellStyle.Alignment = DataGridViewContentAlignment.MiddleCenter;
-            dgvLibro.Columns["Folio"].DefaultCellStyle.Font = new Font("Segoe UI", 8.5F, FontStyle.Bold);
+                dgvLibro.Columns.Add(col);
+            }
 
-            dgvLibro.Columns["Fecha"].Width = 115;
-            dgvLibro.Columns["Fecha"].DefaultCellStyle.Alignment = DataGridViewContentAlignment.MiddleCenter;
-
-            dgvLibro.Columns["Proveedor"].AutoSizeMode = DataGridViewAutoSizeColumnMode.Fill;
-            dgvLibro.Columns["Proveedor"].MinimumWidth = 220;
-
-            dgvLibro.Columns["Rut"].Width = 120;
-            dgvLibro.Columns["Neto"].Width = 120;
-            dgvLibro.Columns["Neto"].DefaultCellStyle.Alignment = DataGridViewContentAlignment.MiddleRight;
-            dgvLibro.Columns["Neto"].DefaultCellStyle.Format = "$#,##0";
-
-            dgvLibro.Columns["Iva"].Width = 110;
-            dgvLibro.Columns["Iva"].DefaultCellStyle.Alignment = DataGridViewContentAlignment.MiddleRight;
-            dgvLibro.Columns["Iva"].DefaultCellStyle.Format = "$#,##0";
-
-            dgvLibro.Columns["Total"].Width = 130;
-            dgvLibro.Columns["Total"].DefaultCellStyle.Alignment = DataGridViewContentAlignment.MiddleRight;
-            dgvLibro.Columns["Total"].DefaultCellStyle.Format = "$#,##0";
-            dgvLibro.Columns["Total"].DefaultCellStyle.Font = new Font("Segoe UI", 9F, FontStyle.Bold);
-            dgvLibro.Columns["Total"].DefaultCellStyle.ForeColor = Color.FromArgb(22, 163, 74);
-
-            dgvLibro.Columns["Estado"].Width = 100;
-            dgvLibro.Columns["Estado"].DefaultCellStyle.Alignment = DataGridViewContentAlignment.MiddleCenter;
+            AgregarColumna("TipoDoc", "TIPO DTE", 85, DataGridViewContentAlignment.MiddleCenter, "", Color.FromArgb(37, 99, 235), true);
+            AgregarColumna("Folio", "N° FOLIO", 100, DataGridViewContentAlignment.MiddleCenter, "", null, true);
+            AgregarColumna("Fecha", "FECHA EMISIÓN", 115, DataGridViewContentAlignment.MiddleCenter);
+            AgregarColumna("Proveedor", "PROVEEDOR / RAZÓN SOCIAL", 240, DataGridViewContentAlignment.MiddleLeft, "", null, false, true);
+            AgregarColumna("Rut", "RUT", 120, DataGridViewContentAlignment.MiddleCenter);
+            AgregarColumna("Neto", "NETO", 120, DataGridViewContentAlignment.MiddleCenter, "$#,##0");
+            AgregarColumna("Iva", "IVA (19%)", 110, DataGridViewContentAlignment.MiddleCenter, "$#,##0");
+            AgregarColumna("Total", "TOTAL", 130, DataGridViewContentAlignment.MiddleCenter, "$#,##0", Color.FromArgb(22, 163, 74), true);
+            AgregarColumna("Estado", "ESTADO", 100, DataGridViewContentAlignment.MiddleCenter);
         }
 
         private void CargarDatosLibro()
@@ -747,7 +733,10 @@ namespace SISTEMAACTUALIZADO.Forms
             {
                 var compraSeleccionada = _comprasCargadas[dgvLibro.CurrentRow.Index];
                 using var modal = new FormDetalleCompraModal(compraSeleccionada.CompraID);
-                modal.ShowDialog(this);
+                if (modal.ShowDialog(this) == DialogResult.OK && modal.CambiosGuardados)
+                {
+                    CargarDatosLibro(); // Recarga la tabla y recalcula los KPIs superiores en vivo
+                }
             }
         }
     }

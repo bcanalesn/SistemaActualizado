@@ -2,7 +2,6 @@ using System;
 using System.Collections.Generic;
 using System.Drawing;
 using System.Linq;
-using System.Runtime.InteropServices;
 using System.Windows.Forms;
 using SISTEMAACTUALIZADO.Models;
 using SISTEMAACTUALIZADO.Services;
@@ -11,11 +10,6 @@ namespace SISTEMAACTUALIZADO.Modals
 {
     public class FormListaProveedoresModal : Form
     {
-        [DllImport("user32.DLL", EntryPoint = "ReleaseCapture")]
-        private extern static void ReleaseCapture();
-        [DllImport("user32.DLL", EntryPoint = "SendMessage")]
-        private extern static void SendMessage(IntPtr hWnd, int wMsg, int wParam, int lParam);
-
         private readonly ProveedorService _proveedorService = new ProveedorService();
 
         private TextBox txtFiltro = null!;
@@ -32,66 +26,61 @@ namespace SISTEMAACTUALIZADO.Modals
 
         private void InitializeComponent()
         {
-            this.FormBorderStyle = FormBorderStyle.None;
+            // Ventana nativa con la barra y botón de cerrar 'X' de Windows
+            this.FormBorderStyle = FormBorderStyle.FixedDialog;
             this.StartPosition = FormStartPosition.CenterParent;
-            this.Size = new Size(800, 520);
+            this.MaximizeBox = false;
+            this.MinimizeBox = false;
+            this.ShowInTaskbar = false;
+            this.Text = "Catálogo de Proveedores Registrados";
+            this.Size = new Size(820, 530);
             this.BackColor = Color.White;
 
-            Panel pnlBorde = new Panel
+            Panel pnlMain = new Panel
             {
                 Dock = DockStyle.Fill,
-                Padding = new Padding(20, 15, 20, 20),
+                Padding = new Padding(16, 12, 16, 16),
                 BackColor = Color.White
             };
-            pnlBorde.Paint += (s, e) =>
-            {
-                ControlPaint.DrawBorder(e.Graphics, pnlBorde.ClientRectangle, Color.FromArgb(203, 213, 225), ButtonBorderStyle.Solid);
+
+            // 1. Buscador / Filtro superior
+            Panel pnlFiltro = new Panel 
+            { 
+                Dock = DockStyle.Top, 
+                Height = 44, 
+                Padding = new Padding(0, 4, 0, 8),
+                BackColor = Color.Transparent
             };
 
-            Panel pnlHeader = new Panel { Dock = DockStyle.Top, Height = 40, BackColor = Color.Transparent };
-            pnlHeader.MouseDown += (s, e) => { ReleaseCapture(); SendMessage(this.Handle, 0x112, 0xf012, 0); };
-
-            Label lblTitulo = new Label
-            {
-                Text = "🚚 Catálogo de Proveedores Registrados",
-                Font = new Font("Segoe UI", 12F, FontStyle.Bold),
-                ForeColor = Color.FromArgb(15, 23, 42),
-                Dock = DockStyle.Left,
-                TextAlign = ContentAlignment.MiddleLeft,
-                AutoSize = true
+            Label lblBuscar = new Label 
+            { 
+                Text = "🔍 Filtrar Proveedor:", 
+                Font = new Font("Segoe UI", 9F, FontStyle.Bold), 
+                Location = new Point(0, 10), 
+                AutoSize = true,
+                ForeColor = Color.FromArgb(15, 23, 42)
             };
-            lblTitulo.MouseDown += (s, e) => { ReleaseCapture(); SendMessage(this.Handle, 0x112, 0xf012, 0); };
-
-            Button btnX = new Button
-            {
-                Text = "✕",
-                Size = new Size(32, 32),
-                Dock = DockStyle.Right,
-                FlatStyle = FlatStyle.Flat,
-                Font = new Font("Segoe UI", 10F, FontStyle.Bold),
-                ForeColor = Color.FromArgb(100, 116, 139),
-                Cursor = Cursors.Hand
-            };
-            btnX.FlatAppearance.BorderSize = 0;
-            btnX.Click += (s, e) => this.Close();
-
-            pnlHeader.Controls.Add(lblTitulo);
-            pnlHeader.Controls.Add(btnX);
-
-            Panel pnlFiltro = new Panel { Dock = DockStyle.Top, Height = 50, Padding = new Padding(0, 8, 0, 8) };
-            Label lblBuscar = new Label { Text = "🔍 Filtrar Proveedor:", Font = new Font("Segoe UI", 9F, FontStyle.Bold), Location = new Point(0, 14), AutoSize = true };
 
             txtFiltro = new TextBox
             {
-                Location = new Point(140, 10),
-                Size = new Size(380, 28),
+                Location = new Point(140, 6),
+                Size = new Size(420, 28),
                 Font = new Font("Segoe UI", 9.5F)
             };
             txtFiltro.TextChanged += TxtFiltro_TextChanged;
+            txtFiltro.KeyDown += (s, e) =>
+            {
+                if (e.KeyCode == Keys.Enter)
+                {
+                    e.SuppressKeyPress = true;
+                    SeleccionarYSalir();
+                }
+            };
 
             pnlFiltro.Controls.Add(lblBuscar);
             pnlFiltro.Controls.Add(txtFiltro);
 
+            // 2. Grilla de Proveedores
             dgvProveedores = new DataGridView
             {
                 Dock = DockStyle.Fill,
@@ -107,9 +96,23 @@ namespace SISTEMAACTUALIZADO.Modals
             };
             ConfigurarEstiloTabla(dgvProveedores);
             dgvProveedores.DoubleClick += (s, e) => SeleccionarYSalir();
-            dgvProveedores.KeyDown += (s, e) => { if (e.KeyCode == Keys.Enter) { e.Handled = true; SeleccionarYSalir(); } };
+            dgvProveedores.KeyDown += (s, e) => 
+            { 
+                if (e.KeyCode == Keys.Enter) 
+                { 
+                    e.Handled = true; 
+                    SeleccionarYSalir(); 
+                } 
+            };
 
-            Panel pnlBotones = new Panel { Dock = DockStyle.Bottom, Height = 48, Padding = new Padding(0, 8, 0, 0) };
+            // 3. Botones inferiores
+            Panel pnlBotones = new Panel 
+            { 
+                Dock = DockStyle.Bottom, 
+                Height = 48, 
+                Padding = new Padding(0, 10, 0, 0),
+                BackColor = Color.Transparent
+            };
 
             Button btnSeleccionar = new Button
             {
@@ -139,15 +142,17 @@ namespace SISTEMAACTUALIZADO.Modals
             btnCerrar.FlatAppearance.BorderSize = 0;
             btnCerrar.Click += (s, e) => this.Close();
 
+            // Asignación de tecla Escape para cerrar
+            this.CancelButton = btnCerrar;
+
             pnlBotones.Controls.Add(btnCerrar);
             pnlBotones.Controls.Add(btnSeleccionar);
 
-            pnlBorde.Controls.Add(dgvProveedores);
-            pnlBorde.Controls.Add(pnlFiltro);
-            pnlBorde.Controls.Add(pnlBotones);
-            pnlBorde.Controls.Add(pnlHeader);
+            pnlMain.Controls.Add(dgvProveedores);
+            pnlMain.Controls.Add(pnlFiltro);
+            pnlMain.Controls.Add(pnlBotones);
 
-            this.Controls.Add(pnlBorde);
+            this.Controls.Add(pnlMain);
         }
 
         private void ConfigurarEstiloTabla(DataGridView dgv)
@@ -156,11 +161,16 @@ namespace SISTEMAACTUALIZADO.Modals
             dgv.ColumnHeadersDefaultCellStyle.BackColor = Color.FromArgb(30, 41, 59);
             dgv.ColumnHeadersDefaultCellStyle.ForeColor = Color.White;
             dgv.ColumnHeadersDefaultCellStyle.Font = new Font("Segoe UI", 9F, FontStyle.Bold);
-            dgv.ColumnHeadersHeight = 32;
+
+            // Evita que el encabezado cambie de color al seleccionar la celda o columna
+            dgv.ColumnHeadersDefaultCellStyle.SelectionBackColor = Color.FromArgb(30, 41, 59);
+            dgv.ColumnHeadersDefaultCellStyle.SelectionForeColor = Color.White;
+            dgv.ColumnHeadersHeight = 34;
+
             dgv.DefaultCellStyle.Font = new Font("Segoe UI", 9F);
             dgv.DefaultCellStyle.SelectionBackColor = Color.FromArgb(224, 242, 254);
             dgv.DefaultCellStyle.SelectionForeColor = Color.FromArgb(15, 23, 42);
-            dgv.RowTemplate.Height = 30;
+            dgv.RowTemplate.Height = 32;
             dgv.GridColor = Color.FromArgb(226, 232, 240);
         }
 
@@ -170,6 +180,7 @@ namespace SISTEMAACTUALIZADO.Modals
             {
                 _listaOriginal = _proveedorService.ObtenerProveedoresActivos();
                 ActualizarGrilla(_listaOriginal);
+                txtFiltro.Focus();
             }
             catch (Exception ex)
             {
@@ -185,7 +196,7 @@ namespace SISTEMAACTUALIZADO.Modals
 
             if (dgvProveedores.Columns.Count > 0)
             {
-                if (dgvProveedores.Columns.Contains("ProveedorID")) dgvProveedores.Columns["ProveedorID"].Width = 50;
+                if (dgvProveedores.Columns.Contains("ProveedorID")) dgvProveedores.Columns["ProveedorID"].Width = 55;
                 if (dgvProveedores.Columns.Contains("Rut")) dgvProveedores.Columns["Rut"].Width = 110;
                 if (dgvProveedores.Columns.Contains("RazonSocial")) dgvProveedores.Columns["RazonSocial"].HeaderText = "Razón Social";
                 if (dgvProveedores.Columns.Contains("Giro")) dgvProveedores.Columns["Giro"].HeaderText = "Giro";

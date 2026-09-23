@@ -105,6 +105,18 @@ namespace SISTEMAACTUALIZADO.Services
                     prodBd.PrecioCosto = producto.PrecioCosto;
                     prodBd.ListaDefectoPOS = producto.ListaDefectoPOS;
                     prodBd.PrecioUnitario = producto.PrecioUnitario;
+
+                    // PERSISTENCIA DE LISTAS 2 A LA 10
+                    prodBd.Precio2 = producto.Precio2;
+                    prodBd.Precio3 = producto.Precio3;
+                    prodBd.Precio4 = producto.Precio4;
+                    prodBd.Precio5 = producto.Precio5;
+                    prodBd.Precio6 = producto.Precio6;
+                    prodBd.Precio7 = producto.Precio7;
+                    prodBd.Precio8 = producto.Precio8;
+                    prodBd.Precio9 = producto.Precio9;
+                    prodBd.Precio10 = producto.Precio10;
+
                     prodBd.Stock = producto.Stock;
                     prodBd.StockMinimo = producto.StockMinimo;
                     prodBd.ImagenPath = producto.ImagenPath;

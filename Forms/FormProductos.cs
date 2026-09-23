@@ -195,6 +195,7 @@ namespace SISTEMAACTUALIZADO
                 SelectionMode = DataGridViewSelectionMode.FullRowSelect,
                 MultiSelect = false,
                 AllowUserToAddRows = false,
+                AutoGenerateColumns = false, // <-- CLAVE: Evita desfase automático de índices
                 ReadOnly = true,
                 RowHeadersVisible = false,
                 ScrollBars = ScrollBars.Both,
@@ -202,6 +203,7 @@ namespace SISTEMAACTUALIZADO
                 RowTemplate = { Height = 34 }
             };
             ConfigurarEstiloTabla(dgvProductos);
+            CrearColumnasEstaticasGrilla(dgvProductos); // <-- Creamos la estructura fija
             dgvProductos.DoubleClick += (s, e) => BtnEditar_Click(s, e);
 
             Panel pnlFooter = new Panel { Dock = DockStyle.Bottom, Height = 32, Padding = new Padding(4, 6, 4, 0) };
@@ -254,6 +256,52 @@ namespace SISTEMAACTUALIZADO
             }
         }
 
+        private void CrearColumnasEstaticasGrilla(DataGridView dgv)
+        {
+            dgv.Columns.Clear();
+
+            void Agregar(string prop, string header, int width, 
+                        DataGridViewContentAlignment align = DataGridViewContentAlignment.MiddleLeft, 
+                        string format = "", Color? fore = null, bool bold = false)
+            {
+                var col = new DataGridViewTextBoxColumn
+                {
+                    Name = prop,
+                    DataPropertyName = prop,
+                    HeaderText = header,
+                    Width = width
+                };
+
+                // Si los datos van centrados, el título del encabezado también se centra
+                col.HeaderCell.Style.Alignment = align;
+                col.DefaultCellStyle.Alignment = align;
+
+                if (!string.IsNullOrEmpty(format)) col.DefaultCellStyle.Format = format;
+                if (fore.HasValue) col.DefaultCellStyle.ForeColor = fore.Value;
+                if (bold) col.DefaultCellStyle.Font = new Font("Segoe UI", 8.5F, FontStyle.Bold);
+
+                dgv.Columns.Add(col);
+            }
+
+            // Textos a la izquierda
+            Agregar("Nombre", "Descripción Producto", 230, DataGridViewContentAlignment.MiddleLeft);
+            Agregar("Categoria", "Categoría", 110, DataGridViewContentAlignment.MiddleLeft);
+            Agregar("NFamilia", "Familia", 110, DataGridViewContentAlignment.MiddleLeft);
+
+            // Stock y Precios CENTRADOS para quedar debajo de su título
+            Agregar("Stock", "Stock", 85, DataGridViewContentAlignment.MiddleCenter, "#,##0", null, true);
+            Agregar("PrecioCosto", "Costo Neto", 100, DataGridViewContentAlignment.MiddleCenter, "$#,##0");
+            Agregar("PrecioUnitario", "Precio Venta (L1)", 125, DataGridViewContentAlignment.MiddleCenter, "$#,##0", Color.FromArgb(16, 185, 129), true);
+
+            for (int i = 2; i <= 10; i++)
+            {
+                Agregar($"Precio{i}", $"Lista {i}", 100, DataGridViewContentAlignment.MiddleCenter, "$#,##0", Color.FromArgb(2, 132, 199), false);
+            }
+
+            Agregar("ListaDefectoPOS", "Lista Activa POS", 110, DataGridViewContentAlignment.MiddleCenter, "Lista #0", Color.FromArgb(124, 58, 237), true);
+            Agregar("CodigoBarra", "SKU / Código Barra", 140, DataGridViewContentAlignment.MiddleCenter);
+        }
+
         private void ConfigurarEstiloTabla(DataGridView dgv)
         {
             dgv.EnableHeadersVisualStyles = false;
@@ -288,57 +336,28 @@ namespace SISTEMAACTUALIZADO
 
         private void ActualizarGrilla(List<Producto> lista)
         {
-            dgvProductos.DataSource = null;
-            dgvProductos.DataSource = lista;
-
-            foreach (DataGridViewColumn col in dgvProductos.Columns)
+            // 1. Aplicar visibilidad de las listas 2 a la 10
+            for (int i = 2; i <= 10; i++)
             {
-                col.Visible = false;
-            }
-
-            void ConfigurarCol(string prop, string titulo, int dispIndex, int ancho, 
-                              DataGridViewContentAlignment align = DataGridViewContentAlignment.MiddleLeft, 
-                              string formato = "", Color? fore = null, bool bold = false, bool visible = true)
-            {
-                if (dgvProductos.Columns[prop] is DataGridViewColumn c)
+                string colName = $"Precio{i}";
+                if (dgvProductos.Columns.Contains(colName))
                 {
-                    c.Visible = visible;
-                    c.HeaderText = titulo;
-                    c.DisplayIndex = dispIndex;
-                    c.Width = ancho;
-                    c.DefaultCellStyle.Alignment = align;
-
-                    if (!string.IsNullOrEmpty(formato)) c.DefaultCellStyle.Format = formato;
-                    if (fore.HasValue) c.DefaultCellStyle.ForeColor = fore.Value;
-                    if (bold) c.DefaultCellStyle.Font = new Font("Segoe UI", 8.5F, FontStyle.Bold);
+                    dgvProductos.Columns[colName].Visible = _listasVisibles[i - 2];
                 }
             }
 
-            int orden = 0;
-            ConfigurarCol("Nombre", "Descripción Producto", orden++, 240);
-            ConfigurarCol("Categoria", "Categoría", orden++, 120);
-            ConfigurarCol("NFamilia", "Familia", orden++, 120);
-            ConfigurarCol("Stock", "Stock", orden++, 80, DataGridViewContentAlignment.MiddleRight, "#,##0", null, true);
-            ConfigurarCol("PrecioCosto", "Costo Neto", orden++, 105, DataGridViewContentAlignment.MiddleRight, "$#,##0");
-            ConfigurarCol("PrecioUnitario", "Precio Venta (L1)", orden++, 130, DataGridViewContentAlignment.MiddleRight, "$#,##0", Color.FromArgb(16, 185, 129), true);
-
-            for (int i = 2; i <= 10; i++)
-            {
-                string propName = $"Precio{i}";
-                bool estaVisible = _listasVisibles[i - 2];
-                ConfigurarCol(propName, $"Lista {i}", orden++, 110, DataGridViewContentAlignment.MiddleRight, "$#,##0", Color.FromArgb(2, 132, 199), false, estaVisible);
-            }
-
-            ConfigurarCol("ListaDefectoPOS", "Lista Activa POS", orden++, 110, DataGridViewContentAlignment.MiddleCenter, "Lista #0", Color.FromArgb(124, 58, 237), true);
-            ConfigurarCol("CodigoBarra", "SKU / Código Barra", orden++, 140);
+            // 2. Asignar los datos
+            dgvProductos.DataSource = null;
+            dgvProductos.DataSource = lista;
 
             lblContadorFooter.Text = $"Mostrando {lista.Count:N0} de {_listaProductos.Count:N0} productos registrados";
 
             if (dgvProductos.Rows.Count > 0)
             {
                 var primeraColumnaVisible = dgvProductos.Columns.Cast<DataGridViewColumn>()
+                    .Where(c => c.Visible)
                     .OrderBy(c => c.DisplayIndex)
-                    .FirstOrDefault(c => c.Visible);
+                    .FirstOrDefault();
 
                 if (primeraColumnaVisible != null)
                 {
