@@ -59,14 +59,14 @@ namespace SISTEMAACTUALIZADO.Modals
 
         private void InitializeComponent()
         {
-            // Ventana nativa ampliada para evitar compresión y scrolls cruzados
+            // Configuración base de la ventana
             this.FormBorderStyle = FormBorderStyle.FixedDialog;
             this.StartPosition = FormStartPosition.CenterParent;
             this.MaximizeBox = false;
             this.MinimizeBox = false;
             this.ShowInTaskbar = false;
             this.Text = _productoAEditar == null ? "Registrar Nuevo Producto" : "Editar Producto";
-            this.Size = new Size(720, 780); // <-- Ancho y alto con holgura
+            this.Size = new Size(720, 780);
             this.BackColor = Color.White;
             this.Font = new Font("Segoe UI", 9F, FontStyle.Regular, GraphicsUnit.Point);
 
@@ -83,7 +83,7 @@ namespace SISTEMAACTUALIZADO.Modals
                 FlowDirection = FlowDirection.TopDown,
                 WrapContents = false,
                 Padding = new Padding(0, 4, 10, 0),
-                AutoScroll = true // Solo scroll vertical cuando sea necesario
+                AutoScroll = true
             };
 
             // Fila 1: Código de Barra y Nombre
@@ -181,25 +181,39 @@ namespace SISTEMAACTUALIZADO.Modals
             pnlFilaPrecios.Controls.Add(CrearCampo("📦 Stock Actual (Editable)", txtStockActual, 250, 170));
             pnlFilaPrecios.Controls.Add(CrearCampo("🔔 Stock Mínimo Alerta", txtStockMinimo, 440, 170));
 
-            // Tarjeta Foto
+            // Tarjeta Foto con el botón 🌐 Buscar en Línea
             Panel pnlCardFoto = CrearCardPanel(630, 74);
             Label lblTitFoto = new Label { Text = "🖼️ Foto del Producto", Font = new Font("Segoe UI", 8.5F, FontStyle.Bold), ForeColor = Color.FromArgb(71, 85, 105), Location = new Point(14, 6), AutoSize = true };
             pbFoto = new PictureBox { Location = new Point(14, 24), Size = new Size(42, 42), BorderStyle = BorderStyle.FixedSingle, SizeMode = PictureBoxSizeMode.Zoom, BackColor = Color.FromArgb(248, 250, 252) };
-            Button btnCargarFoto = new Button { Text = "📤 Seleccionar imagen", Location = new Point(64, 28), Size = new Size(160, 32), BackColor = Color.FromArgb(239, 246, 255), ForeColor = Color.FromArgb(29, 78, 216), FlatStyle = FlatStyle.Flat, Font = new Font("Segoe UI", 8.5F, FontStyle.Bold), Cursor = Cursors.Hand };
+            
+            Button btnCargarFoto = new Button { Text = "📤 Archivo local", Location = new Point(64, 28), Size = new Size(120, 32), BackColor = Color.FromArgb(239, 246, 255), ForeColor = Color.FromArgb(29, 78, 216), FlatStyle = FlatStyle.Flat, Font = new Font("Segoe UI", 8.5F, FontStyle.Bold), Cursor = Cursors.Hand };
             btnCargarFoto.FlatAppearance.BorderColor = Color.FromArgb(191, 219, 254);
             btnCargarFoto.Click += BtnCargarFoto_Click;
 
-            Button btnQuitarFoto = new Button { Text = "🗑️ Quitar", Location = new Point(232, 28), Size = new Size(80, 32), BackColor = Color.FromArgb(254, 242, 242), ForeColor = Color.FromArgb(220, 38, 38), FlatStyle = FlatStyle.Flat, Font = new Font("Segoe UI", 8.5F, FontStyle.Bold), Cursor = Cursors.Hand };
+            Button btnBuscarWeb = new Button { Text = "🌐 Buscar en Línea", Location = new Point(190, 28), Size = new Size(135, 32), BackColor = Color.FromArgb(240, 253, 244), ForeColor = Color.FromArgb(22, 101, 52), FlatStyle = FlatStyle.Flat, Font = new Font("Segoe UI", 8.5F, FontStyle.Bold), Cursor = Cursors.Hand };
+            btnBuscarWeb.FlatAppearance.BorderColor = Color.FromArgb(187, 247, 208);
+            btnBuscarWeb.Click += BtnBuscarWeb_Click;
+
+            Button btnQuitarFoto = new Button { Text = "🗑️ Quitar", Location = new Point(331, 28), Size = new Size(75, 32), BackColor = Color.FromArgb(254, 242, 242), ForeColor = Color.FromArgb(220, 38, 38), FlatStyle = FlatStyle.Flat, Font = new Font("Segoe UI", 8.5F, FontStyle.Bold), Cursor = Cursors.Hand };
             btnQuitarFoto.FlatAppearance.BorderColor = Color.FromArgb(254, 202, 202);
             btnQuitarFoto.Click += (s, e) => { _rutaImagenSeleccionada = string.Empty; pbFoto.Image?.Dispose(); pbFoto.Image = null; };
 
-            Label lblFormatos = new Label { Text = "Formatos permitidos: JPG, PNG. Máx. 2MB.", Location = new Point(325, 36), AutoSize = true, Font = new Font("Segoe UI", 7.5F), ForeColor = Color.FromArgb(148, 163, 184) };
-            pnlCardFoto.Controls.AddRange(new Control[] { lblTitFoto, pbFoto, btnCargarFoto, btnQuitarFoto, lblFormatos });
+            Label lblFormatos = new Label { Text = "Formatos: JPG, PNG, WEBP.", Location = new Point(415, 36), AutoSize = true, Font = new Font("Segoe UI", 7.5F), ForeColor = Color.FromArgb(148, 163, 184) };
+            pnlCardFoto.Controls.AddRange(new Control[] { lblTitFoto, pbFoto, btnCargarFoto, btnBuscarWeb, btnQuitarFoto, lblFormatos });
 
-            flow.Controls.AddRange(new Control[] { pnlFila1, pnlFila2, pnlCardCosto, pnlCardModalidad, pnlSeccionTramos, pnlFilaPrecios, pnlCardFoto });
+            // Agregar secciones al flow
+            flow.Controls.AddRange(new Control[] { 
+                pnlFila1, 
+                pnlFila2, 
+                pnlCardCosto, 
+                pnlCardModalidad, 
+                pnlSeccionTramos, 
+                pnlFilaPrecios, 
+                pnlCardFoto 
+            });
 
             // Botones de acción inferiores
-            Panel pnlBotones = new Panel { Dock = DockStyle.Bottom, Height = 50, BackColor = Color.Transparent, Padding = new Padding(0, 6, 0, 0) };
+            Panel pnlBotones = new Panel { Dock = DockStyle.Bottom, Height = 50, BackColor = Color.White, Padding = new Padding(0, 6, 0, 0) };
             Button btnGuardar = new Button
             {
                 Text = "💾 Guardar Cambios",
@@ -229,10 +243,13 @@ namespace SISTEMAACTUALIZADO.Modals
             btnCancelar.Click += (s, e) => this.Close();
 
             this.CancelButton = btnCancelar;
-
             pnlBotones.Controls.AddRange(new Control[] { btnGuardar, btnCancelar });
 
-            pnlBorde.Controls.AddRange(new Control[] { flow, pnlBotones });
+            // Ensamblaje con orden estricto de Dock
+            pnlBorde.Controls.Add(flow);
+            pnlBorde.Controls.Add(pnlBotones);
+            flow.BringToFront();
+
             this.Controls.Add(pnlBorde);
 
             RegenerarFilasTramos(2);
@@ -359,14 +376,10 @@ namespace SISTEMAACTUALIZADO.Modals
                 txtStockMinimo.Text = _productoAEditar.StockMinimo.ToString();
 
                 _rutaImagenSeleccionada = _productoAEditar.ImagenPath ?? string.Empty;
-                if (!string.IsNullOrEmpty(_rutaImagenSeleccionada) && File.Exists(_rutaImagenSeleccionada))
+                if (!string.IsNullOrEmpty(_rutaImagenSeleccionada))
                 {
-                    try
-                    {
-                        using var stream = new MemoryStream(File.ReadAllBytes(_rutaImagenSeleccionada));
-                        pbFoto.Image = new Bitmap(stream);
-                    }
-                    catch { }
+                    pbFoto.Image?.Dispose();
+                    pbFoto.Image = ImagenHelper.CargarImagenSegura(_rutaImagenSeleccionada);
                 }
 
                 CargarEscalaDesdeBD(_productoAEditar.ProductoID);
@@ -434,14 +447,44 @@ namespace SISTEMAACTUALIZADO.Modals
             using OpenFileDialog ofd = new OpenFileDialog { Filter = "Imágenes (*.png;*.jpg;*.jpeg;*.webp)|*.png;*.jpg;*.jpeg;*.webp" };
             if (ofd.ShowDialog(this) == DialogResult.OK)
             {
-                _rutaImagenSeleccionada = ofd.FileName;
                 try
                 {
-                    using var stream = new MemoryStream(File.ReadAllBytes(_rutaImagenSeleccionada));
+                    // Copia automáticamente la foto a la carpeta Imagenes del proyecto y devuelve solo 'archivo.ext'
+                    string sku = txtCodigoBarra.Text.Trim();
+                    string nombreRelativo = ImagenHelper.CopiarAImagenesYObtenerNombreRelativo(ofd.FileName, sku);
+
+                    _rutaImagenSeleccionada = nombreRelativo;
+
                     pbFoto.Image?.Dispose();
-                    pbFoto.Image = new Bitmap(stream);
+                    pbFoto.Image = ImagenHelper.CargarImagenSegura(nombreRelativo);
                 }
-                catch { }
+                catch (Exception ex)
+                {
+                    MessageBox.Show($"Error al cargar imagen: {ex.Message}", "Error", MessageBoxButtons.OK, MessageBoxIcon.Error);
+                }
+            }
+        }
+
+        private void BtnBuscarWeb_Click(object? sender, EventArgs e)
+        {
+            if (!System.Net.NetworkInformation.NetworkInterface.GetIsNetworkAvailable())
+            {
+                MessageBox.Show("No se detecta conexión a internet para realizar la búsqueda en línea.", "Sin Conexión", MessageBoxButtons.OK, MessageBoxIcon.Warning);
+                return;
+            }
+
+            string sugerencia = txtNombre.Text.Trim();
+            string sku = txtCodigoBarra.Text.Trim();
+
+            using var modalBusqueda = new FormBuscarImagenModal(sugerencia, sku);
+            if (modalBusqueda.ShowDialog(this) == DialogResult.OK && !string.IsNullOrEmpty(modalBusqueda.RutaImagenDescargada))
+            {
+                _rutaImagenSeleccionada = modalBusqueda.RutaImagenDescargada;
+
+                // Al ser ahora un JPEG genuino, GDI+ lo carga al instante
+                pbFoto.Image?.Dispose();
+                pbFoto.Image = ImagenHelper.CargarImagenSegura(_rutaImagenSeleccionada);
+                pbFoto.Refresh();
             }
         }
 

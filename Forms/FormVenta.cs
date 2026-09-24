@@ -774,18 +774,21 @@ namespace SISTEMAACTUALIZADO
             };
 
             bool esPesable = EsProductoPorGramos(prod);
+            
 
             Control ctrlImagen;
-            if (!string.IsNullOrEmpty(prod.ImagenPath) && System.IO.File.Exists(prod.ImagenPath))
+            Image? imgProd = ImagenHelper.CargarImagenSegura(prod.ImagenPath);
+
+            if (imgProd != null)
             {
                 PictureBox pb = new PictureBox
                 {
                     Location = new Point(40, 6),
                     Size = new Size(50, 50),
                     SizeMode = PictureBoxSizeMode.Zoom,
-                    BackColor = Color.Transparent
+                    BackColor = Color.Transparent,
+                    Image = imgProd
                 };
-                try { pb.Image = Image.FromFile(prod.ImagenPath); } catch { }
                 ctrlImagen = pb;
             }
             else

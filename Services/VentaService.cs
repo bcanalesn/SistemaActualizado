@@ -39,6 +39,7 @@ namespace SISTEMAACTUALIZADO.Services
                     iddocDTE = 0,
                     Documento = "Ticket de Atención",
                     NroTicket = nroTicketAtencion,
+                    FechaTicket = ahora,
                     nroDTE = nroTicketAtencion,
                     nroInT = siguienteNroInT,
                     FecDoc = ahora,
@@ -154,6 +155,7 @@ namespace SISTEMAACTUALIZADO.Services
                         iddocDTE = 0,
                         Documento = "Venta en Espera",
                         NroTicket = nroTicket,
+                        FechaTicket = ahora,
                         nroDTE = nroTicket,
                         nroInT = siguienteNroInT,
                         FecDoc = ahora,
@@ -313,6 +315,7 @@ namespace SISTEMAACTUALIZADO.Services
                 venta.UserDTE = vendedor;
                 venta.Vendedor = vendedor;
                 venta.FecDoc = ahora;
+                if (!venta.FechaTicket.HasValue) venta.FechaTicket = ahora;
                 venta.Documento = "Ticket de Atención";
                 venta.status = "Pendiente";
 
@@ -428,7 +431,7 @@ namespace SISTEMAACTUALIZADO.Services
                 {
                     IdTve = v.idTve,
                     NroTicket = v.NroTicket > 0 ? v.NroTicket : v.nroDTE,
-                    FechaHora = v.FecDoc,
+                    FechaHora = v.FechaTicket ?? v.FecDoc,
                     Cliente = string.IsNullOrWhiteSpace(v.RazonSocial) ? "Consumidor Final" : v.RazonSocial,
                     Total = v.Total,
                     EstadoBD = v.status ?? "",

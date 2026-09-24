@@ -65,16 +65,18 @@ namespace SISTEMAACTUALIZADO.Modals
             this.KeyPreview = true;
 
             Control ctrlIcono;
-            if (!string.IsNullOrEmpty(imagenPath) && File.Exists(imagenPath))
+            Image? imgModal = ImagenHelper.CargarImagenSegura(imagenPath);
+
+            if (imgModal != null)
             {
                 PictureBox pb = new PictureBox
                 {
                     Location = new Point(25, 18),
                     Size = new Size(45, 45),
                     SizeMode = PictureBoxSizeMode.Zoom,
-                    BackColor = Color.Transparent
+                    BackColor = Color.Transparent,
+                    Image = imgModal
                 };
-                try { pb.Image = Image.FromFile(imagenPath); } catch { }
                 ctrlIcono = pb;
             }
             else
