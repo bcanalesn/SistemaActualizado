@@ -1,0 +1,61 @@
+[33m09a9828[m[33m ([m[1;31morigin/main[m[33m, [m[1;31morigin/HEAD[m[33m)[m se añadio los valores a los campos descuento y subtotal
+[33ma99d4aa[m agregamos campos para manter los nros y fecha de los tickets
+[33m913f1ef[m cambiamos listaa de vendedor directo desded bd, agregamos nuevos roles y actualizamos funciones con el enter
+[33me9a5345[m[33m ([m[1;36mHEAD[m[33m -> [m[1;32mmain[m[33m)[m Implementación del Módulo POS Móvil / Preventa Web
+[33m2c2f42c[m Se creo opcion venta en espera
+[33ma2e5bba[m añadimos opcion de cierre de caja por turno
+[33m849ba1c[m Arreglamos detalles visuales de las tarjetas que se sobreponen
+[33mf8a78fd[m modularizando el codigo
+[33m14fe8a7[m añadimo el modal para ver los tickets emitidos
+[33m7dbc1c2[m Añadimos funcion de cerrar caja en caso de quedar abierta(prueba)
+[33mb3aa7d3[m Cambio de valores a moneda nacional
+[33m62c85b1[m Merge branch 'main' of https://github.com/bcanalesn/SistemaActualizado
+[33mf6c8e0d[m Actualiza AppDbContext
+[33m4cb1d50[m arreglamos vista de caja, pasamo la mayoria de precios a formato chileno en caja
+[33mb2385fb[m añadimos configuracion de la boleta, cambiamos el resumen del turno, añádimos script configuracionempresa.sql
+[33mf8157ce[m Merge branch 'main' of https://github.com/bcanalesn/SistemaActualizado
+[33mc7cedc9[m Agregando opcion de credito interno
+[33me919da2[m agregamos kpi y exportacion en pdf en libro de compras
+[33m194f733[m Modificacion de margenes
+[33mf6d1b7e[m Se agrega vista libro de compra
+[33mc7f80b8[m[33m ([m[1;31morigin/Rama_Victor[m[33m)[m añadimos funcion centralizada para unir los margenes con el precio costo en recepcion de compra y productos
+[33m4d70f43[m arreglamos dispocision vista recepcion de compra
+[33m399ade1[m Actualizamos vista recepcion de compra para stock y gastos operacionales
+[33md73e389[m Actualizar login con base de datos
+[33mbf5ace8[m Login
+[33m86f0f39[m Precio Especial
+[33m7869e04[m mejoras en la vista de formcaja
+[33m7956a9f[m Modificaciones de algunos diseños en vista producto y clientes
+[33m7af3bd9[m le dimos ua lista al cliente, pero tambien ver segun los tramos, respetar precios
+[33m880e17b[m agregamos la vista clientes
+[33mc519ca1[m Añadimos metodo de listas fijas y por tramos
+[33m65525e6[m mejoramos la configuracion para las listas de precio
+[33md678b29[m Añadimos ajuste de margenes en productos
+[33mb145e5b[m limpieza de codigo
+[33ma2fddc2[m Actualizacion Tabla Producto y Visualizacion FormProducto
+[33m981446b[m correccion categorias
+[33m53506f8[m correciones en productos y punto de venta
+[33m5de73d3[m Correccion Recepcion de compras
+[33m26e132b[m Recepcion de compra e Inventario
+[33mcc6e8ed[m Actualizacion de libro ventas y reimpresion de boletas o facturas
+[33me2c3d7b[m Actualizando vista historial de ventas
+[33m1af60c2[m arreglando conexion a BD y modificando algunas vistas
+[33m632cbd2[m[33m ([m[1;32mprueba[m[33m)[m Medios de Pago/ Resumen Turno
+[33md6534b0[m Actualizando vista de la caja
+[33mb57b537[m terminando vista punto de venta
+[33m1370de3[m habilitando opcion de agregar imagenes a productos
+[33m7f294c4[m modificamos la vista pos y stock
+[33m2788803[m Modificacion Control Caja
+[33m6c2a33b[m Correccion tablas TVE y TVD, Nota de Credito
+[33ma394e0d[m Merge branch 'prueba' en main
+[33m6670d74[m[33m ([m[1;31morigin/Prueba[m[33m)[m estandarización de BD con tablas TVE2607 y TVD2607 e integración de módulos
+[33m96b2623[m Merge pull request #3 from bcanalesn/Prueba
+[33m8422f14[m Fase 3 Frontend - Libro de Ventas y F29
+[33m0448672[m Fix: Interfaz de Historial de Ventas integrada
+[33madfb635[m Union de ramas de la fase 2
+[33me12bfe7[m Merge remote-tracking branch 'origin/main' into Rama_Victor
+[33m8ca1007[m Merge pull request #1 from bcanalesn/Prueba
+[33md369556[m implementar backend DTE, persistencia de ventas y notas de crédito
+[33m2d5ca70[m Fase 2 Frontend, Interfaz & Comprobantes DTE
+[33m6b496c4[m Fase 1 (Control de Folios SII, Facturación Electrónica)
+[33m98e43fa[m Base del Proyecto

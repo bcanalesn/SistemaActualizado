@@ -30,72 +30,83 @@ namespace SISTEMAACTUALIZADO.Services
             decimal neto = Math.Round(totalCobrado / 1.19m, 0);
             decimal iva = totalCobrado - neto;
 
-            var nuevaVenta = new TVE2607
+            try
             {
-                idLocal = 1,
-                nmbLocal = "Local Principal",
-                iddocDTE = 0,
-                Documento = "Ticket de Atención",
-                NroTicket = nroTicketAtencion,
-                FechaTicket = ahora,
-                nroDTE = nroTicketAtencion,
-                nroInT = siguienteNroInT,
-                FecDoc = ahora,
-                SubTotal = subtotalLista1,    // Monto original Lista 1
-                Descuento = descuentoGlobal,  // Descuento comercial aplicado
-                Neto = neto,                  // Afecto real
-                IvA = iva,                    // IVA 19%
-                Total = totalCobrado,         // Monto real que ingresa a caja
-                UserDTE = vendedor,
-                Vendedor = vendedor,
-                Idcliente = clienteDb?.IdCliente ?? 0,
-                RuT = clienteDb != null ? RutHelper.Formatear(clienteDb.Rut) : "",
-                RazonSocial = clienteDb?.RazonSocial ?? "Consumidor Final",
-                Giro = clienteDb?.Giro ?? "",
-                Direccion = clienteDb?.Direccion ?? "",
-                nComuna = clienteDb?.Comuna ?? "",
-                nCiudad = clienteDb?.Ciudad ?? "",
-                Fono1 = clienteDb?.Telefono ?? "",
-                email = clienteDb?.Email ?? "",
-                status = "Pendiente"
-            };
-
-            db.TVE2607.Add(nuevaVenta);
-            db.SaveChanges();
-
-            foreach (var item in carrito)
-            {
-                var detalle = new TVD2607
+                var nuevaVenta = new TVE2607
                 {
-                    idTve = nuevaVenta.idTve,
                     idLocal = 1,
+                    nmbLocal = "Local Principal",
                     iddocDTE = 0,
                     Documento = "Ticket de Atención",
-                    NroDTE = nroTicketAtencion,
-                    NroInT = siguienteNroInT,
-                    FecMoV = ahora,
-                    HoraMoV = ahora.ToString("HH:mm:ss"),
-                    IdProducto = item.ProductoID,
-                    NmbProducto = item.Nombre,
-                    Cantidad = item.Cantidad,
-                    Precio = item.PrecioUnitario,
-                    SubTotal = item.Subtotal,
-                    nmbVendedor = vendedor,
-                    Unidad = "UN"
+                    NroTicket = nroTicketAtencion,
+                    nroDTE = nroTicketAtencion,
+                    nroInT = siguienteNroInT,
+                    FecDoc = ahora,
+                    SubTotal = subtotalLista1,    // Monto original Lista 1
+                    Descuento = descuentoGlobal,  // Descuento comercial aplicado
+                    Neto = neto,                  // Afecto real
+                    IvA = iva,                    // IVA 19%
+                    Total = totalCobrado,         // Monto real que ingresa a caja
+                    UserDTE = vendedor,
+                    Vendedor = vendedor,
+                    Idcliente = clienteDb?.IdCliente ?? 0,
+                    RuT = clienteDb != null ? RutHelper.Formatear(clienteDb.Rut) : "",
+                    RazonSocial = clienteDb?.RazonSocial ?? "Consumidor Final",
+                    Giro = clienteDb?.Giro ?? "",
+                    Direccion = clienteDb?.Direccion ?? "",
+                    nComuna = clienteDb?.Comuna ?? "",
+                    nCiudad = clienteDb?.Ciudad ?? "",
+                    Fono1 = clienteDb?.Telefono ?? "",
+                    email = clienteDb?.Email ?? "",
+                    status = "Pendiente"
                 };
 
-                db.TVD2607.Add(detalle);
+                db.TVE2607.Add(nuevaVenta);
+                db.SaveChanges();
 
-                var prodBD = db.Productos.FirstOrDefault(p => p.ProductoID == item.ProductoID);
-                if (prodBD != null)
+                foreach (var item in carrito)
                 {
-                    prodBD.Stock -= item.Cantidad;
-                    if (prodBD.Stock < 0) prodBD.Stock = 0;
-                }
-            }
+                    string nombreSeguro = item.Nombre ?? "Producto";
+                    if (nombreSeguro.Length > 80) nombreSeguro = nombreSeguro.Substring(0, 80);
 
-            db.SaveChanges();
-            return nroTicketAtencion;
+                    var detalle = new TVD2607
+                    {
+                        idTve = nuevaVenta.idTve,
+                        idLocal = 1,
+                        iddocDTE = 0,
+                        Documento = "Ticket de Atención",
+                        NroDTE = nroTicketAtencion,
+                        NroInT = siguienteNroInT,
+                        FecMoV = ahora,
+                        HoraMoV = ahora.ToString("HH:mm:ss"),
+                        IdProducto = item.ProductoID,
+                        NmbProducto = nombreSeguro,
+                        Cantidad = item.Cantidad,
+                        Precio = item.PrecioUnitario,
+                        SubTotal = item.Subtotal,
+                        nmbVendedor = vendedor,
+                        Unidad = "UN"
+                    };
+
+                    db.TVD2607.Add(detalle);
+
+                    var prodBD = db.Productos.FirstOrDefault(p => p.ProductoID == item.ProductoID);
+                    if (prodBD != null)
+                    {
+                        prodBD.Stock -= item.Cantidad;
+                        if (prodBD.Stock < 0) prodBD.Stock = 0;
+                    }
+                }
+
+                db.SaveChanges();
+                return nroTicketAtencion;
+            }
+            catch (Exception ex)
+            {
+                string msg = ex.InnerException != null ? ex.InnerException.Message : ex.Message;
+                if (ex.InnerException?.InnerException != null) msg += $"\nCausa raíz: {ex.InnerException.InnerException.Message}";
+                throw new Exception(msg);
+            }
         }
 
         // 2. VENTAS EN ESPERA: GUARDAR EN PAUSA
@@ -128,87 +139,98 @@ namespace SISTEMAACTUALIZADO.Services
             decimal neto = Math.Round(totalCobrado / 1.19m, 0);
             decimal iva = totalCobrado - neto;
 
-            if (venta == null)
+            try
             {
-                int ultimoNroInT = db.TVE2607.Max(v => (int?)v.nroInT) ?? 0;
-                int siguienteNroInT = ultimoNroInT + 1;
-                int nroTicket = (int)(ahora.Ticks % 1000000);
-
-                venta = new TVE2607
+                if (venta == null)
                 {
-                    idLocal = 1,
-                    nmbLocal = "Local Principal",
-                    iddocDTE = 0,
-                    Documento = "Venta en Espera",
-                    NroTicket = nroTicket,
-                    FechaTicket = ahora,
-                    nroDTE = nroTicket,
-                    nroInT = siguienteNroInT,
-                    FecDoc = ahora,
-                    SubTotal = subtotalLista1,
-                    Descuento = descuentoGlobal,
-                    Neto = neto,
-                    IvA = iva,
-                    Total = totalCobrado,
-                    UserDTE = vendedor,
-                    Vendedor = vendedor,
-                    Idcliente = clienteDb?.IdCliente ?? 0,
-                    RuT = clienteDb != null ? RutHelper.Formatear(clienteDb.Rut) : "",
-                    RazonSocial = razonSocialFinal,
-                    Giro = clienteDb?.Giro ?? "",
-                    Direccion = clienteDb?.Direccion ?? "",
-                    nComuna = clienteDb?.Comuna ?? "",
-                    nCiudad = clienteDb?.Ciudad ?? "",
-                    Fono1 = clienteDb?.Telefono ?? "",
-                    email = clienteDb?.Email ?? "",
-                    status = "EnEspera"
-                };
-                db.TVE2607.Add(venta);
-            }
-            else
-            {
-                venta.SubTotal = subtotalLista1;
-                venta.Descuento = descuentoGlobal;
-                venta.Neto = neto;
-                venta.IvA = iva;
-                venta.Total = totalCobrado;
-                venta.UserDTE = vendedor;
-                venta.Vendedor = vendedor;
-                venta.RazonSocial = razonSocialFinal;
-                venta.FecDoc = ahora;
-                venta.status = "EnEspera";
+                    int ultimoNroInT = db.TVE2607.Max(v => (int?)v.nroInT) ?? 0;
+                    int siguienteNroInT = ultimoNroInT + 1;
+                    int nroTicket = (int)(ahora.Ticks % 1000000);
 
-                var detallesAntiguos = db.TVD2607.Where(d => d.idTve == venta.idTve).ToList();
-                db.TVD2607.RemoveRange(detallesAntiguos);
-            }
-
-            db.SaveChanges();
-
-            foreach (var item in carrito)
-            {
-                var detalle = new TVD2607
+                    venta = new TVE2607
+                    {
+                        idLocal = 1,
+                        nmbLocal = "Local Principal",
+                        iddocDTE = 0,
+                        Documento = "Venta en Espera",
+                        NroTicket = nroTicket,
+                        nroDTE = nroTicket,
+                        nroInT = siguienteNroInT,
+                        FecDoc = ahora,
+                        SubTotal = subtotalLista1,
+                        Descuento = descuentoGlobal,
+                        Neto = neto,
+                        IvA = iva,
+                        Total = totalCobrado,
+                        UserDTE = vendedor,
+                        Vendedor = vendedor,
+                        Idcliente = clienteDb?.IdCliente ?? 0,
+                        RuT = clienteDb != null ? RutHelper.Formatear(clienteDb.Rut) : "",
+                        RazonSocial = razonSocialFinal,
+                        Giro = clienteDb?.Giro ?? "",
+                        Direccion = clienteDb?.Direccion ?? "",
+                        nComuna = clienteDb?.Comuna ?? "",
+                        nCiudad = clienteDb?.Ciudad ?? "",
+                        Fono1 = clienteDb?.Telefono ?? "",
+                        email = clienteDb?.Email ?? "",
+                        status = "EnEspera"
+                    };
+                    db.TVE2607.Add(venta);
+                }
+                else
                 {
-                    idTve = venta.idTve,
-                    idLocal = 1,
-                    iddocDTE = 0,
-                    Documento = "Venta en Espera",
-                    NroDTE = venta.nroDTE,
-                    NroInT = venta.nroInT,
-                    FecMoV = ahora,
-                    HoraMoV = ahora.ToString("HH:mm:ss"),
-                    IdProducto = item.ProductoID,
-                    NmbProducto = item.Nombre,
-                    Cantidad = item.Cantidad,
-                    Precio = item.PrecioUnitario,
-                    SubTotal = item.Subtotal,
-                    nmbVendedor = vendedor,
-                    Unidad = "UN"
-                };
-                db.TVD2607.Add(detalle);
-            }
+                    venta.SubTotal = subtotalLista1;
+                    venta.Descuento = descuentoGlobal;
+                    venta.Neto = neto;
+                    venta.IvA = iva;
+                    venta.Total = totalCobrado;
+                    venta.UserDTE = vendedor;
+                    venta.Vendedor = vendedor;
+                    venta.RazonSocial = razonSocialFinal;
+                    venta.FecDoc = ahora;
+                    venta.status = "EnEspera";
 
-            db.SaveChanges();
-            return venta.idTve;
+                    var detallesAntiguos = db.TVD2607.Where(d => d.idTve == venta.idTve).ToList();
+                    db.TVD2607.RemoveRange(detallesAntiguos);
+                }
+
+                db.SaveChanges();
+
+                foreach (var item in carrito)
+                {
+                    string nombreSeguro = item.Nombre ?? "Producto";
+                    if (nombreSeguro.Length > 80) nombreSeguro = nombreSeguro.Substring(0, 80);
+
+                    var detalle = new TVD2607
+                    {
+                        idTve = venta.idTve,
+                        idLocal = 1,
+                        iddocDTE = 0,
+                        Documento = "Venta en Espera",
+                        NroDTE = venta.nroDTE,
+                        NroInT = venta.nroInT,
+                        FecMoV = ahora,
+                        HoraMoV = ahora.ToString("HH:mm:ss"),
+                        IdProducto = item.ProductoID,
+                        NmbProducto = nombreSeguro,
+                        Cantidad = item.Cantidad,
+                        Precio = item.PrecioUnitario,
+                        SubTotal = item.Subtotal,
+                        nmbVendedor = vendedor,
+                        Unidad = "UN"
+                    };
+                    db.TVD2607.Add(detalle);
+                }
+
+                db.SaveChanges();
+                return venta.idTve;
+            }
+            catch (Exception ex)
+            {
+                string msg = ex.InnerException != null ? ex.InnerException.Message : ex.Message;
+                if (ex.InnerException?.InnerException != null) msg += $"\nCausa raíz: {ex.InnerException.InnerException.Message}";
+                throw new Exception(msg);
+            }
         }
 
         // 3. CONSULTAR VENTAS EN ESPERA
@@ -281,61 +303,72 @@ namespace SISTEMAACTUALIZADO.Services
 
             decimal neto = Math.Round(totalCobrado / 1.19m, 0);
 
-            venta.SubTotal = subtotalLista1;
-            venta.Descuento = descuentoGlobal;
-            venta.Neto = neto;
-            venta.IvA = totalCobrado - neto;
-            venta.Total = totalCobrado;
-            venta.UserDTE = vendedor;
-            venta.Vendedor = vendedor;
-            venta.FecDoc = ahora;
-            if (!venta.FechaTicket.HasValue) venta.FechaTicket = ahora;
-            venta.Documento = "Ticket de Atención";
-            venta.status = "Pendiente";
-
-            if (clienteDb != null)
+            try
             {
-                venta.Idcliente = clienteDb.IdCliente;
-                venta.RuT = RutHelper.Formatear(clienteDb.Rut);
-                venta.RazonSocial = clienteDb.RazonSocial;
-                venta.Giro = clienteDb.Giro ?? "";
-            }
+                venta.SubTotal = subtotalLista1;
+                venta.Descuento = descuentoGlobal;
+                venta.Neto = neto;
+                venta.IvA = totalCobrado - neto;
+                venta.Total = totalCobrado;
+                venta.UserDTE = vendedor;
+                venta.Vendedor = vendedor;
+                venta.FecDoc = ahora;
+                venta.Documento = "Ticket de Atención";
+                venta.status = "Pendiente";
 
-            var anteriores = db.TVD2607.Where(d => d.idTve == idTve).ToList();
-            db.TVD2607.RemoveRange(anteriores);
-
-            foreach (var item in carrito)
-            {
-                var detalle = new TVD2607
+                if (clienteDb != null)
                 {
-                    idTve = venta.idTve,
-                    idLocal = 1,
-                    iddocDTE = 0,
-                    Documento = "Ticket de Atención",
-                    NroDTE = venta.nroDTE,
-                    NroInT = venta.nroInT,
-                    FecMoV = ahora,
-                    HoraMoV = ahora.ToString("HH:mm:ss"),
-                    IdProducto = item.ProductoID,
-                    NmbProducto = item.Nombre,
-                    Cantidad = item.Cantidad,
-                    Precio = item.PrecioUnitario,
-                    SubTotal = item.Subtotal,
-                    nmbVendedor = vendedor,
-                    Unidad = "UN"
-                };
-                db.TVD2607.Add(detalle);
-
-                var prodBD = db.Productos.FirstOrDefault(p => p.ProductoID == item.ProductoID);
-                if (prodBD != null)
-                {
-                    prodBD.Stock -= item.Cantidad;
-                    if (prodBD.Stock < 0) prodBD.Stock = 0;
+                    venta.Idcliente = clienteDb.IdCliente;
+                    venta.RuT = RutHelper.Formatear(clienteDb.Rut);
+                    venta.RazonSocial = clienteDb.RazonSocial;
+                    venta.Giro = clienteDb.Giro ?? "";
                 }
-            }
 
-            db.SaveChanges();
-            return venta.NroTicket > 0 ? venta.NroTicket : venta.nroDTE;
+                var anteriores = db.TVD2607.Where(d => d.idTve == idTve).ToList();
+                db.TVD2607.RemoveRange(anteriores);
+
+                foreach (var item in carrito)
+                {
+                    string nombreSeguro = item.Nombre ?? "Producto";
+                    if (nombreSeguro.Length > 80) nombreSeguro = nombreSeguro.Substring(0, 80);
+
+                    var detalle = new TVD2607
+                    {
+                        idTve = venta.idTve,
+                        idLocal = 1,
+                        iddocDTE = 0,
+                        Documento = "Ticket de Atención",
+                        NroDTE = venta.nroDTE,
+                        NroInT = venta.nroInT,
+                        FecMoV = ahora,
+                        HoraMoV = ahora.ToString("HH:mm:ss"),
+                        IdProducto = item.ProductoID,
+                        NmbProducto = nombreSeguro,
+                        Cantidad = item.Cantidad,
+                        Precio = item.PrecioUnitario,
+                        SubTotal = item.Subtotal,
+                        nmbVendedor = vendedor,
+                        Unidad = "UN"
+                    };
+                    db.TVD2607.Add(detalle);
+
+                    var prodBD = db.Productos.FirstOrDefault(p => p.ProductoID == item.ProductoID);
+                    if (prodBD != null)
+                    {
+                        prodBD.Stock -= item.Cantidad;
+                        if (prodBD.Stock < 0) prodBD.Stock = 0;
+                    }
+                }
+
+                db.SaveChanges();
+                return venta.NroTicket > 0 ? venta.NroTicket : venta.nroDTE;
+            }
+            catch (Exception ex)
+            {
+                string msg = ex.InnerException != null ? ex.InnerException.Message : ex.Message;
+                if (ex.InnerException?.InnerException != null) msg += $"\nCausa raíz: {ex.InnerException.InnerException.Message}";
+                throw new Exception(msg);
+            }
         }
 
         // 6. DESCARTAR VENTA
@@ -395,7 +428,7 @@ namespace SISTEMAACTUALIZADO.Services
                 {
                     IdTve = v.idTve,
                     NroTicket = v.NroTicket > 0 ? v.NroTicket : v.nroDTE,
-                    FechaHora = v.FechaTicket ?? v.FecDoc,
+                    FechaHora = v.FecDoc,
                     Cliente = string.IsNullOrWhiteSpace(v.RazonSocial) ? "Consumidor Final" : v.RazonSocial,
                     Total = v.Total,
                     EstadoBD = v.status ?? "",

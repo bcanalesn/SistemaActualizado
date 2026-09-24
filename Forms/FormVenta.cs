@@ -510,11 +510,17 @@ namespace SISTEMAACTUALIZADO
             this.Load += (s, e) => AjustarAnchoYAlturaCategorias();
         }
 
+        private static bool EsProductoPorGramos(Producto prod)
+        {
+            if (prod == null) return false;
+            string n = prod.Nombre?.ToLower() ?? "";
+            return n.Contains("(gr)") || n.Contains("(g)") || n.Contains("/gr") || n.Contains("granel");
+        }
+
         private void CargarCategoriasDesdeBD()
         {
             flowCategorias.Controls.Clear();
 
-            // Botón "Todas" fijo en su azul distintivo
             flowCategorias.Controls.Add(CrearBotonCategoria(
                 "Todas",
                 Color.FromArgb(239, 246, 255),
@@ -529,7 +535,6 @@ namespace SISTEMAACTUALIZADO
             {
                 if (cat.Equals("Todas", StringComparison.OrdinalIgnoreCase)) continue;
 
-                // Hash determinista: asegura que la misma categoría tenga siempre el mismo color
                 int colorHash = Math.Abs(cat.Trim().ToLowerInvariant().GetHashCode());
                 var estilo = _paletaColores[colorHash % _paletaColores.Count];
                 bool seleccionada = _categoriaActivaNombre.Equals(cat, StringComparison.OrdinalIgnoreCase);
@@ -654,7 +659,7 @@ namespace SISTEMAACTUALIZADO
             Button btn = new Button
             {
                 Name = "cat_" + nombreCategoria.Replace(" ", "_"),
-                Text = nombreCategoria, // Solo el texto limpio
+                Text = nombreCategoria,
                 Height = 36,
                 Width = 120,
                 BackColor = back,
@@ -723,7 +728,7 @@ namespace SISTEMAACTUALIZADO
                     var prod = _productosCache.FirstOrDefault(p => p.ProductoID == item.ProductoID);
                     if (prod != null)
                     {
-                        item.PrecioLista1 = prod.PrecioUnitario; // <-- Guarda el precio de Lista 1
+                        item.PrecioLista1 = prod.PrecioUnitario;
                         item.PrecioUnitario = _productoService.ObtenerPrecioProductoConCliente(prod, _listaClienteActivo, item.Cantidad, clienteId);
                         prod.Stock -= item.Cantidad;
                         if (prod.Stock < 0) prod.Stock = 0;
@@ -768,6 +773,8 @@ namespace SISTEMAACTUALIZADO
                 Cursor = Cursors.Hand
             };
 
+            bool esPesable = EsProductoPorGramos(prod);
+
             Control ctrlImagen;
             if (!string.IsNullOrEmpty(prod.ImagenPath) && System.IO.File.Exists(prod.ImagenPath))
             {
@@ -785,7 +792,7 @@ namespace SISTEMAACTUALIZADO
             {
                 ctrlImagen = new Label
                 {
-                    Text = "📦",
+                    Text = esPesable ? "⚖️" : "📦",
                     Font = new Font("Segoe UI", 20F),
                     Location = new Point(42, 4),
                     Size = new Size(46, 46),
@@ -806,10 +813,14 @@ namespace SISTEMAACTUALIZADO
             decimal precioVenta = ObtenerPrecioActivoProducto(prod);
             Color colorPrecio = prod.ListaDefectoPOS > 1 ? Color.FromArgb(2, 132, 199) : Color.FromArgb(0, 102, 255);
 
+            string textoPrecio = esPesable 
+                ? $"{MonedaHelper.Formatear(precioVenta, conSigno: true)}/g" 
+                : MonedaHelper.Formatear(precioVenta, conSigno: true);
+
             Label lblPrecio = new Label
             {
-                Text = MonedaHelper.Formatear(precioVenta, conSigno: true),
-                Font = new Font("Segoe UI", 10.5F, FontStyle.Bold),
+                Text = textoPrecio,
+                Font = new Font("Segoe UI", esPesable ? 9.5F : 10.5F, FontStyle.Bold),
                 ForeColor = colorPrecio,
                 Location = new Point(4, 88),
                 Size = new Size(122, 20),
@@ -827,9 +838,13 @@ namespace SISTEMAACTUALIZADO
             };
 
             Color stockColor = prod.Stock > 10 ? Color.FromArgb(16, 185, 129) : (prod.Stock > 0 ? Color.FromArgb(245, 158, 11) : Color.FromArgb(239, 68, 68));
+            string stockTexto = esPesable 
+                ? (prod.Stock >= 1000 ? $"Stock: {(prod.Stock / 1000.0):0.0} kg" : $"Stock: {prod.Stock} g") 
+                : $"Stock: {prod.Stock} un.";
+
             Label lblStock = new Label
             {
-                Text = $"Stock: {prod.Stock} un.",
+                Text = stockTexto,
                 Font = new Font("Segoe UI", 7.5F, FontStyle.Bold),
                 ForeColor = stockColor,
                 Location = new Point(4, 128),
@@ -978,13 +993,14 @@ namespace SISTEMAACTUALIZADO
                 return;
             }
 
+            bool esPorGramos = EsProductoPorGramos(prod);
             var cart = ObtenerCarritoActivo();
             var itemExistente = cart.FirstOrDefault(c => c.ProductoID == prod.ProductoID);
-            int cantidadInicial = itemExistente != null ? itemExistente.Cantidad : 1;
+            int cantidadInicial = itemExistente != null ? itemExistente.Cantidad : (esPorGramos ? 250 : 1);
 
             decimal precioBaseVenta = ObtenerPrecioActivoProducto(prod);
 
-            using (FormCantidadModal modal = new FormCantidadModal(prod.Nombre, precioBaseVenta, cantidadInicial, prod.Stock, prod.ImagenPath))
+            using (FormCantidadModal modal = new FormCantidadModal(prod.Nombre, precioBaseVenta, cantidadInicial, prod.Stock, prod.ImagenPath, esPorGramos))
             {
                 if (modal.ShowDialog(this) == DialogResult.OK)
                 {
@@ -992,7 +1008,8 @@ namespace SISTEMAACTUALIZADO
 
                     if (nuevaCantidad > prod.Stock)
                     {
-                        MessageBox.Show($"Stock insuficiente. Solo hay {prod.Stock} unidades disponibles.", "Stock Insuficiente", MessageBoxButtons.OK, MessageBoxIcon.Warning);
+                        string unidad = esPorGramos ? "gramos" : "unidades";
+                        MessageBox.Show($"Stock insuficiente. Solo hay {prod.Stock} {unidad} disponibles.", "Stock Insuficiente", MessageBoxButtons.OK, MessageBoxIcon.Warning);
                         nuevaCantidad = prod.Stock;
                     }
 
@@ -1062,16 +1079,23 @@ namespace SISTEMAACTUALIZADO
                     Cursor = Cursors.Hand
                 };
 
-                Label lblNombre = new Label { Name = "lblNombre", Text = item.Nombre, Font = new Font("Segoe UI", 8.5F, FontStyle.Bold), ForeColor = Color.FromArgb(15, 23, 42), Location = new Point(6, 4), AutoSize = false, Size = new Size(110, 18) };
-                Label lblPrecioU = new Label { Name = "lblPrecioU", Text = MonedaHelper.Formatear(item.PrecioUnitario, conSigno: true), Font = new Font("Segoe UI", 7.5F), ForeColor = Color.FromArgb(100, 116, 139), Location = new Point(6, 24), AutoSize = true };
-
                 var prodOriginal = _productosCache.FirstOrDefault(p => p.ProductoID == item.ProductoID);
+                bool esGramos = prodOriginal != null && EsProductoPorGramos(prodOriginal);
+                int pasoCarrito = esGramos ? 50 : 1;
+
+                Label lblNombre = new Label { Name = "lblNombre", Text = item.Nombre, Font = new Font("Segoe UI", 8.5F, FontStyle.Bold), ForeColor = Color.FromArgb(15, 23, 42), Location = new Point(6, 4), AutoSize = false, Size = new Size(110, 18) };
+                
+                string txtUnit = esGramos 
+                    ? $"{MonedaHelper.Formatear(item.PrecioUnitario, conSigno: true)}/g" 
+                    : MonedaHelper.Formatear(item.PrecioUnitario, conSigno: true);
+
+                Label lblPrecioU = new Label { Name = "lblPrecioU", Text = txtUnit, Font = new Font("Segoe UI", 7.5F), ForeColor = Color.FromArgb(100, 116, 139), Location = new Point(6, 24), AutoSize = true };
 
                 Button btnRestar = new Button { Name = "btnRestar", Text = "-", Size = new Size(22, 22), FlatStyle = FlatStyle.Flat, BackColor = Color.FromArgb(241, 245, 249), Font = new Font("Segoe UI", 8.5F, FontStyle.Bold), Cursor = Cursors.Hand };
                 btnRestar.FlatAppearance.BorderSize = 0;
                 btnRestar.Click += (s, e) =>
                 {
-                    item.Cantidad--;
+                    item.Cantidad -= pasoCarrito;
                     if (item.Cantidad <= 0)
                     {
                         cart.Remove(item);
@@ -1086,19 +1110,20 @@ namespace SISTEMAACTUALIZADO
                     ActualizarCarritoUI();
                 };
 
-                Label lblQty = new Label { Name = "lblQty", Text = item.Cantidad.ToString(), Font = new Font("Segoe UI", 8.5F, FontStyle.Bold), Size = new Size(22, 18), TextAlign = ContentAlignment.MiddleCenter };
+                string txtCantidadBadge = esGramos ? $"{item.Cantidad}g" : item.Cantidad.ToString();
+                Label lblQty = new Label { Name = "lblQty", Text = txtCantidadBadge, Font = new Font("Segoe UI", esGramos ? 7.5F : 8.5F, FontStyle.Bold), Size = new Size(esGramos ? 44 : 22, 18), TextAlign = ContentAlignment.MiddleCenter };
 
                 Button btnSumar = new Button { Name = "btnSumar", Text = "+", Size = new Size(22, 22), FlatStyle = FlatStyle.Flat, BackColor = Color.FromArgb(241, 245, 249), Font = new Font("Segoe UI", 8.5F, FontStyle.Bold), Cursor = Cursors.Hand };
                 btnSumar.FlatAppearance.BorderSize = 0;
                 btnSumar.Click += (s, e) =>
                 {
-                    if (prodOriginal != null && prodOriginal.Stock <= 0)
+                    if (prodOriginal != null && prodOriginal.Stock < (item.Cantidad + pasoCarrito))
                     {
                         MessageBox.Show($"No hay más stock disponible de '{item.Nombre}'.", "Límite de Stock", MessageBoxButtons.OK, MessageBoxIcon.Warning);
                         return;
                     }
                     
-                    item.Cantidad++;
+                    item.Cantidad += pasoCarrito;
 
                     if (prodOriginal != null)
                     {
@@ -1156,9 +1181,9 @@ namespace SISTEMAACTUALIZADO
                     if (btnDeleteRow != null) btnDeleteRow.Location = new Point(anchoContenedor - 24, 14);
                     if (lblSubtotal != null) lblSubtotal.Location = new Point(anchoContenedor - 95, 16);
                     if (btnSumar != null) btnSumar.Location = new Point(anchoContenedor - 122, 14);
-                    if (lblQty != null) lblQty.Location = new Point(anchoContenedor - 146, 16);
-                    if (btnRestar != null) btnRestar.Location = new Point(anchoContenedor - 170, 14);
-                    if (lblNombre != null) lblNombre.Width = Math.Max(50, anchoContenedor - 178);
+                    if (lblQty != null) lblQty.Location = new Point(anchoContenedor - 156, 16);
+                    if (btnRestar != null) btnRestar.Location = new Point(anchoContenedor - 180, 14);
+                    if (lblNombre != null) lblNombre.Width = Math.Max(50, anchoContenedor - 188);
                 }
             }
         }
@@ -1180,6 +1205,7 @@ namespace SISTEMAACTUALIZADO
 
             CargarProductosDesdeBD();
         }
+
         private void CargarListaVendedoresBD()
         {
             cbVendedor.Items.Clear();
@@ -1187,7 +1213,6 @@ namespace SISTEMAACTUALIZADO
 
             foreach (var u in usuariosVenta)
             {
-                // Usa el nombre de pila o nombre completo
                 string display = !string.IsNullOrWhiteSpace(u.NombreCompleto) ? u.NombreCompleto : u.NombreUsuario;
                 cbVendedor.Items.Add(display);
             }
@@ -1197,7 +1222,6 @@ namespace SISTEMAACTUALIZADO
                 cbVendedor.Items.Add(_usuarioActual?.NombreCompleto ?? "Vendedor");
             }
 
-            // Seleccionar por defecto al usuario con sesión iniciada
             string usuarioSesion = _usuarioActual?.NombreCompleto ?? _usuarioActual?.NombreUsuario ?? "";
             int indexSesion = -1;
 
@@ -1225,18 +1249,15 @@ namespace SISTEMAACTUALIZADO
             }
         }
 
-        // ACCIÓN UNIFICADA DE PAUSA / RECUPERACIÓN
         private void BtnVentasEnEspera_Click(object? sender, EventArgs e)
         {
             var cart = ObtenerCarritoActivo();
             string vendedorNombre = cbVendedor.SelectedItem?.ToString() ?? _vendedorActualNombre;
 
-            // 1. CARRO CON PRODUCTOS: PAUSAR VENTA
             if (cart.Count > 0)
             {
                 string identificador = "";
 
-                // Solo pide identificador si el cliente NO tiene RUT registrado y es Consumidor Final
                 bool esConsumidorFinal = string.IsNullOrWhiteSpace(_clienteSeleccionadoRut) || 
                                          _clienteSeleccionadoNombre.StartsWith("Consumidor Final", StringComparison.OrdinalIgnoreCase);
 
@@ -1251,7 +1272,7 @@ namespace SISTEMAACTUALIZADO
                         MaximizeBox = false,
                         MinimizeBox = false,
                         BackColor = Color.White,
-                        KeyPreview = true // <-- Captura eventos de teclado
+                        KeyPreview = true
                     })
                     {
                         Label lbl = new Label { Text = "Referencia para Consumidor Final:", Location = new Point(20, 15), AutoSize = true, Font = new Font("Segoe UI", 9F, FontStyle.Bold) };
@@ -1260,10 +1281,8 @@ namespace SISTEMAACTUALIZADO
                         btnOk.FlatAppearance.BorderSize = 0;
                         btnOk.Click += (s, ev) => { modalPrompt.DialogResult = DialogResult.OK; modalPrompt.Close(); };
 
-                        // 1. Asigna el botón de aceptación por defecto para la tecla Enter
                         modalPrompt.AcceptButton = btnOk;
 
-                        // 2. Ejecuta inmediatamente si se presiona Enter dentro del TextBox
                         txt.KeyDown += (s, ev) =>
                         {
                             if (ev.KeyCode == Keys.Enter)
@@ -1297,7 +1316,6 @@ namespace SISTEMAACTUALIZADO
                 return;
             }
 
-            // 2. CARRO VACÍO: ABRIR PANEL DE VENTAS PAUSADAS
             using var modal = new FormVentasEnEsperaModal(vendedorNombre);
             if (modal.ShowDialog(this) == DialogResult.OK && modal.IdTveSeleccionado > 0)
             {
@@ -1313,7 +1331,6 @@ namespace SISTEMAACTUALIZADO
                 cart.Clear();
                 cart.AddRange(resultado.Carrito);
 
-                // Reconstruir el cliente formal en memoria para no perder su RUT ni precios
                 using (var db = new AppDbContext())
                 {
                     string rutLimpio = RutHelper.Limpiar(resultado.Rut);
@@ -1321,7 +1338,6 @@ namespace SISTEMAACTUALIZADO
                     AsignarClienteActivo(clienteBD);
                 }
 
-                // Si fue consumidor final con referencia, mantenemos el texto para mostrarlo en el botón
                 if (_clienteActual == null)
                 {
                     _clienteSeleccionadoNombre = resultado.Cliente;
@@ -1332,7 +1348,6 @@ namespace SISTEMAACTUALIZADO
             }
         }
 
-        // ACCIÓN: ENVIAR TICKET A CAJA
         private void BtnGenerarTicket_Click(object? sender, EventArgs e)
         {
             var cart = ObtenerCarritoActivo();

@@ -16,8 +16,11 @@ namespace SISTEMAACTUALIZADO.Models
         public int iddocDTE { get; set; } = 39;
         public string Documento { get; set; } = "Boleta Electrónica";
 
-        // Columnas nuevas de Preventa
+        // Columnas en memoria (no existen en la tabla MySQL)
+        [NotMapped]
         public int NroTicket { get; set; }
+
+        [NotMapped]
         public DateTime? FechaTicket { get; set; }
 
         public int nroDTE { get; set; }
