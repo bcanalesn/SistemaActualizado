@@ -17,12 +17,14 @@ namespace SISTEMAACTUALIZADO.Modals
 
         private TextBox txtBusqueda = null!;
         private Button btnBuscar = null!;
-        private Button btnMas = null!;
+        private Button btnAnterior = null!;
+        private Button btnSiguiente = null!;
+        private Label lblPagina = null!;
         private Label lblEstado = null!;
         private FlowLayoutPanel pnlTarjetas = null!;
 
         private List<ProductoScrapDTO> _resultadosTotales = new List<ProductoScrapDTO>();
-        private int _indiceActual = 0;
+        private int _paginaActual = 0;
         private const int CANTIDAD_POR_PAGINA = 3;
 
         public string? RutaImagenDescargada { get; private set; }
@@ -51,7 +53,7 @@ namespace SISTEMAACTUALIZADO.Modals
             this.ShowInTaskbar = false;
             this.Size = new Size(680, 520);
             this.BackColor = Color.White;
-            this.Text = "🌐 Buscar Imagen en Línea";
+            this.Text = "🌐 Buscar Imagen en Línea (Jumbo)";
             this.Font = new Font("Segoe UI", 9F);
 
             Panel pnlTop = new Panel { Dock = DockStyle.Top, Height = 75, Padding = new Padding(15, 12, 15, 10), BackColor = Color.FromArgb(248, 250, 252) };
@@ -96,20 +98,49 @@ namespace SISTEMAACTUALIZADO.Modals
             };
 
             Panel pnlBottom = new Panel { Dock = DockStyle.Bottom, Height = 60, BackColor = Color.White, Padding = new Padding(15, 8, 15, 10) };
-            btnMas = new Button
+            
+            // Botón Retroceder
+            btnAnterior = new Button
             {
-                Text = "➕ Ver 3 opciones más",
-                Size = new Size(180, 38),
+                Text = "◀ Anteriores",
+                Size = new Size(115, 38),
                 BackColor = Color.FromArgb(241, 245, 249),
                 ForeColor = Color.FromArgb(30, 41, 59),
                 FlatStyle = FlatStyle.Flat,
-                Font = new Font("Segoe UI", 9F, FontStyle.Bold),
+                Font = new Font("Segoe UI", 8.5F, FontStyle.Bold),
                 Cursor = Cursors.Hand,
                 Enabled = false,
                 Location = new Point(15, 10)
             };
-            btnMas.FlatAppearance.BorderColor = Color.FromArgb(203, 213, 225);
-            btnMas.Click += (s, e) => MostrarSiguienteGrupo();
+            btnAnterior.FlatAppearance.BorderColor = Color.FromArgb(203, 213, 225);
+            btnAnterior.Click += (s, e) => CambiarPagina(-1);
+
+            // Indicador numérico (ej: "Página 1 de 5")
+            lblPagina = new Label
+            {
+                Text = "",
+                Size = new Size(110, 38),
+                Location = new Point(135, 10),
+                TextAlign = ContentAlignment.MiddleCenter,
+                Font = new Font("Segoe UI", 8.5F, FontStyle.Bold),
+                ForeColor = Color.FromArgb(71, 85, 105)
+            };
+
+            // Botón Avanzar
+            btnSiguiente = new Button
+            {
+                Text = "Siguientes ▶",
+                Size = new Size(115, 38),
+                BackColor = Color.FromArgb(241, 245, 249),
+                ForeColor = Color.FromArgb(30, 41, 59),
+                FlatStyle = FlatStyle.Flat,
+                Font = new Font("Segoe UI", 8.5F, FontStyle.Bold),
+                Cursor = Cursors.Hand,
+                Enabled = false,
+                Location = new Point(250, 10)
+            };
+            btnSiguiente.FlatAppearance.BorderColor = Color.FromArgb(203, 213, 225);
+            btnSiguiente.Click += (s, e) => CambiarPagina(1);
 
             Button btnCerrar = new Button
             {
@@ -125,7 +156,7 @@ namespace SISTEMAACTUALIZADO.Modals
             btnCerrar.FlatAppearance.BorderSize = 0;
             btnCerrar.Click += (s, e) => this.Close();
 
-            pnlBottom.Controls.AddRange(new Control[] { btnMas, btnCerrar });
+            pnlBottom.Controls.AddRange(new Control[] { btnAnterior, lblPagina, btnSiguiente, btnCerrar });
 
             this.Controls.AddRange(new Control[] { pnlTarjetas, lblEstado, pnlBottom, pnlTop });
         }
@@ -136,13 +167,15 @@ namespace SISTEMAACTUALIZADO.Modals
             if (string.IsNullOrWhiteSpace(query)) return;
 
             btnBuscar.Enabled = false;
-            btnMas.Enabled = false;
-            lblEstado.Text = "Buscando productos e imágenes...";
+            btnAnterior.Enabled = false;
+            btnSiguiente.Enabled = false;
+            lblPagina.Text = "";
+            lblEstado.Text = "Buscando productos e imágenes en Jumbo...";
             lblEstado.ForeColor = Color.FromArgb(37, 99, 235);
             LimpiarTarjetas();
 
             _resultadosTotales = await _scraperService.BuscarProductosAsync(query);
-            _indiceActual = 0;
+            _paginaActual = 0;
 
             btnBuscar.Enabled = true;
 
@@ -153,9 +186,7 @@ namespace SISTEMAACTUALIZADO.Modals
                 return;
             }
 
-            lblEstado.Text = $"Se encontraron {_resultadosTotales.Count} imágenes. Mostrando las 3 primeras:";
-            lblEstado.ForeColor = Color.FromArgb(22, 101, 52);
-            MostrarSiguienteGrupo();
+            MostrarPaginaActual();
         }
 
         private void LimpiarTarjetas()
@@ -171,14 +202,39 @@ namespace SISTEMAACTUALIZADO.Modals
             pnlTarjetas.Controls.Clear();
         }
 
-        private async void MostrarSiguienteGrupo()
+        private void CambiarPagina(int delta)
+        {
+            int nuevaPagina = _paginaActual + delta;
+            int totalPaginas = (int)Math.Ceiling((double)_resultadosTotales.Count / CANTIDAD_POR_PAGINA);
+
+            if (nuevaPagina >= 0 && nuevaPagina < totalPaginas)
+            {
+                _paginaActual = nuevaPagina;
+                MostrarPaginaActual();
+            }
+        }
+
+        private void MostrarPaginaActual()
         {
             LimpiarTarjetas();
 
-            var grupo = _resultadosTotales.Skip(_indiceActual).Take(CANTIDAD_POR_PAGINA).ToList();
-            _indiceActual += grupo.Count;
+            int totalPaginas = (int)Math.Ceiling((double)_resultadosTotales.Count / CANTIDAD_POR_PAGINA);
+            lblPagina.Text = $"Pág. {_paginaActual + 1} de {totalPaginas}";
 
-            btnMas.Enabled = _indiceActual < _resultadosTotales.Count;
+            btnAnterior.Enabled = _paginaActual > 0;
+            btnSiguiente.Enabled = _paginaActual < totalPaginas - 1;
+
+            // Rango dinámico visible (ej: 1 a 3, 4 a 6, etc.)
+            int desde = (_paginaActual * CANTIDAD_POR_PAGINA) + 1;
+            int hasta = Math.Min((_paginaActual + 1) * CANTIDAD_POR_PAGINA, _resultadosTotales.Count);
+
+            lblEstado.Text = $"Se encontraron {_resultadosTotales.Count} imágenes. Mostrando de la {desde} a la {hasta}:";
+            lblEstado.ForeColor = Color.FromArgb(22, 101, 52);
+
+            var grupo = _resultadosTotales
+                .Skip(_paginaActual * CANTIDAD_POR_PAGINA)
+                .Take(CANTIDAD_POR_PAGINA)
+                .ToList();
 
             foreach (var prod in grupo)
             {
@@ -242,7 +298,7 @@ namespace SISTEMAACTUALIZADO.Modals
                 card.Controls.AddRange(new Control[] { pb, lblNombre, btnSeleccionar });
                 pnlTarjetas.Controls.Add(card);
 
-                // Carga asíncrona de miniatura
+                // Carga asíncrona de miniatura web
                 _ = Task.Run(async () =>
                 {
                     try

@@ -765,26 +765,26 @@ namespace SISTEMAACTUALIZADO
 
         private Panel CrearTarjetaProductoUI(Producto prod)
         {
+            // Tarjeta con mejor proporción vertical y visual
             Panel card = new Panel
             {
-                Size = new Size(130, 155),
+                Size = new Size(135, 175),
                 BackColor = Color.White,
                 Margin = new Padding(6),
                 Cursor = Cursors.Hand
             };
 
             bool esPesable = EsProductoPorGramos(prod);
-            
-
             Control ctrlImagen;
             Image? imgProd = ImagenHelper.CargarImagenSegura(prod.ImagenPath);
 
             if (imgProd != null)
             {
-                PictureBox pb = new PictureBox
+                // PictureBox con renderizado suavizado de alta definición
+                PictureBox pb = new PictureBoxCalidadAlta
                 {
-                    Location = new Point(40, 6),
-                    Size = new Size(50, 50),
+                    Location = new Point(12, 6),
+                    Size = new Size(111, 74), // Área visual más amplia y nítida
                     SizeMode = PictureBoxSizeMode.Zoom,
                     BackColor = Color.Transparent,
                     Image = imgProd
@@ -796,9 +796,9 @@ namespace SISTEMAACTUALIZADO
                 ctrlImagen = new Label
                 {
                     Text = esPesable ? "⚖️" : "📦",
-                    Font = new Font("Segoe UI", 20F),
-                    Location = new Point(42, 4),
-                    Size = new Size(46, 46),
+                    Font = new Font("Segoe UI", 24F),
+                    Location = new Point(12, 6),
+                    Size = new Size(111, 74),
                     TextAlign = ContentAlignment.MiddleCenter
                 };
             }
@@ -808,8 +808,8 @@ namespace SISTEMAACTUALIZADO
                 Text = prod.Nombre,
                 Font = new Font("Segoe UI", 8.5F, FontStyle.Bold),
                 ForeColor = Color.FromArgb(15, 23, 42),
-                Location = new Point(4, 56),
-                Size = new Size(122, 30),
+                Location = new Point(4, 84),
+                Size = new Size(127, 28),
                 TextAlign = ContentAlignment.TopCenter
             };
 
@@ -825,8 +825,8 @@ namespace SISTEMAACTUALIZADO
                 Text = textoPrecio,
                 Font = new Font("Segoe UI", esPesable ? 9.5F : 10.5F, FontStyle.Bold),
                 ForeColor = colorPrecio,
-                Location = new Point(4, 88),
-                Size = new Size(122, 20),
+                Location = new Point(4, 114),
+                Size = new Size(127, 20),
                 TextAlign = ContentAlignment.MiddleCenter
             };
 
@@ -835,8 +835,8 @@ namespace SISTEMAACTUALIZADO
                 Text = $"Cód. {prod.CodigoBarra}",
                 Font = new Font("Segoe UI", 7.5F),
                 ForeColor = Color.FromArgb(100, 116, 139),
-                Location = new Point(4, 110),
-                Size = new Size(122, 16),
+                Location = new Point(4, 134),
+                Size = new Size(127, 16),
                 TextAlign = ContentAlignment.MiddleCenter
             };
 
@@ -850,8 +850,8 @@ namespace SISTEMAACTUALIZADO
                 Text = stockTexto,
                 Font = new Font("Segoe UI", 7.5F, FontStyle.Bold),
                 ForeColor = stockColor,
-                Location = new Point(4, 128),
-                Size = new Size(122, 18),
+                Location = new Point(4, 152),
+                Size = new Size(127, 18),
                 TextAlign = ContentAlignment.MiddleCenter
             };
 
@@ -1417,6 +1417,20 @@ namespace SISTEMAACTUALIZADO
 
             CargarProductosDesdeBD();
             ActualizarCarritoUI();
+        }
+    }
+
+    /// <summary>
+    /// PictureBox optimizado con algoritmos de alta definición para reducción de imágenes
+    /// </summary>
+    public class PictureBoxCalidadAlta : PictureBox
+    {
+        protected override void OnPaint(PaintEventArgs pe)
+        {
+            pe.Graphics.InterpolationMode = System.Drawing.Drawing2D.InterpolationMode.HighQualityBicubic;
+            pe.Graphics.PixelOffsetMode = System.Drawing.Drawing2D.PixelOffsetMode.HighQuality;
+            pe.Graphics.SmoothingMode = System.Drawing.Drawing2D.SmoothingMode.HighQuality;
+            base.OnPaint(pe);
         }
     }
 }
