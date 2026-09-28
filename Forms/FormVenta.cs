@@ -113,6 +113,14 @@ namespace SISTEMAACTUALIZADO
             _usuarioActual = usuario;
             InitializeComponent();
 
+            // Evita el parpadeo del scroll y del fondo en la grilla de productos
+            if (pnlProductosGrid != null)
+            {
+                typeof(Panel).InvokeMember("DoubleBuffered", 
+                    System.Reflection.BindingFlags.SetProperty | System.Reflection.BindingFlags.Instance | System.Reflection.BindingFlags.NonPublic, 
+                    null, pnlProductosGrid, new object[] { true });
+            }
+
             this.VisibleChanged += (s, e) =>
             {
                 if (this.Visible)
@@ -741,6 +749,12 @@ namespace SISTEMAACTUALIZADO
 
         private void FiltrarProductosPorJerarquia()
         {
+            pnlProductosGrid.SuspendLayout();
+
+            foreach (Control c in pnlProductosGrid.Controls)
+            {
+                c.Dispose();
+            }
             pnlProductosGrid.Controls.Clear();
 
             IEnumerable<Producto> filtrados = _productosCache;
@@ -756,16 +770,19 @@ namespace SISTEMAACTUALIZADO
             }
 
             var lista = filtrados.ToList();
+            var tarjetas = new List<Control>(lista.Count);
 
             foreach (var prod in lista)
             {
-                pnlProductosGrid.Controls.Add(CrearTarjetaProductoUI(prod));
+                tarjetas.Add(CrearTarjetaProductoUI(prod));
             }
+
+            pnlProductosGrid.Controls.AddRange(tarjetas.ToArray());
+            pnlProductosGrid.ResumeLayout(true);
         }
 
         private Panel CrearTarjetaProductoUI(Producto prod)
         {
-            // Tarjeta con mejor proporción vertical y visual
             Panel card = new Panel
             {
                 Size = new Size(135, 175),
@@ -780,16 +797,14 @@ namespace SISTEMAACTUALIZADO
 
             if (imgProd != null)
             {
-                // PictureBox con renderizado suavizado de alta definición
-                PictureBox pb = new PictureBoxCalidadAlta
+                ctrlImagen = new PictureBoxCalidadAlta
                 {
                     Location = new Point(12, 6),
-                    Size = new Size(111, 74), // Área visual más amplia y nítida
+                    Size = new Size(111, 74),
                     SizeMode = PictureBoxSizeMode.Zoom,
                     BackColor = Color.Transparent,
                     Image = imgProd
                 };
-                ctrlImagen = pb;
             }
             else
             {
@@ -855,14 +870,37 @@ namespace SISTEMAACTUALIZADO
                 TextAlign = ContentAlignment.MiddleCenter
             };
 
-            Action onClick = () => SolicitarCantidadYAgregar(prod);
+            Action onClick = () =>
+            {
+                card.BackColor = Color.White;
+                VentanaPreviewProducto.Ocultar();
+                SolicitarCantidadYAgregar(prod);
+            };
 
-            card.Click += (s, e) => onClick();
-            ctrlImagen.Click += (s, e) => onClick();
-            lblNombre.Click += (s, e) => onClick();
-            lblPrecio.Click += (s, e) => onClick();
-            lblCodigo.Click += (s, e) => onClick();
-            lblStock.Click += (s, e) => onClick();
+            void AlEntrarMouse(object? s, EventArgs e)
+            {
+                card.BackColor = Color.FromArgb(241, 245, 249);
+                VentanaPreviewProducto.Mostrar(card, imgProd, prod.Nombre, textoPrecio, $"Cód. {prod.CodigoBarra}", stockTexto, stockColor);
+            }
+
+            void AlSalirMouse(object? s, EventArgs e)
+            {
+                Point pos = card.PointToClient(Cursor.Position);
+                if (!card.ClientRectangle.Contains(pos))
+                {
+                    card.BackColor = Color.White;
+                    VentanaPreviewProducto.Ocultar();
+                }
+            }
+
+            var listaControles = new Control[] { card, ctrlImagen, lblNombre, lblPrecio, lblCodigo, lblStock };
+
+            foreach (var ctrl in listaControles)
+            {
+                ctrl.Click += (s, e) => onClick();
+                ctrl.MouseEnter += AlEntrarMouse;
+                ctrl.MouseLeave += AlSalirMouse;
+            }
 
             card.Controls.AddRange(new Control[] { ctrlImagen, lblNombre, lblPrecio, lblCodigo, lblStock });
             return card;
@@ -904,6 +942,12 @@ namespace SISTEMAACTUALIZADO
                 return;
             }
 
+            pnlProductosGrid.SuspendLayout();
+
+            foreach (Control c in pnlProductosGrid.Controls)
+            {
+                c.Dispose();
+            }
             pnlProductosGrid.Controls.Clear();
 
             IEnumerable<Producto> queryJerarquica = _productosCache;
@@ -924,10 +968,14 @@ namespace SISTEMAACTUALIZADO
                 p.ProductoID.ToString().StartsWith(query)
             ).ToList();
 
+            var tarjetas = new List<Control>(filtrados.Count);
             foreach (var prod in filtrados)
             {
-                pnlProductosGrid.Controls.Add(CrearTarjetaProductoUI(prod));
+                tarjetas.Add(CrearTarjetaProductoUI(prod));
             }
+
+            pnlProductosGrid.Controls.AddRange(tarjetas.ToArray());
+            pnlProductosGrid.ResumeLayout(true);
         }
 
         private List<DetalleCarrito> ObtenerCarritoActivo()
@@ -1431,6 +1479,134 @@ namespace SISTEMAACTUALIZADO
             pe.Graphics.PixelOffsetMode = System.Drawing.Drawing2D.PixelOffsetMode.HighQuality;
             pe.Graphics.SmoothingMode = System.Drawing.Drawing2D.SmoothingMode.HighQuality;
             base.OnPaint(pe);
+        }
+    }
+
+    /// <summary>
+    /// Tarjeta flotante emergente para previsualización ampliada del producto
+    /// </summary>
+    public class VentanaPreviewProducto : Form
+    {
+        private static VentanaPreviewProducto? _instanciaActual;
+        private static Control? _controlOrigenActual;
+
+        private readonly PictureBox pbFoto;
+        private readonly Label lblNombre;
+        private readonly Label lblPrecio;
+        private readonly Label lblCodigo;
+        private readonly Label lblStock;
+
+        public VentanaPreviewProducto()
+        {
+            this.FormBorderStyle = FormBorderStyle.None;
+            this.ShowInTaskbar = false;
+            this.StartPosition = FormStartPosition.Manual;
+            this.Size = new Size(220, 290);
+            this.BackColor = Color.White;
+            this.DoubleBuffered = true;
+
+            Panel pnlBorde = new Panel
+            {
+                Dock = DockStyle.Fill,
+                BorderStyle = BorderStyle.FixedSingle,
+                Padding = new Padding(10),
+                BackColor = Color.White
+            };
+
+            pbFoto = new PictureBoxCalidadAlta
+            {
+                Dock = DockStyle.Top,
+                Height = 160,
+                SizeMode = PictureBoxSizeMode.Zoom,
+                BackColor = Color.FromArgb(248, 250, 252)
+            };
+
+            lblNombre = new Label
+            {
+                Dock = DockStyle.Top,
+                Height = 42,
+                Font = new Font("Segoe UI", 9.5F, FontStyle.Bold),
+                ForeColor = Color.FromArgb(15, 23, 42),
+                TextAlign = ContentAlignment.MiddleCenter,
+                Padding = new Padding(0, 4, 0, 0)
+            };
+
+            lblPrecio = new Label
+            {
+                Dock = DockStyle.Top,
+                Height = 26,
+                Font = new Font("Segoe UI", 12F, FontStyle.Bold),
+                ForeColor = Color.FromArgb(0, 102, 255),
+                TextAlign = ContentAlignment.MiddleCenter
+            };
+
+            lblCodigo = new Label
+            {
+                Dock = DockStyle.Top,
+                Height = 20,
+                Font = new Font("Segoe UI", 8F),
+                ForeColor = Color.FromArgb(100, 116, 139),
+                TextAlign = ContentAlignment.MiddleCenter
+            };
+
+            lblStock = new Label
+            {
+                Dock = DockStyle.Top,
+                Height = 22,
+                Font = new Font("Segoe UI", 8.5F, FontStyle.Bold),
+                TextAlign = ContentAlignment.MiddleCenter
+            };
+
+            pnlBorde.Controls.Add(lblStock);
+            pnlBorde.Controls.Add(lblCodigo);
+            pnlBorde.Controls.Add(lblPrecio);
+            pnlBorde.Controls.Add(lblNombre);
+            pnlBorde.Controls.Add(pbFoto);
+            this.Controls.Add(pnlBorde);
+        }
+
+        protected override bool ShowWithoutActivation => true;
+
+        public static void Mostrar(Control tarjeta, Image? img, string nombre, string precio, string codigo, string stock, Color stockColor)
+        {
+            // Si ya está mostrándose para la misma tarjeta, no la recreamos ni parpadeamos
+            if (_instanciaActual != null && _controlOrigenActual == tarjeta && !_instanciaActual.IsDisposed)
+            {
+                return;
+            }
+
+            Ocultar();
+
+            _controlOrigenActual = tarjeta;
+            _instanciaActual = new VentanaPreviewProducto();
+            _instanciaActual.pbFoto.Image = img;
+            _instanciaActual.lblNombre.Text = nombre;
+            _instanciaActual.lblPrecio.Text = precio;
+            _instanciaActual.lblCodigo.Text = codigo;
+            _instanciaActual.lblStock.Text = stock;
+            _instanciaActual.lblStock.ForeColor = stockColor;
+
+            Point puntoPantalla = tarjeta.PointToScreen(new Point(tarjeta.Width + 8, 0));
+            Rectangle pantalla = Screen.FromControl(tarjeta).WorkingArea;
+
+            if (puntoPantalla.X + _instanciaActual.Width > pantalla.Right)
+            {
+                puntoPantalla = tarjeta.PointToScreen(new Point(-_instanciaActual.Width - 8, 0));
+            }
+
+            _instanciaActual.Location = puntoPantalla;
+            _instanciaActual.Show();
+        }
+
+        public static void Ocultar()
+        {
+            if (_instanciaActual != null)
+            {
+                _instanciaActual.Close();
+                _instanciaActual.Dispose();
+                _instanciaActual = null;
+                _controlOrigenActual = null;
+            }
         }
     }
 }
