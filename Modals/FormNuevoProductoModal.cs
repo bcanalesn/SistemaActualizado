@@ -181,25 +181,41 @@ namespace SISTEMAACTUALIZADO.Modals
             pnlFilaPrecios.Controls.Add(CrearCampo("📦 Stock Actual (Editable)", txtStockActual, 250, 170));
             pnlFilaPrecios.Controls.Add(CrearCampo("🔔 Stock Mínimo Alerta", txtStockMinimo, 440, 170));
 
-            // Tarjeta Foto con el botón 🌐 Buscar en Línea
+            // Tarjeta Foto con botones de carga local, Jumbo y Google Imágenes
             Panel pnlCardFoto = CrearCardPanel(630, 74);
             Label lblTitFoto = new Label { Text = "🖼️ Foto del Producto", Font = new Font("Segoe UI", 8.5F, FontStyle.Bold), ForeColor = Color.FromArgb(71, 85, 105), Location = new Point(14, 6), AutoSize = true };
             pbFoto = new PictureBox { Location = new Point(14, 24), Size = new Size(42, 42), BorderStyle = BorderStyle.FixedSingle, SizeMode = PictureBoxSizeMode.Zoom, BackColor = Color.FromArgb(248, 250, 252) };
             
-            Button btnCargarFoto = new Button { Text = "📤 Archivo local", Location = new Point(64, 28), Size = new Size(120, 32), BackColor = Color.FromArgb(239, 246, 255), ForeColor = Color.FromArgb(29, 78, 216), FlatStyle = FlatStyle.Flat, Font = new Font("Segoe UI", 8.5F, FontStyle.Bold), Cursor = Cursors.Hand };
+            Button btnCargarFoto = new Button { Text = "📤 Archivo", Location = new Point(62, 28), Size = new Size(80, 32), BackColor = Color.FromArgb(239, 246, 255), ForeColor = Color.FromArgb(29, 78, 216), FlatStyle = FlatStyle.Flat, Font = new Font("Segoe UI", 8F, FontStyle.Bold), Cursor = Cursors.Hand };
             btnCargarFoto.FlatAppearance.BorderColor = Color.FromArgb(191, 219, 254);
             btnCargarFoto.Click += BtnCargarFoto_Click;
 
-            Button btnBuscarWeb = new Button { Text = "🌐 Buscar en Línea", Location = new Point(190, 28), Size = new Size(135, 32), BackColor = Color.FromArgb(240, 253, 244), ForeColor = Color.FromArgb(22, 101, 52), FlatStyle = FlatStyle.Flat, Font = new Font("Segoe UI", 8.5F, FontStyle.Bold), Cursor = Cursors.Hand };
+            // Búsqueda en Jumbo (Existente)
+            Button btnBuscarWeb = new Button { Text = "🛒 Jumbo", Location = new Point(146, 28), Size = new Size(85, 32), BackColor = Color.FromArgb(240, 253, 244), ForeColor = Color.FromArgb(22, 101, 52), FlatStyle = FlatStyle.Flat, Font = new Font("Segoe UI", 8F, FontStyle.Bold), Cursor = Cursors.Hand };
             btnBuscarWeb.FlatAppearance.BorderColor = Color.FromArgb(187, 247, 208);
             btnBuscarWeb.Click += BtnBuscarWeb_Click;
 
-            Button btnQuitarFoto = new Button { Text = "🗑️ Quitar", Location = new Point(331, 28), Size = new Size(75, 32), BackColor = Color.FromArgb(254, 242, 242), ForeColor = Color.FromArgb(220, 38, 38), FlatStyle = FlatStyle.Flat, Font = new Font("Segoe UI", 8.5F, FontStyle.Bold), Cursor = Cursors.Hand };
+            // NUEVO BOTÓN: Búsqueda en Google Imágenes con filtros de catálogo
+            Button btnBuscarGoogle = new Button 
+            { 
+                Text = "🔍 Buscar Imagen", 
+                Location = new Point(235, 28), 
+                Size = new Size(130, 32), 
+                BackColor = Color.FromArgb(254, 243, 199), 
+                ForeColor = Color.FromArgb(180, 83, 9), 
+                FlatStyle = FlatStyle.Flat, 
+                Font = new Font("Segoe UI", 8F, FontStyle.Bold), 
+                Cursor = Cursors.Hand 
+            };
+            btnBuscarGoogle.FlatAppearance.BorderColor = Color.FromArgb(253, 230, 138);
+            btnBuscarGoogle.Click += BtnBuscarGoogle_Click;
+
+            Button btnQuitarFoto = new Button { Text = "🗑️ Quitar", Location = new Point(369, 28), Size = new Size(70, 32), BackColor = Color.FromArgb(254, 242, 242), ForeColor = Color.FromArgb(220, 38, 38), FlatStyle = FlatStyle.Flat, Font = new Font("Segoe UI", 8F, FontStyle.Bold), Cursor = Cursors.Hand };
             btnQuitarFoto.FlatAppearance.BorderColor = Color.FromArgb(254, 202, 202);
             btnQuitarFoto.Click += (s, e) => { _rutaImagenSeleccionada = string.Empty; pbFoto.Image?.Dispose(); pbFoto.Image = null; };
 
-            Label lblFormatos = new Label { Text = "Formatos: JPG, PNG, WEBP.", Location = new Point(415, 36), AutoSize = true, Font = new Font("Segoe UI", 7.5F), ForeColor = Color.FromArgb(148, 163, 184) };
-            pnlCardFoto.Controls.AddRange(new Control[] { lblTitFoto, pbFoto, btnCargarFoto, btnBuscarWeb, btnQuitarFoto, lblFormatos });
+            Label lblFormatos = new Label { Text = "JPG, PNG, WEBP.", Location = new Point(445, 36), AutoSize = true, Font = new Font("Segoe UI", 7.5F), ForeColor = Color.FromArgb(148, 163, 184) };
+            pnlCardFoto.Controls.AddRange(new Control[] { lblTitFoto, pbFoto, btnCargarFoto, btnBuscarWeb, btnBuscarGoogle, btnQuitarFoto, lblFormatos });
 
             // Agregar secciones al flow
             flow.Controls.AddRange(new Control[] { 
@@ -462,6 +478,122 @@ namespace SISTEMAACTUALIZADO.Modals
                 {
                     MessageBox.Show($"Error al cargar imagen: {ex.Message}", "Error", MessageBoxButtons.OK, MessageBoxIcon.Error);
                 }
+            }
+        }
+        private void BtnBuscarGoogle_Click(object? sender, EventArgs e)
+        {
+            string nombre = txtNombre.Text.Trim();
+            if (string.IsNullOrWhiteSpace(nombre))
+            {
+                MessageBox.Show("Ingrese primero el nombre del producto para buscar imágenes.", "Aviso", MessageBoxButtons.OK, MessageBoxIcon.Information);
+                txtNombre.Focus();
+                return;
+            }
+
+            string sku = txtCodigoBarra.Text.Trim();
+
+            // Filtros de búsqueda: Nombre del producto + fondo blanco + modo imágenes (udm=2) + fotos comerciales
+            string query = Uri.EscapeDataString($"{nombre} fondo blanco chile");
+            string urlGoogle = $"https://www.google.com/search?q={query}&udm=2&tbs=itp:photo";
+
+            try
+            {
+                // Limpiar portapapeles antes de abrir el navegador para evitar pegar imágenes anteriores
+                Clipboard.Clear();
+
+                var psi = new System.Diagnostics.ProcessStartInfo
+                {
+                    FileName = urlGoogle,
+                    UseShellExecute = true
+                };
+                System.Diagnostics.Process.Start(psi);
+
+                using (Form modalPegar = new Form
+                {
+                    Text = "Asignar Imagen desde Google",
+                    Size = new Size(430, 220),
+                    StartPosition = FormStartPosition.CenterParent,
+                    FormBorderStyle = FormBorderStyle.FixedDialog,
+                    MaximizeBox = false,
+                    MinimizeBox = false,
+                    BackColor = Color.White
+                })
+                {
+                    Label lblInstrucciones = new Label
+                    {
+                        Text = "1. En Google Imágenes, haz clic derecho sobre la foto que prefieras.\n" +
+                               "2. Elige 'Copiar imagen'.\n" +
+                               "3. Presiona el botón de abajo para guardarla y asignarla.",
+                        Location = new Point(20, 16),
+                        Size = new Size(375, 60),
+                        Font = new Font("Segoe UI", 9F),
+                        ForeColor = Color.FromArgb(51, 65, 85)
+                    };
+
+                    Button btnAsignar = new Button
+                    {
+                        Text = "📋 Pegar y Asignar Imagen",
+                        Location = new Point(20, 92),
+                        Size = new Size(375, 44),
+                        BackColor = Color.FromArgb(16, 185, 129),
+                        ForeColor = Color.White,
+                        FlatStyle = FlatStyle.Flat,
+                        Font = new Font("Segoe UI", 9.5F, FontStyle.Bold),
+                        Cursor = Cursors.Hand
+                    };
+                    btnAsignar.FlatAppearance.BorderSize = 0;
+
+                    btnAsignar.Click += (sBtn, eBtn) =>
+                    {
+                        if (!Clipboard.ContainsImage())
+                        {
+                            MessageBox.Show("Aún no has copiado ninguna imagen al portapapeles.\n\nEn Google, haz clic derecho sobre la foto y selecciona 'Copiar imagen'.", "Sin imagen", MessageBoxButtons.OK, MessageBoxIcon.Warning);
+                            return;
+                        }
+
+                        try
+                        {
+                            using Image imgPortapapeles = Clipboard.GetImage()!;
+                            string skuLimpio = string.IsNullOrWhiteSpace(sku) ? "PROD" : sku.Trim();
+
+                            // 1. Guardar temporalmente en el directorio Temp del sistema
+                            string rutaTemp = Path.Combine(Path.GetTempPath(), $"{skuLimpio}_{DateTime.Now.Ticks}.jpg");
+                            using (Bitmap bmp = new Bitmap(imgPortapapeles))
+                            {
+                                bmp.Save(rutaTemp, System.Drawing.Imaging.ImageFormat.Jpeg);
+                            }
+
+                            // 2. Reutilizar ImagenHelper para que se guarde tanto en la raíz como en bin/Debug
+                            string nombreRelativo = ImagenHelper.CopiarAImagenesYObtenerNombreRelativo(rutaTemp, skuLimpio);
+
+                            // 3. Eliminar el archivo temporal
+                            if (File.Exists(rutaTemp))
+                            {
+                                try { File.Delete(rutaTemp); } catch { }
+                            }
+
+                            // 4. Asignar y refrescar PictureBox
+                            _rutaImagenSeleccionada = nombreRelativo;
+                            pbFoto.Image?.Dispose();
+                            pbFoto.Image = ImagenHelper.CargarImagenSegura(_rutaImagenSeleccionada);
+                            pbFoto.Refresh();
+
+                            modalPegar.DialogResult = DialogResult.OK;
+                            modalPegar.Close();
+                        }
+                        catch (Exception ex)
+                        {
+                            MessageBox.Show($"Error al procesar la imagen: {ex.Message}", "Error", MessageBoxButtons.OK, MessageBoxIcon.Error);
+                        }
+                    };
+
+                    modalPegar.Controls.AddRange(new Control[] { lblInstrucciones, btnAsignar });
+                    modalPegar.ShowDialog(this);
+                }
+            }
+            catch (Exception ex)
+            {
+                MessageBox.Show($"No se pudo abrir el navegador: {ex.Message}", "Error", MessageBoxButtons.OK, MessageBoxIcon.Warning);
             }
         }
 
