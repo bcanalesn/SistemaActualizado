@@ -14,8 +14,6 @@ namespace SISTEMAACTUALIZADO.Modals
 {
     public class FormNuevoProductoModal : Form
     {
-        
-
         private readonly ProductoService _productoService = new ProductoService();
 
         // Campos Base
@@ -24,6 +22,11 @@ namespace SISTEMAACTUALIZADO.Modals
         private ComboBox cbCategoria = null!;
         private ComboBox cbFamilia = null!;
         private TextBox txtPrecioCosto = null!;
+        private Label lblTitCosto = null!;
+        private Label lblSubCosto = null!;
+
+        // Configuración Producto Pesable
+        private CheckBox chkEsPesable = null!;
 
         // Modalidad Precio POS
         private RadioButton rbModoListaFija = null!;
@@ -40,7 +43,9 @@ namespace SISTEMAACTUALIZADO.Modals
 
         // Precios y Stock
         private TextBox txtPrecioUnitario = null!;
+        private Label lblTitPrecioVenta = null!;
         private TextBox txtStockActual = null!;
+        private Label lblTitStockActual = null!;
         private TextBox txtStockMinimo = null!;
         private PictureBox pbFoto = null!;
 
@@ -59,14 +64,13 @@ namespace SISTEMAACTUALIZADO.Modals
 
         private void InitializeComponent()
         {
-            // Configuración base de la ventana
             this.FormBorderStyle = FormBorderStyle.FixedDialog;
             this.StartPosition = FormStartPosition.CenterParent;
             this.MaximizeBox = false;
             this.MinimizeBox = false;
             this.ShowInTaskbar = false;
             this.Text = _productoAEditar == null ? "Registrar Nuevo Producto" : "Editar Producto";
-            this.Size = new Size(720, 780);
+            this.Size = new Size(720, 830);
             this.BackColor = Color.White;
             this.Font = new Font("Segoe UI", 9F, FontStyle.Regular, GraphicsUnit.Point);
 
@@ -100,11 +104,25 @@ namespace SISTEMAACTUALIZADO.Modals
             pnlFila2.Controls.Add(CrearCampo("Categoría", cbCategoria, 0, 300));
             pnlFila2.Controls.Add(CrearCampo("Familia de Producto", cbFamilia, 320, 310));
 
+            // Tarjeta Tipo de Venta: Pesable / Unidad
+            Panel pnlCardPesable = CrearCardPanel(630, 50);
+            chkEsPesable = new CheckBox
+            {
+                Text = "⚖️ Producto Pesable / A Granel (Se vende por peso: Gramos y Kilos)",
+                Font = new Font("Segoe UI", 9F, FontStyle.Bold),
+                ForeColor = Color.FromArgb(30, 41, 59),
+                Location = new Point(14, 12),
+                AutoSize = true,
+                Cursor = Cursors.Hand
+            };
+            chkEsPesable.CheckedChanged += (s, e) => ActualizarEtiquetasSegunModalidadPeso();
+            pnlCardPesable.Controls.Add(chkEsPesable);
+
             // Tarjeta Costo Neto
             Panel pnlCardCosto = CrearCardPanel(630, 68);
             Label lblIconCosto = new Label { Text = "$", Font = new Font("Segoe UI", 11F, FontStyle.Bold), ForeColor = Color.FromArgb(71, 85, 105), Location = new Point(14, 14), Size = new Size(24, 24), TextAlign = ContentAlignment.MiddleCenter, BackColor = Color.FromArgb(241, 245, 249) };
-            Label lblTitCosto = new Label { Text = "Costo Neto Base ($)", Font = new Font("Segoe UI", 8.5F, FontStyle.Bold), ForeColor = Color.FromArgb(51, 65, 85), Location = new Point(46, 10), AutoSize = true };
-            Label lblSubCosto = new Label { Text = "Costo en pesos sin IVA.", Font = new Font("Segoe UI", 7.5F), ForeColor = Color.FromArgb(148, 163, 184), Location = new Point(46, 46), AutoSize = true };
+            lblTitCosto = new Label { Text = "Costo Neto Base ($)", Font = new Font("Segoe UI", 8.5F, FontStyle.Bold), ForeColor = Color.FromArgb(51, 65, 85), Location = new Point(46, 10), AutoSize = true };
+            lblSubCosto = new Label { Text = "Costo en pesos sin IVA.", Font = new Font("Segoe UI", 7.5F), ForeColor = Color.FromArgb(148, 163, 184), Location = new Point(46, 46), AutoSize = true };
             txtPrecioCosto = new TextBox { Location = new Point(46, 26), Width = 560, Font = new Font("Segoe UI", 9.5F, FontStyle.Bold), Text = "0" };
             txtPrecioCosto.KeyPress += (s, e) => { if (!char.IsControl(e.KeyChar) && !char.IsDigit(e.KeyChar)) e.Handled = true; };
             txtPrecioCosto.TextChanged += (s, e) => 
@@ -177,8 +195,14 @@ namespace SISTEMAACTUALIZADO.Modals
             txtStockMinimo = new TextBox { Width = 170, Font = new Font("Segoe UI", 10F), Text = "5" };
             txtStockMinimo.KeyPress += (s, e) => { if (!char.IsControl(e.KeyChar) && !char.IsDigit(e.KeyChar)) e.Handled = true; };
 
-            pnlFilaPrecios.Controls.Add(CrearCampo("💲 Precio Venta Base POS (IVA Inc.)", txtPrecioUnitario, 0, 230));
-            pnlFilaPrecios.Controls.Add(CrearCampo("📦 Stock Actual (Editable)", txtStockActual, 250, 170));
+            var campoPrecio = CrearCampoConLabel("💲 Precio Venta Base POS (IVA Inc.)", txtPrecioUnitario, 0, 230);
+            lblTitPrecioVenta = campoPrecio.LabelControl;
+            pnlFilaPrecios.Controls.Add(campoPrecio.Contenedor);
+
+            var campoStock = CrearCampoConLabel("📦 Stock Actual (Editable)", txtStockActual, 250, 170);
+            lblTitStockActual = campoStock.LabelControl;
+            pnlFilaPrecios.Controls.Add(campoStock.Contenedor);
+
             pnlFilaPrecios.Controls.Add(CrearCampo("🔔 Stock Mínimo Alerta", txtStockMinimo, 440, 170));
 
             // Tarjeta Foto con botones de carga local, Jumbo y Google Imágenes
@@ -221,6 +245,7 @@ namespace SISTEMAACTUALIZADO.Modals
             flow.Controls.AddRange(new Control[] { 
                 pnlFila1, 
                 pnlFila2, 
+                pnlCardPesable,
                 pnlCardCosto, 
                 pnlCardModalidad, 
                 pnlSeccionTramos, 
@@ -261,7 +286,6 @@ namespace SISTEMAACTUALIZADO.Modals
             this.CancelButton = btnCancelar;
             pnlBotones.Controls.AddRange(new Control[] { btnGuardar, btnCancelar });
 
-            // Ensamblaje con orden estricto de Dock
             pnlBorde.Controls.Add(flow);
             pnlBorde.Controls.Add(pnlBotones);
             flow.BringToFront();
@@ -270,6 +294,27 @@ namespace SISTEMAACTUALIZADO.Modals
 
             RegenerarFilasTramos(2);
             SeleccionarModo(escala: false);
+            ActualizarEtiquetasSegunModalidadPeso();
+        }
+
+        private void ActualizarEtiquetasSegunModalidadPeso()
+        {
+            bool esPesable = chkEsPesable.Checked;
+
+            if (esPesable)
+            {
+                lblTitCosto.Text = "Costo Neto por Kg ($)";
+                lblSubCosto.Text = "Costo en pesos por kilogramo sin IVA.";
+                lblTitPrecioVenta.Text = "💲 Precio Venta por Kg (IVA Inc.)";
+                lblTitStockActual.Text = "📦 Stock en Gramos (ej: 5000g = 5kg)";
+            }
+            else
+            {
+                lblTitCosto.Text = "Costo Neto Base ($)";
+                lblSubCosto.Text = "Costo en pesos por unidad sin IVA.";
+                lblTitPrecioVenta.Text = "💲 Precio Venta Base POS (IVA Inc.)";
+                lblTitStockActual.Text = "📦 Stock Actual (Editable)";
+            }
         }
 
         private void SeleccionarModo(bool escala)
@@ -296,11 +341,16 @@ namespace SISTEMAACTUALIZADO.Modals
 
         private Panel CrearCampo(string titulo, Control ctrl, int x, int w)
         {
+            return CrearCampoConLabel(titulo, ctrl, x, w).Contenedor;
+        }
+
+        private (Panel Contenedor, Label LabelControl) CrearCampoConLabel(string titulo, Control ctrl, int x, int w)
+        {
             Panel p = new Panel { Location = new Point(x, 0), Size = new Size(w, 52) };
             Label l = new Label { Text = titulo, Font = new Font("Segoe UI", 8F, FontStyle.Bold), ForeColor = Color.FromArgb(71, 85, 105), Location = new Point(0, 0), AutoSize = true };
             ctrl.Location = new Point(0, 20);
             p.Controls.AddRange(new Control[] { l, ctrl });
-            return p;
+            return (p, l);
         }
 
         private void LlenarComboListas(ComboBox cb)
@@ -382,12 +432,22 @@ namespace SISTEMAACTUALIZADO.Modals
                 txtNombre.Text = _productoAEditar.Nombre;
                 cbCategoria.Text = !string.IsNullOrWhiteSpace(_productoAEditar.Categoria) ? _productoAEditar.Categoria : "General";
                 cbFamilia.Text = !string.IsNullOrWhiteSpace(_productoAEditar.NFamilia) ? _productoAEditar.NFamilia : cbCategoria.Text;
-                txtPrecioCosto.Text = MonedaHelper.Formatear(_productoAEditar.PrecioCosto);
+
+                // Marcar checkbox de pesable
+                chkEsPesable.Checked = _productoAEditar.EsPesable;
+                ActualizarEtiquetasSegunModalidadPeso();
+
+                // Conversión de visualización si es pesable: multiplicar x1000 para ver precios por kilo
+                decimal factorConversion = _productoAEditar.EsPesable ? 1000m : 1m;
+                decimal costoMostrar = _productoAEditar.PrecioCosto * factorConversion;
+                decimal precioMostrar = _productoAEditar.PrecioUnitario * factorConversion;
+
+                txtPrecioCosto.Text = MonedaHelper.Formatear(costoMostrar);
 
                 int listaIdx = Math.Max(1, Math.Min(10, _productoAEditar.ListaDefectoPOS)) - 1;
                 cbListaPrecioPOS.SelectedIndex = listaIdx;
 
-                txtPrecioUnitario.Text = MonedaHelper.Formatear(_productoAEditar.PrecioUnitario);
+                txtPrecioUnitario.Text = MonedaHelper.Formatear(precioMostrar);
                 txtStockActual.Text = _productoAEditar.Stock.ToString();
                 txtStockMinimo.Text = _productoAEditar.StockMinimo.ToString();
 
@@ -399,7 +459,6 @@ namespace SISTEMAACTUALIZADO.Modals
                 }
 
                 CargarEscalaDesdeBD(_productoAEditar.ProductoID);
-                RecalcularPrecioSegunLista();
             }
         }
 
@@ -465,7 +524,6 @@ namespace SISTEMAACTUALIZADO.Modals
             {
                 try
                 {
-                    // Copia automáticamente la foto a la carpeta Imagenes del proyecto y devuelve solo 'archivo.ext'
                     string sku = txtCodigoBarra.Text.Trim();
                     string nombreRelativo = ImagenHelper.CopiarAImagenesYObtenerNombreRelativo(ofd.FileName, sku);
 
@@ -613,7 +671,6 @@ namespace SISTEMAACTUALIZADO.Modals
             {
                 _rutaImagenSeleccionada = modalBusqueda.RutaImagenDescargada;
 
-                // Al ser ahora un JPEG genuino, GDI+ lo carga al instante
                 pbFoto.Image?.Dispose();
                 pbFoto.Image = ImagenHelper.CargarImagenSegura(_rutaImagenSeleccionada);
                 pbFoto.Refresh();
@@ -629,10 +686,17 @@ namespace SISTEMAACTUALIZADO.Modals
                 return;
             }
 
-            decimal costo = MonedaHelper.Limpiar(txtPrecioCosto.Text);
-            decimal pvp = MonedaHelper.Limpiar(txtPrecioUnitario.Text);
+            decimal costoIngresado = MonedaHelper.Limpiar(txtPrecioCosto.Text);
+            decimal pvpIngresado = MonedaHelper.Limpiar(txtPrecioUnitario.Text);
             int.TryParse(txtStockActual.Text.Trim(), out int stockActual);
             int.TryParse(txtStockMinimo.Text.Trim(), out int stockMin);
+
+            bool esPesable = chkEsPesable.Checked;
+
+            // Factor de conversión hacia base de datos: si es pesable se guarda por gramo (/ 1000)
+            decimal divisor = esPesable ? 1000m : 1m;
+            decimal costoInterno = divisor > 0 ? (costoIngresado / divisor) : 0;
+            decimal pvpInterno = divisor > 0 ? (pvpIngresado / divisor) : 0;
 
             int listaSeleccionada = rbModoEscala.Checked ? 1 : (cbListaPrecioPOS.SelectedIndex + 1);
 
@@ -646,28 +710,29 @@ namespace SISTEMAACTUALIZADO.Modals
                 productoGuardar.Nombre = nombre;
                 productoGuardar.Categoria = cbCategoria.Text.Trim();
                 productoGuardar.NFamilia = cbFamilia.Text.Trim();
+                productoGuardar.EsPesable = esPesable;
                 productoGuardar.ListaDefectoPOS = listaSeleccionada;
                 productoGuardar.Stock = stockActual;
-                productoGuardar.StockMinimo = stockMin > 0 ? stockMin : 5;
+                productoGuardar.StockMinimo = stockMin > 0 ? stockMin : (esPesable ? 500 : 5);
                 productoGuardar.ImagenPath = _rutaImagenSeleccionada;
                 productoGuardar.Estado = true;
                 productoGuardar.FchUpd = DateTime.Now;
 
                 // Recalcula en cascada de Lista 1 a Lista 10 según la matriz de márgenes
-                if (costo > 0)
+                if (costoInterno > 0)
                 {
-                    ProductoService.AplicarNuevoCostoYRecalcularListas(productoGuardar, costo);
+                    ProductoService.AplicarNuevoCostoYRecalcularListas(productoGuardar, costoInterno);
 
                     // Si el usuario fijó un precio manual en la caja de texto (L1), se respeta
-                    if (pvp > 0)
+                    if (pvpInterno > 0)
                     {
-                        productoGuardar.PrecioUnitario = pvp;
+                        productoGuardar.PrecioUnitario = pvpInterno;
                     }
                 }
                 else
                 {
                     productoGuardar.PrecioCosto = 0;
-                    productoGuardar.PrecioUnitario = pvp;
+                    productoGuardar.PrecioUnitario = pvpInterno;
                 }
 
                 var tramos = _filasTramos.Select(f => new TramoEscalaDTO

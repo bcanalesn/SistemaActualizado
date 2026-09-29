@@ -1,3 +1,4 @@
+using System;
 using Microsoft.EntityFrameworkCore;
 using SISTEMAACTUALIZADO.Models;
 
@@ -23,14 +24,60 @@ namespace SISTEMAACTUALIZADO.Data
         public DbSet<PagoCliente> PagosClientes { get; set; } = null!;
         public DbSet<PagoDetalleFactura> PagosDetalleFacturas { get; set; } = null!;
         public DbSet<HistorialCondicionesCredito> HistorialCondicionesCredito { get; set; } = null!;
-        public DbSet<CajaTurno> CajaTurnos { get; set; } = null!; // REGISTRADO
+        public DbSet<CajaTurno> CajaTurnos { get; set; } = null!;
 
         protected override void OnConfiguring(DbContextOptionsBuilder optionsBuilder)
         {
             if (!optionsBuilder.IsConfigured)
             {
-                optionsBuilder.UseMySql("Server=localhost;Database=sistemaepos;Uid=root;Pwd=root;", 
+                optionsBuilder.UseMySql("Server=localhost;Database=sistemaepos;Uid=root;Pwd=;", 
                     new MySqlServerVersion(new Version(8, 0, 30)));
+            }
+        }
+
+        /// <summary>
+        /// Comprueba y crea la columna EsPesable en MySQL de forma no destructiva.
+        /// </summary>
+        public void AsegurarColumnaEsPesableMySQL()
+        {
+            try
+            {
+                using (var connection = this.Database.GetDbConnection())
+                {
+                    connection.Open();
+                    using (var cmd = connection.CreateCommand())
+                    {
+                        // 1. Verificar si la columna existe en MySQL
+                        cmd.CommandText = @"
+                            SELECT COUNT(*) 
+                            FROM INFORMATION_SCHEMA.COLUMNS 
+                            WHERE TABLE_SCHEMA = DATABASE() 
+                              AND TABLE_NAME = 'Productos' 
+                              AND COLUMN_NAME = 'EsPesable';";
+
+                        long existe = Convert.ToInt64(cmd.ExecuteScalar() ?? 0);
+
+                        if (existe == 0)
+                        {
+                            // 2. Agregar columna tipo TINYINT(1) booleana
+                            cmd.CommandText = "ALTER TABLE Productos ADD COLUMN EsPesable TINYINT(1) NOT NULL DEFAULT 0;";
+                            cmd.ExecuteNonQuery();
+
+                            // 3. Migración de convenios históricos a formato booleano
+                            cmd.CommandText = @"
+                                UPDATE Productos 
+                                SET EsPesable = 1 
+                                WHERE LOWER(Nombre) LIKE '%(gr)%' 
+                                   OR LOWER(Nombre) LIKE '%(g)%' 
+                                   OR LOWER(Nombre) LIKE '%granel%';";
+                            cmd.ExecuteNonQuery();
+                        }
+                    }
+                }
+            }
+            catch
+            {
+                // Manejo silencioso para no interrumpir el arranque si la conexión aún no está lista
             }
         }
     }
