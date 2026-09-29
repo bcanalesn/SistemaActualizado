@@ -521,6 +521,8 @@ namespace SISTEMAACTUALIZADO
         private static bool EsProductoPorGramos(Producto prod)
         {
             if (prod == null) return false;
+            if (prod.EsPesable) return true;
+
             string n = prod.Nombre?.ToLower() ?? "";
             return n.Contains("(gr)") || n.Contains("(g)") || n.Contains("/gr") || n.Contains("granel");
         }
@@ -832,7 +834,7 @@ namespace SISTEMAACTUALIZADO
             Color colorPrecio = prod.ListaDefectoPOS > 1 ? Color.FromArgb(2, 132, 199) : Color.FromArgb(0, 102, 255);
 
             string textoPrecio = esPesable 
-                ? $"{MonedaHelper.Formatear(precioVenta, conSigno: true)}/g" 
+                ? $"{MonedaHelper.Formatear(precioVenta * 1000m, conSigno: true)}/Kg" 
                 : MonedaHelper.Formatear(precioVenta, conSigno: true);
 
             Label lblPrecio = new Label
@@ -1078,6 +1080,7 @@ namespace SISTEMAACTUALIZADO
                             itemExistente.Cantidad = nuevaCantidad;
                             itemExistente.PrecioLista1 = prod.PrecioUnitario;
                             itemExistente.PrecioUnitario = precioFinal;
+                            itemExistente.EsPesable = prod.EsPesable; // <-- Identificación real
                         }
                         else
                         {
@@ -1087,7 +1090,8 @@ namespace SISTEMAACTUALIZADO
                                 Nombre = prod.Nombre,
                                 PrecioLista1 = prod.PrecioUnitario,
                                 PrecioUnitario = precioFinal,
-                                Cantidad = nuevaCantidad
+                                Cantidad = nuevaCantidad,
+                                EsPesable = prod.EsPesable // <-- Identificación real
                             });
                         }
                     }
@@ -1131,13 +1135,14 @@ namespace SISTEMAACTUALIZADO
                 };
 
                 var prodOriginal = _productosCache.FirstOrDefault(p => p.ProductoID == item.ProductoID);
-                bool esGramos = prodOriginal != null && EsProductoPorGramos(prodOriginal);
+                // Si el item ya viene marcado o si el producto en caché es pesable
+                bool esGramos = item.EsPesable || (prodOriginal != null && prodOriginal.EsPesable);
                 int pasoCarrito = esGramos ? 50 : 1;
 
                 Label lblNombre = new Label { Name = "lblNombre", Text = item.Nombre, Font = new Font("Segoe UI", 8.5F, FontStyle.Bold), ForeColor = Color.FromArgb(15, 23, 42), Location = new Point(6, 4), AutoSize = false, Size = new Size(110, 18) };
                 
                 string txtUnit = esGramos 
-                    ? $"{MonedaHelper.Formatear(item.PrecioUnitario, conSigno: true)}/g" 
+                    ? $"{MonedaHelper.Formatear(item.PrecioUnitario * 1000m, conSigno: true)}/Kg" 
                     : MonedaHelper.Formatear(item.PrecioUnitario, conSigno: true);
 
                 Label lblPrecioU = new Label { Name = "lblPrecioU", Text = txtUnit, Font = new Font("Segoe UI", 7.5F), ForeColor = Color.FromArgb(100, 116, 139), Location = new Point(6, 24), AutoSize = true };

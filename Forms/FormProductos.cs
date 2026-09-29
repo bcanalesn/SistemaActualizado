@@ -319,6 +319,40 @@ namespace SISTEMAACTUALIZADO
             dgv.RowTemplate.Height = 34;
             dgv.AlternatingRowsDefaultCellStyle.BackColor = Color.FromArgb(248, 250, 252);
             dgv.GridColor = Color.FromArgb(226, 232, 240);
+
+            // Formateo dinámico para productos pesables en la grilla
+            dgv.CellFormatting += DgvProductos_CellFormatting;
+        }
+
+        private void DgvProductos_CellFormatting(object? sender, DataGridViewCellFormattingEventArgs e)
+        {
+            if (e.RowIndex < 0 || e.RowIndex >= dgvProductos.Rows.Count) return;
+
+            if (dgvProductos.Rows[e.RowIndex].DataBoundItem is Producto prod && prod.EsPesable)
+            {
+                string colName = dgvProductos.Columns[e.ColumnIndex].Name;
+
+                // 1. Formateo de Costo y Listas de Precios por Kilo
+                if (colName == "PrecioCosto" || colName == "PrecioUnitario" || colName.StartsWith("Precio"))
+                {
+                    if (e.Value is decimal valDecimal)
+                    {
+                        e.Value = $"${(valDecimal * 1000m):#,##0}/Kg";
+                        e.FormattingApplied = true;
+                    }
+                }
+                // 2. Formateo de Stock en Kg o Gramos
+                else if (colName == "Stock")
+                {
+                    if (e.Value is int stockGramos)
+                    {
+                        e.Value = stockGramos >= 1000 
+                            ? $"{(stockGramos / 1000.0):0.0} Kg" 
+                            : $"{stockGramos} g";
+                        e.FormattingApplied = true;
+                    }
+                }
+            }
         }
 
         private void CargarProductos()

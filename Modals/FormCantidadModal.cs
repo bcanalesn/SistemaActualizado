@@ -54,7 +54,7 @@ namespace SISTEMAACTUALIZADO.Modals
         private void InitializeComponent(string nombreProducto, string? imagenPath)
         {
             this.SuspendLayout();
-            this.Text = _esPorGramos ? "Agregar Peso (Gramos)" : "Agregar a la Venta";
+            this.Text = "Agregar a la Venta";
             this.Size = new Size(390, 500);
             this.StartPosition = FormStartPosition.CenterParent;
             this.FormBorderStyle = FormBorderStyle.FixedDialog;
@@ -93,25 +93,39 @@ namespace SISTEMAACTUALIZADO.Modals
             Label lblTitle = new Label { Text = nombreProducto, Font = new Font("Segoe UI", 11F, FontStyle.Bold), ForeColor = Color.FromArgb(15, 23, 42), Location = new Point(75, 16), AutoSize = true };
 
             string stockTexto = _esPorGramos 
-                ? $"Disp: {_stockDisponible:N0} g ({(_stockDisponible / 1000.0):0.0} kg)" 
+                ? $"Stock: {(_stockDisponible / 1000.0):0.0} kg" 
                 : $"Stock: {_stockDisponible} un.";
 
             string precioTexto = _esPorGramos 
-                ? $"Precio: {MonedaHelper.Formatear(_precioUnitario, conSigno: true)}/g  (${(_precioUnitario * 1000):N0}/Kg)  |  {stockTexto}" 
-                : $"Precio: {MonedaHelper.Formatear(_precioUnitario, conSigno: true)}  |  {stockTexto}";
+                ? $"Precio: {MonedaHelper.Formatear(_precioUnitario, conSigno: true)}/g | {stockTexto}" 
+                : $"Precio: {MonedaHelper.Formatear(_precioUnitario, conSigno: true)} | {stockTexto}";
 
             Label lblSub = new Label { Text = precioTexto, Font = new Font("Segoe UI", 8F, FontStyle.Bold), ForeColor = Color.FromArgb(2, 132, 199), Location = new Point(75, 40), AutoSize = true };
             Label lblDivider = new Label { Height = 1, BackColor = Color.FromArgb(226, 232, 240), Location = new Point(15, 68), Width = 355 };
 
-            string headerCantidad = _esPorGramos 
-                ? "Gramos a vender (Escriba o elija botón rápido)" 
-                : "Cantidad (Escriba con teclado o seleccione botón)";
-
-            Label lblCantHeader = new Label { Text = headerCantidad, Font = new Font("Segoe UI", 8F, FontStyle.Bold), ForeColor = Color.FromArgb(100, 116, 139), Location = new Point(15, 76), Width = 355, TextAlign = ContentAlignment.MiddleCenter };
+            Label lblCantHeader = new Label 
+            { 
+                Text = "Cantidad (Escriba con teclado o seleccione botón)", 
+                Font = new Font("Segoe UI", 8F, FontStyle.Bold), 
+                ForeColor = Color.FromArgb(100, 116, 139), 
+                Location = new Point(15, 76), 
+                Width = 355, 
+                TextAlign = ContentAlignment.MiddleCenter 
+            };
 
             int paso = _esPorGramos ? 50 : 1;
 
-            Button btnMinus = new Button { Text = "─", Font = new Font("Segoe UI", 12F, FontStyle.Bold), Location = new Point(35, 96), Size = new Size(44, 42), BackColor = Color.FromArgb(241, 245, 249), FlatStyle = FlatStyle.Flat, TabStop = false, Cursor = Cursors.Hand };
+            Button btnMinus = new Button 
+            { 
+                Text = "─", 
+                Font = new Font("Segoe UI", 12F, FontStyle.Bold), 
+                Location = new Point(35, 96), 
+                Size = new Size(44, 42), 
+                BackColor = Color.FromArgb(241, 245, 249), 
+                FlatStyle = FlatStyle.Flat, 
+                TabStop = false, 
+                Cursor = Cursors.Hand 
+            };
             btnMinus.FlatAppearance.BorderSize = 0;
             btnMinus.Click += (s, e) => 
             { 
@@ -136,7 +150,17 @@ namespace SISTEMAACTUALIZADO.Modals
             };
             lblCantidadDisplay.Paint += (s, e) => { ControlPaint.DrawBorder(e.Graphics, lblCantidadDisplay.ClientRectangle, Color.FromArgb(226, 232, 240), ButtonBorderStyle.Solid); };
 
-            Button btnPlus = new Button { Text = "┼", Font = new Font("Segoe UI", 12F, FontStyle.Bold), Location = new Point(302, 96), Size = new Size(44, 42), BackColor = Color.FromArgb(241, 245, 249), FlatStyle = FlatStyle.Flat, TabStop = false, Cursor = Cursors.Hand };
+            Button btnPlus = new Button 
+            { 
+                Text = "┼", 
+                Font = new Font("Segoe UI", 12F, FontStyle.Bold), 
+                Location = new Point(302, 96), 
+                Size = new Size(44, 42), 
+                BackColor = Color.FromArgb(241, 245, 249), 
+                FlatStyle = FlatStyle.Flat, 
+                TabStop = false, 
+                Cursor = Cursors.Hand 
+            };
             btnPlus.FlatAppearance.BorderSize = 0;
             btnPlus.Click += (s, e) =>
             {
@@ -155,7 +179,7 @@ namespace SISTEMAACTUALIZADO.Modals
 
             Label lblRapidasHeader = new Label 
             { 
-                Text = _esPorGramos ? "PESOS FRECUENTES" : "CANTIDADES RÁPIDAS", 
+                Text = "CANTIDADES RÁPIDAS", 
                 Font = new Font("Segoe UI", 7.5F, FontStyle.Bold), 
                 ForeColor = Color.FromArgb(148, 163, 184), 
                 Location = new Point(15, 148), 
@@ -164,9 +188,12 @@ namespace SISTEMAACTUALIZADO.Modals
             };
 
             flowRapidas = new FlowLayoutPanel { Location = new Point(25, 168), Size = new Size(335, 38), WrapContents = false };
+            
             int[] cantidades = _esPorGramos 
                 ? new int[] { 100, 200, 250, 500, 1000 } 
                 : new int[] { 1, 2, 3, 5, 10 };
+
+            int anchoBtn = _esPorGramos ? 60 : 58;
 
             foreach (int c in cantidades)
             {
@@ -174,12 +201,12 @@ namespace SISTEMAACTUALIZADO.Modals
                 Button btnQ = new Button
                 {
                     Text = txtBtn,
-                    Size = new Size(58, 32),
+                    Size = new Size(anchoBtn, 32),
                     BackColor = (_cantidad == c) ? Color.FromArgb(0, 102, 255) : Color.FromArgb(248, 250, 252),
                     ForeColor = (_cantidad == c) ? Color.White : Color.FromArgb(15, 23, 42),
                     FlatStyle = FlatStyle.Flat,
                     Font = new Font("Segoe UI", 8F, FontStyle.Bold),
-                    Margin = new Padding(3, 0, 3, 0),
+                    Margin = new Padding(2, 0, 2, 0),
                     TabStop = false,
                     Cursor = Cursors.Hand
                 };
@@ -198,7 +225,7 @@ namespace SISTEMAACTUALIZADO.Modals
                         _cantidad = val;
                     }
 
-                    _esPrimerDigito = false;
+                    _esPrimerDigito = true;
                     ResaltarBotonRapido(val);
                     ActualizarValores();
                     btnAgregarAccion.Focus();
@@ -456,7 +483,7 @@ namespace SISTEMAACTUALIZADO.Modals
 
         private void ConfirmarYAgregar()
         {
-            if (_cantidad <= 0) _cantidad = _esPorGramos ? 50 : 1;
+            if (_cantidad <= 0) _cantidad = _esPorGramos ? 1 : 1;
             if (_cantidad > _stockDisponible)
             {
                 _cantidad = _stockDisponible;

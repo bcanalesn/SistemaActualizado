@@ -53,7 +53,7 @@ namespace SISTEMAACTUALIZADO.Services
             int width = anchoContenedor;
             StringFormat centerFormat = new StringFormat { Alignment = StringAlignment.Center };
 
-            // Encabezado del Emisor (Datos fiscales reales desde la BD)
+            // Encabezado del Emisor
             g.DrawString(emp.RazonSocial, fontTitle, brushText, new RectangleF(0, y, width, 25), centerFormat);
             y += 24;
             g.DrawString($"R.U.T.: {emp.Rut}", fontBold, brushText, new RectangleF(0, y, width, 20), centerFormat);
@@ -61,7 +61,6 @@ namespace SISTEMAACTUALIZADO.Services
             g.DrawString($"Giro: {emp.Giro}", fontSub, brushText, new RectangleF(0, y, width, 18), centerFormat);
             y += 16;
             
-            // Ubicación con Comuna y Ciudad
             List<string> partesUbicacion = new List<string>();
             if (!string.IsNullOrWhiteSpace(emp.Direccion)) partesUbicacion.Add(emp.Direccion);
 
@@ -142,7 +141,6 @@ namespace SISTEMAACTUALIZADO.Services
                 y += 18;
             }
 
-            // Desglose fiscal exclusivo para Facturas Electrónicas (iddocDTE == 33)
             if (venta.iddocDTE == 33)
             {
                 if (!string.IsNullOrWhiteSpace(venta.Giro))
@@ -187,8 +185,11 @@ namespace SISTEMAACTUALIZADO.Services
 
             foreach (var item in items)
             {
-                string desc = item.Nombre.Length > 22 ? item.Nombre.Substring(0, 22) : item.Nombre;
-                g.DrawString($"{item.Cantidad,2} x   {desc}", fontSub, brushText, 15, y);
+                string desc = item.Nombre.Length > 20 ? item.Nombre.Substring(0, 20) : item.Nombre;
+                
+                // Formato diferenciado según tipo de venta
+                string textoCantidad = item.EsPesable ? $"{item.Cantidad}g" : $"{item.Cantidad,2} x";
+                g.DrawString($"{textoCantidad,-6} {desc}", fontSub, brushText, 15, y);
                 g.DrawString(MonedaHelper.Formatear(item.Subtotal, conSigno: true), fontSub, brushText, width - 85, y);
                 y += 18;
             }
@@ -291,8 +292,11 @@ namespace SISTEMAACTUALIZADO.Services
 
                     foreach (var item in items)
                     {
-                        string nom = item.Nombre.Length > 20 ? item.Nombre.Substring(0, 18) + ".." : item.Nombre;
-                        g.DrawString($"{item.Cantidad}x  {nom}", fontRegular, Brushes.Black, 5, y);
+                        string nom = item.Nombre.Length > 18 ? item.Nombre.Substring(0, 16) + ".." : item.Nombre;
+                        
+                        // Formato limpio: "250g  Queso..." vs "2x    Bebida..."
+                        string prefijoCant = item.EsPesable ? $"{item.Cantidad}g" : $"{item.Cantidad}x";
+                        g.DrawString($"{prefijoCant,-6} {nom}", fontRegular, Brushes.Black, 5, y);
                         g.DrawString(MonedaHelper.Formatear(item.Subtotal, conSigno: true), fontRegular, Brushes.Black, new RectangleF(0, y, width - 5, 20), sfRight);
                         y += 16;
                     }

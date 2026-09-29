@@ -135,5 +135,6 @@ namespace SISTEMAACTUALIZADO.Models
         public DateTime? FchSincro { get; set; }
         public DateTime? FchUpd { get; set; } = DateTime.Now;
         public byte Sincro { get; set; } = 0;
+        public bool EsPesable { get; set; } = false;
     }
 }
