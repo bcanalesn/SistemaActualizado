@@ -24,6 +24,7 @@ namespace SISTEMAACTUALIZADO
         private Button btnCompras = new Button();
         private Button btnClientes = new Button();
         private Button btnCuentasPorCobrar = new Button();
+        private Button btnPedidosReservados = new Button(); // 👈 NUEVO: Pedidos por Encargo y Reservas
         private Button btnProductos = new Button();
         private Button btnUsuarios = new Button();
         private Button btnReportes = new Button();
@@ -108,6 +109,7 @@ namespace SISTEMAACTUALIZADO
             ConfigurarBotonSidebar(this.btnCompras, "📥  Recepción Compras");
             ConfigurarBotonSidebar(this.btnClientes, "👥  Clientes");
             ConfigurarBotonSidebar(this.btnCuentasPorCobrar, "💳  Cuentas por Cobrar");
+            ConfigurarBotonSidebar(this.btnPedidosReservados, "📅  Pedidos / Reservas"); // 👈 Configuración botón
             ConfigurarBotonSidebar(this.btnProductos, "📦  Productos");
             ConfigurarBotonSidebar(this.btnUsuarios, "👤  Usuarios");
             ConfigurarBotonSidebar(this.btnReportes, "📊  Reportes");
@@ -122,6 +124,7 @@ namespace SISTEMAACTUALIZADO
             pnlNav.Controls.Add(this.btnCompras);
             pnlNav.Controls.Add(this.btnClientes);
             pnlNav.Controls.Add(this.btnCuentasPorCobrar);
+            pnlNav.Controls.Add(this.btnPedidosReservados); // 👈 Agregado a navegación
             pnlNav.Controls.Add(this.btnProductos);
             pnlNav.Controls.Add(this.btnUsuarios);
             pnlNav.Controls.Add(this.btnReportes);
@@ -150,6 +153,10 @@ namespace SISTEMAACTUALIZADO
             this.btnCompras.Click += (s, e) => AbrirFormEnContent(new FormCompras(), "Recepción de Compras e Incremento de Stock", btnCompras);
             this.btnClientes.Click += (s, e) => AbrirFormEnContent(new FormClientes(), "Gestión de Clientes (CRM)", btnClientes);
             this.btnCuentasPorCobrar.Click += (s, e) => AbrirFormEnContent(new SISTEMAACTUALIZADO.Forms.FormCuentasPorCobrar(), "Gestión de Cuentas por Cobrar y Control de Crédito Comercial", btnCuentasPorCobrar);
+            
+            // Evento de apertura para Pedidos Reservados
+            this.btnPedidosReservados.Click += (s, e) => AbrirFormEnContent(new FormPedidosReservados(_usuarioActual), "Gestión de Pedidos por Encargo y Reservas", btnPedidosReservados);
+
             this.btnProductos.Click += (s, e) => AbrirFormEnContent(new FormProductos(), "Gestión de Productos e Inventario", btnProductos);
             this.btnUsuarios.Click += (s, e) => AbrirFormEnContent(new FormUsuarios(), "Gestión de Cuentas de Usuarios", btnUsuarios);
             this.btnReportes.Click += (s, e) => AbrirFormEnContent(new FormReportes(), "Reportes y Estadísticas de Ventas", btnReportes);
@@ -220,7 +227,7 @@ namespace SISTEMAACTUALIZADO
         {
             string rol = _usuarioActual?.Rol ?? "Administrador";
 
-            // 1. VENDEDOR: Únicamente Punto de Venta
+            // 1. VENDEDOR: Punto de Venta y Gestión de Reservas
             if (rol.Equals("Vendedor", StringComparison.OrdinalIgnoreCase))
             {
                 btnCaja.Visible = false;
@@ -231,6 +238,7 @@ namespace SISTEMAACTUALIZADO
                 btnCompras.Visible = false;
                 btnClientes.Visible = false;
                 btnCuentasPorCobrar.Visible = false;
+                btnPedidosReservados.Visible = true; // Permite a vendedores tomar y revisar encargos
                 btnProductos.Visible = false;
                 btnUsuarios.Visible = false;
                 btnReportes.Visible = false;
@@ -249,6 +257,7 @@ namespace SISTEMAACTUALIZADO
                 btnCompras.Visible = true;
                 btnClientes.Visible = false;
                 btnCuentasPorCobrar.Visible = false;
+                btnPedidosReservados.Visible = false;
                 btnProductos.Visible = false;
                 btnUsuarios.Visible = false;
                 btnReportes.Visible = false;
@@ -256,7 +265,7 @@ namespace SISTEMAACTUALIZADO
                 return;
             }
 
-            // 3. CAJERO: Control de Caja y Punto de Venta
+            // 3. CAJERO: Control de Caja, Punto de Venta y Gestión de Reservas
             if (rol.Equals("Cajero", StringComparison.OrdinalIgnoreCase))
             {
                 btnCaja.Visible = true;
@@ -267,6 +276,7 @@ namespace SISTEMAACTUALIZADO
                 btnCompras.Visible = false;
                 btnClientes.Visible = false;
                 btnCuentasPorCobrar.Visible = false;
+                btnPedidosReservados.Visible = true; // Permite a cajeros registrar abonos y liquidar retiros
                 btnProductos.Visible = false;
                 btnUsuarios.Visible = false;
                 btnReportes.Visible = false;
@@ -283,6 +293,7 @@ namespace SISTEMAACTUALIZADO
             btnCompras.Visible = true;
             btnClientes.Visible = true;
             btnCuentasPorCobrar.Visible = true;
+            btnPedidosReservados.Visible = true;
             btnProductos.Visible = true;
             btnUsuarios.Visible = true;
             btnReportes.Visible = true;
@@ -341,8 +352,8 @@ namespace SISTEMAACTUALIZADO
         {
             Button[] botones = new[] { 
                 btnCaja, btnVentas, btnLibroVentas, btnLibroCompras, btnFolios, 
-                btnCompras, btnClientes, btnCuentasPorCobrar, btnProductos, 
-                btnUsuarios, btnReportes, btnConfiguracion, btnCerrarSesion 
+                btnCompras, btnClientes, btnCuentasPorCobrar, btnPedidosReservados, 
+                btnProductos, btnUsuarios, btnReportes, btnConfiguracion, btnCerrarSesion 
             };
 
             foreach (var b in botones)

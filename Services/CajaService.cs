@@ -318,19 +318,23 @@ namespace SISTEMAACTUALIZADO.Services
         }
 
         // 4. CÁLCULO DE EFECTIVO AISLADO POR TURNO
+        // 4. CÁLCULO DE EFECTIVO AISLADO POR TURNO
         public decimal CalcularVentasEfectivo(int turnoId)
         {
             try
             {
                 using var db = new AppDbContext();
+
                 var ventasEmitidas = db.TVE2607
                     .Where(v => v.CajaTurnoID == turnoId && v.status == "Emitido")
                     .ToList();
 
                 decimal totalEfectivo = 0;
+
                 foreach (var v in ventasEmitidas)
                 {
                     string medio = v.MedioPago ?? "";
+
                     if (medio.Equals("Efectivo", StringComparison.OrdinalIgnoreCase))
                     {
                         totalEfectivo += (v.iddocDTE == 61 ? -v.Total : v.Total);
@@ -338,16 +342,28 @@ namespace SISTEMAACTUALIZADO.Services
                     else if (medio.StartsWith("Múltiple", StringComparison.OrdinalIgnoreCase))
                     {
                         // Tolerancia a espacios antes y después del signo $
-                        var matchEfec = Regex.Match(medio, @"Efec:\s*\$?\s*([\d\.,]+)");
+                        var matchEfec = Regex.Match(
+                            medio,
+                            @"Efec:\s*\$?\s*([\d\.,]+)"
+                        );
+
                         if (matchEfec.Success)
                         {
-                            decimal efecMonto = MonedaHelper.Limpiar(matchEfec.Groups[1].Value);
+                            decimal efecMonto = MonedaHelper.Limpiar(
+                                matchEfec.Groups[1].Value
+                            );
+
                             totalEfectivo += (efecMonto - v.Vuelto);
                         }
                     }
                 }
 
-                return totalEfectivo;
+                // Agregar abonos de reservas recibidos en efectivo durante este turno
+                var reservaService = new ReservaService();
+                decimal abonosReserva =
+                    reservaService.ObtenerTotalAbonosEfectivoPorTurno(turnoId);
+
+                return totalEfectivo + abonosReserva;
             }
             catch
             {
