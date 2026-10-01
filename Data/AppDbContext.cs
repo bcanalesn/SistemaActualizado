@@ -26,6 +26,11 @@ namespace SISTEMAACTUALIZADO.Data
         public DbSet<HistorialCondicionesCredito> HistorialCondicionesCredito { get; set; } = null!;
         public DbSet<CajaTurno> CajaTurnos { get; set; } = null!;
 
+        // 👈 Solo estas 3 líneas para reservas
+        public DbSet<Reserva> Reservas { get; set; } = null!;
+        public DbSet<ReservaDetalle> ReservaDetalles { get; set; } = null!;
+        public DbSet<ReservaPago> ReservaPagos { get; set; } = null!;
+
         protected override void OnConfiguring(DbContextOptionsBuilder optionsBuilder)
         {
             if (!optionsBuilder.IsConfigured)
@@ -35,9 +40,6 @@ namespace SISTEMAACTUALIZADO.Data
             }
         }
 
-        /// <summary>
-        /// Comprueba y crea la columna EsPesable en MySQL de forma no destructiva.
-        /// </summary>
         public void AsegurarColumnaEsPesableMySQL()
         {
             try
@@ -47,7 +49,6 @@ namespace SISTEMAACTUALIZADO.Data
                     connection.Open();
                     using (var cmd = connection.CreateCommand())
                     {
-                        // 1. Verificar si la columna existe en MySQL
                         cmd.CommandText = @"
                             SELECT COUNT(*) 
                             FROM INFORMATION_SCHEMA.COLUMNS 
@@ -59,11 +60,9 @@ namespace SISTEMAACTUALIZADO.Data
 
                         if (existe == 0)
                         {
-                            // 2. Agregar columna tipo TINYINT(1) booleana
                             cmd.CommandText = "ALTER TABLE Productos ADD COLUMN EsPesable TINYINT(1) NOT NULL DEFAULT 0;";
                             cmd.ExecuteNonQuery();
 
-                            // 3. Migración de convenios históricos a formato booleano
                             cmd.CommandText = @"
                                 UPDATE Productos 
                                 SET EsPesable = 1 
@@ -77,7 +76,6 @@ namespace SISTEMAACTUALIZADO.Data
             }
             catch
             {
-                // Manejo silencioso para no interrumpir el arranque si la conexión aún no está lista
             }
         }
     }

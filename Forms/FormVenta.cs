@@ -26,6 +26,8 @@ namespace SISTEMAACTUALIZADO
         private List<Producto> _productosCache = new List<Producto>();
         private ProductoService _productoService = new ProductoService();
         private VentaService _ventaService = new VentaService();
+        private CajaService _cajaService = new CajaService();
+        private TicketPrintService _ticketPrintService = new TicketPrintService();
 
         // Control de Venta en Espera / Edición
         private int _idTveEnEdicion = 0;
@@ -51,6 +53,7 @@ namespace SISTEMAACTUALIZADO
         private Label lblDescuentoValue = null!;
         private Label lblTotalValue = null!;
         private Button btnCliente = null!;
+        private Button btnReservar = null!;
 
         private string _clienteSeleccionadoNombre = "Consumidor Final";
         private string _clienteSeleccionadoRut = "";
@@ -163,7 +166,7 @@ namespace SISTEMAACTUALIZADO
             this.BackColor = Color.FromArgb(244, 246, 249);
             this.Font = new Font("Segoe UI", 9F, FontStyle.Regular, GraphicsUnit.Point);
 
-            // FOOTER DE ATAJOS
+            // FOOTER DE ATAJOS (Actualizado con F8)
             Panel pnlAtajosFooter = new Panel
             {
                 Dock = DockStyle.Bottom,
@@ -174,7 +177,7 @@ namespace SISTEMAACTUALIZADO
 
             Label lblAtajosInfo = new Label
             {
-                Text = "⏱ Atajos de teclado:   [F2] Buscar   |   [F3] Cliente   |   [F4] Generar Ticket   |   [ESC] Limpiar Carro",
+                Text = "⏱ Atajos:   [F2] Buscar   |   [F3] Cliente   |   [F4] Generar Ticket   |   [F8] Reservar/Encargo   |   [ESC] Limpiar",
                 Font = new Font("Segoe UI", 8.5F, FontStyle.Bold),
                 ForeColor = Color.FromArgb(71, 85, 105),
                 Dock = DockStyle.Fill,
@@ -248,7 +251,8 @@ namespace SISTEMAACTUALIZADO
             };
             flowCarritoItems.SizeChanged += (s, e) => ReajustarAnchoFilasCarrito();
 
-            Panel pnlBottomCheckout = new Panel { Dock = DockStyle.Bottom, Height = 160, Padding = new Padding(0, 6, 0, 0) };
+            // Altura ampliada de checkout para contener F4 y F8 de forma cómoda
+            Panel pnlBottomCheckout = new Panel { Dock = DockStyle.Bottom, Height = 196, Padding = new Padding(0, 4, 0, 0) };
             Panel pnlDesgloseTotales = new Panel { Dock = DockStyle.Top, Height = 85, BackColor = Color.FromArgb(241, 245, 249), Padding = new Padding(10) };
 
             Label lblSubtotalCap = new Label { Text = "Subtotal", Font = new Font("Segoe UI", 8.5F), ForeColor = Color.FromArgb(100, 116, 139), Location = new Point(6, 6), AutoSize = true };
@@ -262,17 +266,18 @@ namespace SISTEMAACTUALIZADO
 
             pnlDesgloseTotales.Controls.AddRange(new Control[] { lblSubtotalCap, lblSubtotalValue, lblDescCap, lblDescuentoValue, lblTotalCap, lblTotalValue });
 
-            Panel pnlBotonesAccion = new Panel { Dock = DockStyle.Bottom, Height = 60, Padding = new Padding(0, 6, 0, 0) };
+            // Panel de Acciones con Cliente, Generar Ticket y Reservar Encargo
+            Panel pnlBotonesAccion = new Panel { Dock = DockStyle.Bottom, Height = 100, Padding = new Padding(0, 4, 0, 0) };
 
             btnCliente = new Button
             {
                 Text = "👤 Consumidor",
-                Location = new Point(0, 6),
-                Size = new Size(108, 48),
+                Location = new Point(0, 4),
+                Size = new Size(110, 44),
                 BackColor = Color.FromArgb(241, 245, 249),
                 ForeColor = Color.FromArgb(30, 41, 59),
                 FlatStyle = FlatStyle.Flat,
-                Font = new Font("Segoe UI", 8.5F, FontStyle.Bold),
+                Font = new Font("Segoe UI", 8.2F, FontStyle.Bold),
                 Cursor = Cursors.Hand
             };
             btnCliente.FlatAppearance.BorderColor = Color.FromArgb(226, 232, 240);
@@ -281,18 +286,32 @@ namespace SISTEMAACTUALIZADO
             Button btnGenerarTicket = new Button
             {
                 Text = "🎟️ F4 GENERAR TICKET",
-                Location = new Point(114, 6),
-                Size = new Size(196, 48),
+                Location = new Point(115, 4),
+                Size = new Size(195, 44),
                 BackColor = Color.FromArgb(16, 185, 129),
                 ForeColor = Color.White,
                 FlatStyle = FlatStyle.Flat,
-                Font = new Font("Segoe UI", 9.5F, FontStyle.Bold),
+                Font = new Font("Segoe UI", 9F, FontStyle.Bold),
                 Cursor = Cursors.Hand
             };
             btnGenerarTicket.FlatAppearance.BorderSize = 0;
             btnGenerarTicket.Click += BtnGenerarTicket_Click;
 
-            pnlBotonesAccion.Controls.AddRange(new Control[] { btnCliente, btnGenerarTicket });
+            btnReservar = new Button
+            {
+                Text = "📅 F8 RESERVAR / PEDIDO POR ENCARGO",
+                Location = new Point(0, 52),
+                Size = new Size(310, 40),
+                BackColor = Color.FromArgb(124, 58, 237),
+                ForeColor = Color.White,
+                FlatStyle = FlatStyle.Flat,
+                Font = new Font("Segoe UI", 8.8F, FontStyle.Bold),
+                Cursor = Cursors.Hand
+            };
+            btnReservar.FlatAppearance.BorderSize = 0;
+            btnReservar.Click += BtnReservarPedido_Click;
+
+            pnlBotonesAccion.Controls.AddRange(new Control[] { btnCliente, btnGenerarTicket, btnReservar });
             pnlBottomCheckout.Controls.AddRange(new Control[] { pnlBotonesAccion, pnlDesgloseTotales });
 
             pnlDerecha.Controls.AddRange(new Control[] { flowCarritoItems, pnlCarritoVacio, pnlBottomCheckout, pnlCartHeader });
@@ -926,6 +945,11 @@ namespace SISTEMAACTUALIZADO
                 BtnGenerarTicket_Click(this, EventArgs.Empty);
                 return true;
             }
+            else if (keyData == Keys.F8)
+            {
+                BtnReservarPedido_Click(this, EventArgs.Empty);
+                return true;
+            }
             else if (keyData == Keys.Escape)
             {
                 LimpiarCarritoActual();
@@ -1080,7 +1104,7 @@ namespace SISTEMAACTUALIZADO
                             itemExistente.Cantidad = nuevaCantidad;
                             itemExistente.PrecioLista1 = prod.PrecioUnitario;
                             itemExistente.PrecioUnitario = precioFinal;
-                            itemExistente.EsPesable = prod.EsPesable; // <-- Identificación real
+                            itemExistente.EsPesable = prod.EsPesable;
                         }
                         else
                         {
@@ -1091,7 +1115,7 @@ namespace SISTEMAACTUALIZADO
                                 PrecioLista1 = prod.PrecioUnitario,
                                 PrecioUnitario = precioFinal,
                                 Cantidad = nuevaCantidad,
-                                EsPesable = prod.EsPesable // <-- Identificación real
+                                EsPesable = prod.EsPesable
                             });
                         }
                     }
@@ -1135,7 +1159,6 @@ namespace SISTEMAACTUALIZADO
                 };
 
                 var prodOriginal = _productosCache.FirstOrDefault(p => p.ProductoID == item.ProductoID);
-                // Si el item ya viene marcado o si el producto en caché es pesable
                 bool esGramos = item.EsPesable || (prodOriginal != null && prodOriginal.EsPesable);
                 int pasoCarrito = esGramos ? 50 : 1;
 
@@ -1441,6 +1464,58 @@ namespace SISTEMAACTUALIZADO
             }
         }
 
+        // =========================================================================
+        // ACCIÓN: REGISTRAR RESERVA / ENCARGO
+        // =========================================================================
+        private void BtnReservarPedido_Click(object? sender, EventArgs e)
+        {
+            var cart = ObtenerCarritoActivo();
+            if (cart.Count == 0)
+            {
+                MessageBox.Show("El carro de compras está vacío. Agregue los productos que desea encargar.", "Carro Vacío", MessageBoxButtons.OK, MessageBoxIcon.Warning);
+                return;
+            }
+
+            // 1. Un pedido por encargo no puede ser anónimo
+            if (_clienteActual == null || string.IsNullOrWhiteSpace(_clienteSeleccionadoRut) || _clienteSeleccionadoNombre.StartsWith("Consumidor Final", StringComparison.OrdinalIgnoreCase))
+            {
+                MessageBox.Show("Para generar un pedido por encargo o reserva debe asociar un cliente con sus datos de contacto.", "Cliente Requerido", MessageBoxButtons.OK, MessageBoxIcon.Information);
+                BtnCliente_Click(sender, e);
+
+                if (_clienteActual == null || string.IsNullOrWhiteSpace(_clienteSeleccionadoRut) || _clienteSeleccionadoNombre.StartsWith("Consumidor Final", StringComparison.OrdinalIgnoreCase))
+                {
+                    return; // Si el usuario canceló la selección de cliente
+                }
+            }
+
+            // 2. Obtener turno de caja activo para asentar el abono si existe
+            string usuarioOperador = _usuarioActual?.NombreUsuario ?? "admin";
+            var turno = _cajaService.ObtenerTurnoAbierto(usuarioOperador);
+            int cajaTurnoId = turno?.CajaTurnoID ?? 0;
+
+            decimal total = cart.Sum(c => c.Subtotal);
+            var cartCopia = cart.ToList();
+            var usuarioSesion = _usuarioActual ?? new Usuario { NombreUsuario = usuarioOperador, NombreCompleto = usuarioOperador };
+
+            // 3. Abrir Modal de Creación de Reserva
+            using (var modalReserva = new FormCrearReservaModal(_clienteActual, cartCopia, total, usuarioSesion, cajaTurnoId))
+            {
+                if (modalReserva.ShowDialog(this) == DialogResult.OK && modalReserva.ReservaCreada != null)
+                {
+                    var reservaFinal = modalReserva.ReservaCreada;
+                    reservaFinal.NombreCliente = _clienteSeleccionadoNombre;
+
+                    // Imprimir Comprobante Térmico no tributario de Reserva / Anticipo
+                    var abonoEfectuado = reservaFinal.Pagos?.FirstOrDefault();
+                    _ticketPrintService.ImprimirComprobanteReserva(reservaFinal, abonoEfectuado, usuarioOperador);
+
+                    // Dejar libre el terminal de venta para la siguiente atención
+                    LimpiarCarritoActual();
+                    AsignarClienteActivo(null);
+                }
+            }
+        }
+
         private void AsignarClienteActivo(Cliente? cliente)
         {
             _clienteActual = cliente;
@@ -1574,7 +1649,6 @@ namespace SISTEMAACTUALIZADO
 
         public static void Mostrar(Control tarjeta, Image? img, string nombre, string precio, string codigo, string stock, Color stockColor)
         {
-            // Si ya está mostrándose para la misma tarjeta, no la recreamos ni parpadeamos
             if (_instanciaActual != null && _controlOrigenActual == tarjeta && !_instanciaActual.IsDisposed)
             {
                 return;

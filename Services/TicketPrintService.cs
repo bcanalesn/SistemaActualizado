@@ -323,5 +323,129 @@ namespace SISTEMAACTUALIZADO.Services
                 MessageBox.Show($"No se pudo conectar a la impresora de tickets: {ex.Message}", "Aviso Impresión", MessageBoxButtons.OK, MessageBoxIcon.Warning);
             }
         }
+        public void ImprimirComprobanteReserva(Reserva reserva, ReservaPago? abonoInicial, string cajero)
+        {
+            try
+            {
+                ConfiguracionEmpresa emp;
+                try
+                {
+                    emp = ObtenerDatosEmpresa();
+                }
+                catch
+                {
+                    emp = new ConfiguracionEmpresa { RazonSocial = "MI LOCAL COMERCIAL", Rut = "76.xxx.xxx-x" };
+                }
+
+                PrintDocument pd = new PrintDocument();
+                pd.PrintController = new StandardPrintController();
+
+                pd.PrintPage += (s, e) =>
+                {
+                    Graphics g = e.Graphics;
+                    if (g == null) return;
+
+                    int width = 285;
+                    int y = 10;
+
+                    using Font fontTitle = new Font("Segoe UI", 11F, FontStyle.Bold);
+                    using Font fontBold = new Font("Segoe UI", 8.5F, FontStyle.Bold);
+                    using Font fontRegular = new Font("Segoe UI", 8F, FontStyle.Regular);
+                    using Font fontSmall = new Font("Segoe UI", 7.5F, FontStyle.Regular);
+                    using StringFormat sfCenter = new StringFormat { Alignment = StringAlignment.Center };
+                    using StringFormat sfRight = new StringFormat { Alignment = StringAlignment.Far };
+
+                    // Encabezado
+                    g.DrawString(emp.RazonSocial, fontTitle, Brushes.Black, new RectangleF(0, y, width, 22), sfCenter);
+                    y += 22;
+                    g.DrawString($"R.U.T.: {emp.Rut}", fontRegular, Brushes.Black, new RectangleF(0, y, width, 16), sfCenter);
+                    y += 18;
+
+                    g.DrawString("COMPROBANTE DE RESERVA / ENCARGO", fontBold, Brushes.Black, new RectangleF(0, y, width, 18), sfCenter);
+                    y += 16;
+                    g.DrawString("(DOCUMENTO NO TRIBUTARIO)", fontSmall, Brushes.Black, new RectangleF(0, y, width, 16), sfCenter);
+                    y += 18;
+
+                    g.DrawString("--------------------------------------------------", fontRegular, Brushes.Black, 0, y);
+                    y += 14;
+
+                    g.DrawString($"CÓDIGO      : {reserva.CodigoReserva}", fontBold, Brushes.Black, 5, y);
+                    y += 16;
+                    g.DrawString($"Fecha Reg.  : {reserva.FechaRegistro:dd/MM/yyyy HH:mm}", fontRegular, Brushes.Black, 5, y);
+                    y += 16;
+                    g.DrawString($"Cliente     : {reserva.NombreCliente}", fontBold, Brushes.Black, 5, y);
+                    y += 16;
+                    if (!string.IsNullOrWhiteSpace(reserva.TelefonoCliente))
+                    {
+                        g.DrawString($"Teléfono    : {reserva.TelefonoCliente}", fontRegular, Brushes.Black, 5, y);
+                        y += 16;
+                    }
+
+                    g.DrawString("--------------------------------------------------", fontRegular, Brushes.Black, 0, y);
+                    y += 14;
+
+                    g.DrawString("FECHA Y HORA COMPROMISO DE ENTREGA:", fontSmall, Brushes.Black, new RectangleF(0, y, width, 16), sfCenter);
+                    y += 16;
+                    g.DrawString($">>> {reserva.FechaEntregaPactada:dddd dd/MM/yyyy HH:mm} hrs <<<", fontBold, Brushes.Black, new RectangleF(0, y, width, 20), sfCenter);
+                    y += 22;
+
+                    if (!string.IsNullOrWhiteSpace(reserva.Observaciones))
+                    {
+                        g.DrawString("Notas / Dedicatoria:", fontBold, Brushes.Black, 5, y);
+                        y += 15;
+                        g.DrawString(reserva.Observaciones, fontRegular, Brushes.Black, new RectangleF(5, y, width - 10, 36));
+                        y += 38;
+                    }
+
+                    g.DrawString("--------------------------------------------------", fontRegular, Brushes.Black, 0, y);
+                    y += 14;
+
+                    g.DrawString("CANT   PRODUCTO", fontBold, Brushes.Black, 5, y);
+                    g.DrawString("SUBTOTAL", fontBold, Brushes.Black, new RectangleF(0, y, width - 5, 18), sfRight);
+                    y += 16;
+
+                    foreach (var item in reserva.Detalles)
+                    {
+                        string nom = item.NombreProducto.Length > 18 ? item.NombreProducto.Substring(0, 16) + ".." : item.NombreProducto;
+                        string cantStr = item.EsPesable ? $"{item.Cantidad}g" : $"{item.Cantidad}x";
+                        g.DrawString($"{cantStr,-6} {nom}", fontRegular, Brushes.Black, 5, y);
+                        g.DrawString(MonedaHelper.Formatear(item.Subtotal, conSigno: true), fontRegular, Brushes.Black, new RectangleF(0, y, width - 5, 18), sfRight);
+                        y += 16;
+                    }
+
+                    g.DrawString("--------------------------------------------------", fontRegular, Brushes.Black, 0, y);
+                    y += 14;
+
+                    g.DrawString("TOTAL PEDIDO     :", fontBold, Brushes.Black, 5, y);
+                    g.DrawString(MonedaHelper.Formatear(reserva.TotalPedido, conSigno: true), fontBold, Brushes.Black, new RectangleF(0, y, width - 5, 18), sfRight);
+                    y += 18;
+
+                    decimal abonoMonto = abonoInicial != null ? abonoInicial.Monto : reserva.TotalAbonado;
+                    string abonoMedio = abonoInicial != null ? $" ({abonoInicial.MedioPago})" : "";
+                    g.DrawString($"ABONO INICIAL{abonoMedio} :", fontRegular, Brushes.Black, 5, y);
+                    g.DrawString(MonedaHelper.Formatear(abonoMonto, conSigno: true), fontRegular, Brushes.Black, new RectangleF(0, y, width - 5, 18), sfRight);
+                    y += 18;
+
+                    g.DrawString("SALDO PENDIENTE  :", fontTitle, Brushes.Black, 5, y);
+                    g.DrawString(MonedaHelper.Formatear(reserva.SaldoPendiente, conSigno: true), fontTitle, Brushes.Black, new RectangleF(0, y, width - 5, 22), sfRight);
+                    y += 24;
+
+                    g.DrawString("--------------------------------------------------", fontRegular, Brushes.Black, 0, y);
+                    y += 14;
+
+                    g.DrawString($"Atendido por: {cajero}", fontSmall, Brushes.Black, new RectangleF(0, y, width, 16), sfCenter);
+                    y += 16;
+                    g.DrawString("Presente este ticket al retirar su encargo.", fontSmall, Brushes.Black, new RectangleF(0, y, width, 16), sfCenter);
+                    y += 15;
+                    g.DrawString("La Boleta Electrónica se emitirá al momento de la entrega final.", fontSmall, Brushes.Black, new RectangleF(0, y, width, 28), sfCenter);
+                };
+
+                pd.Print();
+            }
+            catch (Exception ex)
+            {
+                MessageBox.Show($"No se pudo imprimir el comprobante de reserva: {ex.Message}", "Aviso Impresora", MessageBoxButtons.OK, MessageBoxIcon.Warning);
+            }
+        }
     }
 }
