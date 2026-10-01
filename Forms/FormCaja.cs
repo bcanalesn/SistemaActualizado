@@ -332,6 +332,31 @@ namespace SISTEMAACTUALIZADO
             dgvDetalleTicket.Columns.Add(new DataGridViewTextBoxColumn { Name = "Precio", DataPropertyName = "Precio", HeaderText = "PRECIO UNIT.", FillWeight = 23, DefaultCellStyle = estiloMonedaCL });
             dgvDetalleTicket.Columns.Add(new DataGridViewTextBoxColumn { Name = "SubTotal", DataPropertyName = "SubTotal", HeaderText = "SUBTOTAL", FillWeight = 23, DefaultCellStyle = estiloMonedaCL });
             ConfigurarEstiloTabla(dgvDetalleTicket);
+            dgvDetalleTicket.CellFormatting += (s, e) =>
+            {
+                if (e.RowIndex < 0 || e.RowIndex >= dgvDetalleTicket.Rows.Count) return;
+
+                string colName = dgvDetalleTicket.Columns[e.ColumnIndex].Name;
+                if (colName == "Cantidad" && e.Value != null)
+                {
+                    if (int.TryParse(e.Value.ToString(), out int cant))
+                    {
+                        // Verificamos si en la fila el precio unitario corresponde a gramos
+                        var fila = dgvDetalleTicket.Rows[e.RowIndex].DataBoundItem;
+                        // Si la cantidad es granular, formateamos en g o Kg
+                        if (cant >= 50)
+                        {
+                            e.Value = (cant >= 1000 && cant % 1000 == 0) ? $"{cant / 1000} Kg" : $"{cant} g";
+                            e.FormattingApplied = true;
+                        }
+                        else
+                        {
+                            e.Value = $"{cant} un";
+                            e.FormattingApplied = true;
+                        }
+                    }
+                }
+            };
 
             pnlCardDetalle.Controls.Add(dgvDetalleTicket);
             pnlCardDetalle.Controls.Add(lblTitDet);
@@ -1139,7 +1164,9 @@ namespace SISTEMAACTUALIZADO
                     ProductoID = item.IdProducto,
                     Nombre = item.NmbProducto ?? "Producto",
                     PrecioUnitario = item.Precio,
-                    Cantidad = item.Cantidad
+                    Cantidad = item.Cantidad,
+                    // Si la cantidad es granular (>= 50) y el precio unitario base es menor a 100, es peso en gramos
+                    EsPesable = (item.Cantidad >= 50 && item.Precio > 0 && item.Precio < 100)
                 }).ToList();
 
                 MessageBox.Show($"¡{tipoDoc.ToUpper()} N° {folioOficial} PROCESADA CON ÉXITO!\n\n" +

@@ -428,26 +428,21 @@ namespace SISTEMAACTUALIZADO.Modals
         {
             if (_productoAEditar != null)
             {
+                chkEsPesable.Checked = _productoAEditar.EsPesable;
                 txtCodigoBarra.Text = _productoAEditar.CodigoBarra;
                 txtNombre.Text = _productoAEditar.Nombre;
                 cbCategoria.Text = !string.IsNullOrWhiteSpace(_productoAEditar.Categoria) ? _productoAEditar.Categoria : "General";
                 cbFamilia.Text = !string.IsNullOrWhiteSpace(_productoAEditar.NFamilia) ? _productoAEditar.NFamilia : cbCategoria.Text;
 
-                // Marcar checkbox de pesable
-                chkEsPesable.Checked = _productoAEditar.EsPesable;
-                ActualizarEtiquetasSegunModalidadPeso();
-
-                // Conversión de visualización si es pesable: multiplicar x1000 para ver precios por kilo
-                decimal factorConversion = _productoAEditar.EsPesable ? 1000m : 1m;
-                decimal costoMostrar = _productoAEditar.PrecioCosto * factorConversion;
-                decimal precioMostrar = _productoAEditar.PrecioUnitario * factorConversion;
-
-                txtPrecioCosto.Text = MonedaHelper.Formatear(costoMostrar);
+                // Si es pesable, en la UI se presenta por kilo (multiplicado por 1000)
+                decimal factor = _productoAEditar.EsPesable ? 1000m : 1m;
+                txtPrecioCosto.Text = MonedaHelper.Formatear(_productoAEditar.PrecioCosto * factor);
+                txtPrecioUnitario.Text = MonedaHelper.Formatear(_productoAEditar.PrecioUnitario * factor);
 
                 int listaIdx = Math.Max(1, Math.Min(10, _productoAEditar.ListaDefectoPOS)) - 1;
                 cbListaPrecioPOS.SelectedIndex = listaIdx;
 
-                txtPrecioUnitario.Text = MonedaHelper.Formatear(precioMostrar);
+                // El stock en la BD de un pesable se almacena en gramos
                 txtStockActual.Text = _productoAEditar.Stock.ToString();
                 txtStockMinimo.Text = _productoAEditar.StockMinimo.ToString();
 
@@ -459,6 +454,7 @@ namespace SISTEMAACTUALIZADO.Modals
                 }
 
                 CargarEscalaDesdeBD(_productoAEditar.ProductoID);
+                // NO ejecutamos RecalcularPrecioSegunLista() aquí para evitar pisar el precio guardado
             }
         }
 
@@ -505,6 +501,9 @@ namespace SISTEMAACTUALIZADO.Modals
 
         private void RecalcularPrecioSegunLista()
         {
+            // Si estamos editando y los campos ya fueron cargados, no sobreescribir automáticamente
+            if (_productoAEditar != null && this.Visible) return;
+
             decimal costo = MonedaHelper.Limpiar(txtPrecioCosto.Text);
             if (costo <= 0) return;
 
@@ -686,17 +685,17 @@ namespace SISTEMAACTUALIZADO.Modals
                 return;
             }
 
-            decimal costoIngresado = MonedaHelper.Limpiar(txtPrecioCosto.Text);
-            decimal pvpIngresado = MonedaHelper.Limpiar(txtPrecioUnitario.Text);
+            decimal costoUI = MonedaHelper.Limpiar(txtPrecioCosto.Text);
+            decimal pvpUI = MonedaHelper.Limpiar(txtPrecioUnitario.Text);
             int.TryParse(txtStockActual.Text.Trim(), out int stockActual);
             int.TryParse(txtStockMinimo.Text.Trim(), out int stockMin);
 
             bool esPesable = chkEsPesable.Checked;
-
-            // Factor de conversión hacia base de datos: si es pesable se guarda por gramo (/ 1000)
             decimal divisor = esPesable ? 1000m : 1m;
-            decimal costoInterno = divisor > 0 ? (costoIngresado / divisor) : 0;
-            decimal pvpInterno = divisor > 0 ? (pvpIngresado / divisor) : 0;
+
+            // Valores convertidos para persistencia (base unitaria / gramo)
+            decimal costoBase = costoUI / divisor;
+            decimal pvpBase = pvpUI / divisor;
 
             int listaSeleccionada = rbModoEscala.Checked ? 1 : (cbListaPrecioPOS.SelectedIndex + 1);
 
@@ -704,35 +703,34 @@ namespace SISTEMAACTUALIZADO.Modals
             {
                 var productoGuardar = _productoAEditar ?? new Producto();
 
+                productoGuardar.EsPesable = esPesable;
                 productoGuardar.CodigoBarra = string.IsNullOrWhiteSpace(txtCodigoBarra.Text) 
                     ? "GEN-" + DateTime.Now.Ticks.ToString().Substring(12) 
                     : txtCodigoBarra.Text.Trim();
                 productoGuardar.Nombre = nombre;
                 productoGuardar.Categoria = cbCategoria.Text.Trim();
                 productoGuardar.NFamilia = cbFamilia.Text.Trim();
-                productoGuardar.EsPesable = esPesable;
                 productoGuardar.ListaDefectoPOS = listaSeleccionada;
-                productoGuardar.Stock = stockActual;
-                productoGuardar.StockMinimo = stockMin > 0 ? stockMin : (esPesable ? 500 : 5);
+                productoGuardar.Stock = stockActual; // Se guardan los gramos completos (ej: 10000)
+                productoGuardar.StockMinimo = stockMin > 0 ? stockMin : 5;
                 productoGuardar.ImagenPath = _rutaImagenSeleccionada;
                 productoGuardar.Estado = true;
                 productoGuardar.FchUpd = DateTime.Now;
 
-                // Recalcula en cascada de Lista 1 a Lista 10 según la matriz de márgenes
-                if (costoInterno > 0)
+                // Aplicar costos y listas respetando el precio ingresado en pantalla
+                if (costoBase > 0)
                 {
-                    ProductoService.AplicarNuevoCostoYRecalcularListas(productoGuardar, costoInterno);
-
-                    // Si el usuario fijó un precio manual en la caja de texto (L1), se respeta
-                    if (pvpInterno > 0)
-                    {
-                        productoGuardar.PrecioUnitario = pvpInterno;
-                    }
+                    ProductoService.AplicarNuevoCostoYRecalcularListas(productoGuardar, costoBase);
                 }
                 else
                 {
                     productoGuardar.PrecioCosto = 0;
-                    productoGuardar.PrecioUnitario = pvpInterno;
+                }
+
+                // El precio fijado en el formulario prevalece sobre el margen automático
+                if (pvpBase > 0)
+                {
+                    productoGuardar.PrecioUnitario = pvpBase;
                 }
 
                 var tramos = _filasTramos.Select(f => new TramoEscalaDTO

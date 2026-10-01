@@ -185,10 +185,23 @@ namespace SISTEMAACTUALIZADO.Services
 
             foreach (var item in items)
             {
-                string desc = item.Nombre.Length > 20 ? item.Nombre.Substring(0, 20) : item.Nombre;
+                string desc = item.Nombre.Length > 19 ? item.Nombre.Substring(0, 19) : item.Nombre;
                 
-                // Formato diferenciado según tipo de venta
-                string textoCantidad = item.EsPesable ? $"{item.Cantidad}g" : $"{item.Cantidad,2} x";
+                // Detecta si viene marcado como pesable, o si el precio es por gramo (típicamente < 100 pesos) y cantidad >= 50g
+                bool esPesable = item.EsPesable || (item.Cantidad >= 50 && item.PrecioUnitario > 0 && item.PrecioUnitario < 100);
+
+                string textoCantidad;
+                if (esPesable)
+                {
+                    textoCantidad = (item.Cantidad >= 1000 && item.Cantidad % 1000 == 0)
+                        ? $"{item.Cantidad / 1000}Kg"
+                        : $"{item.Cantidad}g";
+                }
+                else
+                {
+                    textoCantidad = $"{item.Cantidad,2} x";
+                }
+
                 g.DrawString($"{textoCantidad,-6} {desc}", fontSub, brushText, 15, y);
                 g.DrawString(MonedaHelper.Formatear(item.Subtotal, conSigno: true), fontSub, brushText, width - 85, y);
                 y += 18;
