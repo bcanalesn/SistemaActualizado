@@ -375,6 +375,29 @@ namespace SISTEMAACTUALIZADO.Services
                 return idx;
             return 1;
         }
+        public string ObtenerSiguienteCodigoBarraSugerido()
+        {
+            using var db = new AppDbContext();
+
+            // 1. Buscar todos los códigos de barra que sean exclusivamente números
+            var codigosNumericos = db.Productos
+                .AsNoTracking()
+                .Select(p => p.CodigoBarra)
+                .Where(c => !string.IsNullOrEmpty(c))
+                .ToList()
+                .Where(c => long.TryParse(c, out _))
+                .Select(c => long.Parse(c))
+                .ToList();
+
+            if (codigosNumericos.Count > 0)
+            {
+                long maxCodigo = codigosNumericos.Max();
+                return (maxCodigo + 1).ToString();
+            }
+
+            // Código inicial por defecto si no hubiera ninguno numérico registrado
+            return "780123456791";
+        }
 
         public static decimal[] ObtenerMargenesConfigurados()
         {
@@ -401,6 +424,14 @@ namespace SISTEMAACTUALIZADO.Services
             if (costoNeto <= 0 || margenPorcentaje <= 0) return 0m;
             decimal neto = costoNeto * (1m + (margenPorcentaje / 100m));
             decimal bruto = neto * 1.19m;
+
+            // Si el costo es menor a $50 (es un valor por gramo de producto pesable),
+            // NO se redondea a la decena para no destruir la precisión decimal.
+            if (costoNeto < 50m)
+            {
+                return Math.Round(bruto, 4); // 4 decimales de precisión para el gramo
+            }
+
             return redondear ? Math.Round(bruto / 10m, MidpointRounding.AwayFromZero) * 10m : Math.Round(bruto, 0);
         }
 
@@ -410,16 +441,38 @@ namespace SISTEMAACTUALIZADO.Services
             margenes ??= ObtenerMargenesConfigurados();
 
             prod.PrecioCosto = nuevoCostoNeto;
-            if (margenes[0] > 0) prod.PrecioUnitario = CalcularPrecioVenta(nuevoCostoNeto, margenes[0]);
-            prod.Precio2 = margenes[1] > 0 ? CalcularPrecioVenta(nuevoCostoNeto, margenes[1]) : 0m;
-            prod.Precio3 = margenes[2] > 0 ? CalcularPrecioVenta(nuevoCostoNeto, margenes[2]) : 0m;
-            prod.Precio4 = margenes[3] > 0 ? CalcularPrecioVenta(nuevoCostoNeto, margenes[3]) : 0m;
-            prod.Precio5 = margenes[4] > 0 ? CalcularPrecioVenta(nuevoCostoNeto, margenes[4]) : 0m;
-            prod.Precio6 = margenes[5] > 0 ? CalcularPrecioVenta(nuevoCostoNeto, margenes[5]) : 0m;
-            prod.Precio7 = margenes[6] > 0 ? CalcularPrecioVenta(nuevoCostoNeto, margenes[6]) : 0m;
-            prod.Precio8 = margenes[7] > 0 ? CalcularPrecioVenta(nuevoCostoNeto, margenes[7]) : 0m;
-            prod.Precio9 = margenes[8] > 0 ? CalcularPrecioVenta(nuevoCostoNeto, margenes[8]) : 0m;
-            prod.Precio10 = margenes[9] > 0 ? CalcularPrecioVenta(nuevoCostoNeto, margenes[9]) : 0m;
+
+            // Si es pesable, calculamos primero el precio del kilo con redondeo comercial a la decena,
+            // y luego lo dividimos por 1000 para que la base del gramo sea exacta.
+            if (prod.EsPesable)
+            {
+                decimal costoKilo = nuevoCostoNeto * 1000m;
+
+                if (margenes[0] > 0) prod.PrecioUnitario = CalcularPrecioVenta(costoKilo, margenes[0], true) / 1000m;
+                prod.Precio2 = margenes[1] > 0 ? CalcularPrecioVenta(costoKilo, margenes[1], true) / 1000m : 0m;
+                prod.Precio3 = margenes[2] > 0 ? CalcularPrecioVenta(costoKilo, margenes[2], true) / 1000m : 0m;
+                prod.Precio4 = margenes[3] > 0 ? CalcularPrecioVenta(costoKilo, margenes[3], true) / 1000m : 0m;
+                prod.Precio5 = margenes[4] > 0 ? CalcularPrecioVenta(costoKilo, margenes[4], true) / 1000m : 0m;
+                prod.Precio6 = margenes[5] > 0 ? CalcularPrecioVenta(costoKilo, margenes[5], true) / 1000m : 0m;
+                prod.Precio7 = margenes[6] > 0 ? CalcularPrecioVenta(costoKilo, margenes[6], true) / 1000m : 0m;
+                prod.Precio8 = margenes[7] > 0 ? CalcularPrecioVenta(costoKilo, margenes[7], true) / 1000m : 0m;
+                prod.Precio9 = margenes[8] > 0 ? CalcularPrecioVenta(costoKilo, margenes[8], true) / 1000m : 0m;
+                prod.Precio10 = margenes[9] > 0 ? CalcularPrecioVenta(costoKilo, margenes[9], true) / 1000m : 0m;
+            }
+            else
+            {
+                if (margenes[0] > 0) prod.PrecioUnitario = CalcularPrecioVenta(nuevoCostoNeto, margenes[0]);
+                prod.Precio2 = margenes[1] > 0 ? CalcularPrecioVenta(nuevoCostoNeto, margenes[1]) : 0m;
+                prod.Precio3 = margenes[2] > 0 ? CalcularPrecioVenta(nuevoCostoNeto, margenes[2]) : 0m;
+                prod.Precio4 = margenes[3] > 0 ? CalcularPrecioVenta(nuevoCostoNeto, margenes[3]) : 0m;
+                prod.Precio5 = margenes[4] > 0 ? CalcularPrecioVenta(nuevoCostoNeto, margenes[4]) : 0m;
+                prod.Precio6 = margenes[5] > 0 ? CalcularPrecioVenta(nuevoCostoNeto, margenes[5]) : 0m;
+                prod.Precio7 = margenes[6] > 0 ? CalcularPrecioVenta(nuevoCostoNeto, margenes[6]) : 0m;
+                prod.Precio8 = margenes[7] > 0 ? CalcularPrecioVenta(nuevoCostoNeto, margenes[7]) : 0m;
+                prod.Precio9 = margenes[8] > 0 ? CalcularPrecioVenta(nuevoCostoNeto, margenes[8]) : 0m;
+                prod.Precio10 = margenes[9] > 0 ? CalcularPrecioVenta(nuevoCostoNeto, margenes[9]) : 0m;
+            }
+
             prod.FchUpd = DateTime.Now;
             prod.Sincro = 0;
         }

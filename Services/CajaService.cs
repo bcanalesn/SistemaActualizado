@@ -260,12 +260,29 @@ namespace SISTEMAACTUALIZADO.Services
 
             // 3. Sincronizar también las líneas de detalle
             var detalles = db.TVD2607.Where(d => d.idTve == ticket.idTve).ToList();
+            var idsProductos = detalles.Select(d => d.IdProducto).Distinct().ToList();
+            var productosPesablesIds = db.Productos
+                .AsNoTracking()
+                .Where(p => idsProductos.Contains(p.ProductoID) && p.EsPesable)
+                .Select(p => p.ProductoID)
+                .ToHashSet();
+
             foreach (var item in detalles)
             {
                 item.iddocDTE = iddoc;
                 item.Documento = tipoDoc;
                 item.NroDTE = folioOficial;
                 item.NroInT = ticketBd.nroInT;
+
+                // Si ya venía con "gr" o si el producto en catálogo está marcado como pesable
+                if (item.Unidad == "gr" || productosPesablesIds.Contains(item.IdProducto))
+                {
+                    item.Unidad = "gr";
+                }
+                else
+                {
+                    item.Unidad = "UN";
+                }
             }
 
             db.SaveChanges();

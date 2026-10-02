@@ -86,7 +86,7 @@ namespace SISTEMAACTUALIZADO.Services
                         Precio = item.PrecioUnitario,
                         SubTotal = item.Subtotal,
                         nmbVendedor = vendedor,
-                        Unidad = "UN"
+                        Unidad = item.EsPesable ? "gr" : "UN"
                     };
 
                     db.TVD2607.Add(detalle);
@@ -219,7 +219,7 @@ namespace SISTEMAACTUALIZADO.Services
                         Precio = item.PrecioUnitario,
                         SubTotal = item.Subtotal,
                         nmbVendedor = vendedor,
-                        Unidad = "UN"
+                        Unidad = item.EsPesable ? "gr" : "UN"
                     };
                     db.TVD2607.Add(detalle);
                 }
@@ -351,7 +351,7 @@ namespace SISTEMAACTUALIZADO.Services
                         Precio = item.PrecioUnitario,
                         SubTotal = item.Subtotal,
                         nmbVendedor = vendedor,
-                        Unidad = "UN"
+                        Unidad = item.EsPesable ? "gr" : "UN"
                     };
                     db.TVD2607.Add(detalle);
 
