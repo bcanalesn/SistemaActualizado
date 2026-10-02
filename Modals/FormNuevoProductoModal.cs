@@ -561,118 +561,23 @@ namespace SISTEMAACTUALIZADO.Modals
         }
         private void BtnBuscarGoogle_Click(object? sender, EventArgs e)
         {
-            string nombre = txtNombre.Text.Trim();
-            if (string.IsNullOrWhiteSpace(nombre))
+            if (!System.Net.NetworkInformation.NetworkInterface.GetIsNetworkAvailable())
             {
-                MessageBox.Show("Ingrese primero el nombre del producto para buscar imágenes.", "Aviso", MessageBoxButtons.OK, MessageBoxIcon.Information);
-                txtNombre.Focus();
+                MessageBox.Show("No se detecta conexión a internet para realizar la búsqueda en línea.", "Sin Conexión", MessageBoxButtons.OK, MessageBoxIcon.Warning);
                 return;
             }
 
+            string sugerencia = txtNombre.Text.Trim();
             string sku = txtCodigoBarra.Text.Trim();
 
-            // Filtros de búsqueda: Nombre del producto + fondo blanco + modo imágenes (udm=2) + fotos comerciales
-            string query = Uri.EscapeDataString($"{nombre} fondo blanco chile");
-            string urlGoogle = $"https://www.google.com/search?q={query}&udm=2&tbs=itp:photo";
-
-            try
+            using var modalBusqueda = new FormBuscarGoogleModal(sugerencia, sku);
+            if (modalBusqueda.ShowDialog(this) == DialogResult.OK && !string.IsNullOrEmpty(modalBusqueda.RutaImagenDescargada))
             {
-                // Limpiar portapapeles antes de abrir el navegador para evitar pegar imágenes anteriores
-                Clipboard.Clear();
+                _rutaImagenSeleccionada = modalBusqueda.RutaImagenDescargada;
 
-                var psi = new System.Diagnostics.ProcessStartInfo
-                {
-                    FileName = urlGoogle,
-                    UseShellExecute = true
-                };
-                System.Diagnostics.Process.Start(psi);
-
-                using (Form modalPegar = new Form
-                {
-                    Text = "Asignar Imagen desde Google",
-                    Size = new Size(430, 220),
-                    StartPosition = FormStartPosition.CenterParent,
-                    FormBorderStyle = FormBorderStyle.FixedDialog,
-                    MaximizeBox = false,
-                    MinimizeBox = false,
-                    BackColor = Color.White
-                })
-                {
-                    Label lblInstrucciones = new Label
-                    {
-                        Text = "1. En Google Imágenes, haz clic derecho sobre la foto que prefieras.\n" +
-                               "2. Elige 'Copiar imagen'.\n" +
-                               "3. Presiona el botón de abajo para guardarla y asignarla.",
-                        Location = new Point(20, 16),
-                        Size = new Size(375, 60),
-                        Font = new Font("Segoe UI", 9F),
-                        ForeColor = Color.FromArgb(51, 65, 85)
-                    };
-
-                    Button btnAsignar = new Button
-                    {
-                        Text = "📋 Pegar y Asignar Imagen",
-                        Location = new Point(20, 92),
-                        Size = new Size(375, 44),
-                        BackColor = Color.FromArgb(16, 185, 129),
-                        ForeColor = Color.White,
-                        FlatStyle = FlatStyle.Flat,
-                        Font = new Font("Segoe UI", 9.5F, FontStyle.Bold),
-                        Cursor = Cursors.Hand
-                    };
-                    btnAsignar.FlatAppearance.BorderSize = 0;
-
-                    btnAsignar.Click += (sBtn, eBtn) =>
-                    {
-                        if (!Clipboard.ContainsImage())
-                        {
-                            MessageBox.Show("Aún no has copiado ninguna imagen al portapapeles.\n\nEn Google, haz clic derecho sobre la foto y selecciona 'Copiar imagen'.", "Sin imagen", MessageBoxButtons.OK, MessageBoxIcon.Warning);
-                            return;
-                        }
-
-                        try
-                        {
-                            using Image imgPortapapeles = Clipboard.GetImage()!;
-                            string skuLimpio = string.IsNullOrWhiteSpace(sku) ? "PROD" : sku.Trim();
-
-                            // 1. Guardar temporalmente en el directorio Temp del sistema
-                            string rutaTemp = Path.Combine(Path.GetTempPath(), $"{skuLimpio}_{DateTime.Now.Ticks}.jpg");
-                            using (Bitmap bmp = new Bitmap(imgPortapapeles))
-                            {
-                                bmp.Save(rutaTemp, System.Drawing.Imaging.ImageFormat.Jpeg);
-                            }
-
-                            // 2. Reutilizar ImagenHelper para que se guarde tanto en la raíz como en bin/Debug
-                            string nombreRelativo = ImagenHelper.CopiarAImagenesYObtenerNombreRelativo(rutaTemp, skuLimpio);
-
-                            // 3. Eliminar el archivo temporal
-                            if (File.Exists(rutaTemp))
-                            {
-                                try { File.Delete(rutaTemp); } catch { }
-                            }
-
-                            // 4. Asignar y refrescar PictureBox
-                            _rutaImagenSeleccionada = nombreRelativo;
-                            pbFoto.Image?.Dispose();
-                            pbFoto.Image = ImagenHelper.CargarImagenSegura(_rutaImagenSeleccionada);
-                            pbFoto.Refresh();
-
-                            modalPegar.DialogResult = DialogResult.OK;
-                            modalPegar.Close();
-                        }
-                        catch (Exception ex)
-                        {
-                            MessageBox.Show($"Error al procesar la imagen: {ex.Message}", "Error", MessageBoxButtons.OK, MessageBoxIcon.Error);
-                        }
-                    };
-
-                    modalPegar.Controls.AddRange(new Control[] { lblInstrucciones, btnAsignar });
-                    modalPegar.ShowDialog(this);
-                }
-            }
-            catch (Exception ex)
-            {
-                MessageBox.Show($"No se pudo abrir el navegador: {ex.Message}", "Error", MessageBoxButtons.OK, MessageBoxIcon.Warning);
+                pbFoto.Image?.Dispose();
+                pbFoto.Image = ImagenHelper.CargarImagenSegura(_rutaImagenSeleccionada);
+                pbFoto.Refresh();
             }
         }
 
