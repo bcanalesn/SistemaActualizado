@@ -333,13 +333,13 @@ namespace SISTEMAACTUALIZADO.Services
                     select new PrecioEspecialItemDTO
                     {
                         IdEspecial = pe.IdEspecial,
-                        Producto = pr.Nombre,
-                        CostoBase = pr.PrecioCosto,
-                        PrecioEspecial = pe.PrecioEspecial,
+                        Producto = pr.EsPesable ? $"{pr.Nombre} (Kg)" : pr.Nombre,
+                        CostoBase = pr.EsPesable ? (pr.PrecioCosto * 1000m) : pr.PrecioCosto,
+                        PrecioEspecial = pr.EsPesable ? (pe.PrecioEspecial * 1000m) : pe.PrecioEspecial,
                         Desde = pe.FechaInicio,
                         Hasta = pe.FechaFin,
                         EstadoVigencia = (pe.FechaInicio <= hoy && pe.FechaFin >= hoy) ? "🟢 VIGENTE" : (pe.FechaFin < hoy ? "🔴 EXPIRADO" : "🟡 PROGRAMADO")
-                    }).Take(10).ToList();
+                    }).Take(20).ToList();
         }
 
         public void GuardarPrecioEspecial(PrecioEspecialCliente precioEspecial)

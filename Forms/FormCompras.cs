@@ -52,6 +52,8 @@ namespace SISTEMAACTUALIZADO
         private ListBox lstSugerenciasProductos = null!;
         private TextBox txtCantidadRecibida = null!;
         private TextBox txtPrecioCosto = null!;
+        private Label lblTitCantidadRecibida = null!;
+        private Label lblTitCostoNeto = null!;
         private TextBox txtPvpSugerido = null!;
         private Label lblCostoAnterior = null!;
         private const string PLACEHOLDER_PROD = "🔍 Buscar por Código o Nombre...";
@@ -358,8 +360,25 @@ namespace SISTEMAACTUALIZADO
             pnlProd.Controls.Add(lpr);
 
             txtCantidadRecibida = new TextBox { Text = "1", Font = new Font("Segoe UI", 9F, FontStyle.Bold), TextAlign = HorizontalAlignment.Center };
-            txtCantidadRecibida.KeyPress += (s, e) => { if (!char.IsControl(e.KeyChar) && !char.IsDigit(e.KeyChar)) e.Handled = true; };
+            txtCantidadRecibida.KeyPress += (s, e) =>
+            {
+                // Permite teclas de control (borrar, retroceso, tab)
+                if (char.IsControl(e.KeyChar)) return;
+
+                // Si es dígito, lo permite
+                if (char.IsDigit(e.KeyChar)) return;
+
+                // Permite coma o punto sólo si aún no existe uno en la caja de texto
+                if ((e.KeyChar == '.' || e.KeyChar == ',') && !txtCantidadRecibida.Text.Contains('.') && !txtCantidadRecibida.Text.Contains(','))
+                {
+                    return;
+                }
+
+                // Bloquea cualquier otro carácter
+                e.Handled = true;
+            };
             Panel pnlCant = EnvolverConLabel("CANT. RECIBIDA", txtCantidadRecibida);
+            lblTitCantidadRecibida = (Label)pnlCant.Controls[1];
             txtCantidadRecibida.KeyDown += (s, e) =>
             {
                 if (e.KeyCode == Keys.Enter)
@@ -373,6 +392,7 @@ namespace SISTEMAACTUALIZADO
 
             Panel pnlCosto = new Panel { Dock = DockStyle.Fill, Padding = new Padding(6, 0, 6, 0) };
             Label lcost = new Label { Text = "COSTO NETO ($)", Dock = DockStyle.Top, AutoSize = true, Font = new Font("Segoe UI", 7.5F, FontStyle.Bold), ForeColor = Color.FromArgb(100, 116, 139) };
+            lblTitCostoNeto = lcost;
             txtPrecioCosto = new TextBox { Text = "0", Font = new Font("Segoe UI", 9F, FontStyle.Bold), Dock = DockStyle.Top, Height = 24 };
             txtPrecioCosto.KeyPress += (s, e) => { if (!char.IsControl(e.KeyChar) && !char.IsDigit(e.KeyChar)) e.Handled = true; };
             txtPrecioCosto.TextChanged += (s, e) => 
@@ -721,7 +741,26 @@ namespace SISTEMAACTUALIZADO
             {
                 if (_esModoMercaderia)
                 {
-                    dgvDetalle.Rows.Add(item.NombreProducto, item.Cantidad, item.PrecioCostoUnitario, item.PvpSugerido, item.Subtotal);
+                    var prod = _productosCache.FirstOrDefault(p => p.ProductoID == item.ProductoID);
+                    string cantFormateada;
+                    decimal costoMostrar;
+                    decimal pvpMostrar;
+
+                    if (prod != null && prod.EsPesable)
+                    {
+                        decimal kilos = item.Cantidad / 1000m;
+                        cantFormateada = $"{kilos:0.##} Kg";
+                        costoMostrar = item.PrecioCostoUnitario * 1000m;
+                        pvpMostrar = item.PvpSugerido * 1000m;
+                    }
+                    else
+                    {
+                        cantFormateada = item.Cantidad.ToString();
+                        costoMostrar = item.PrecioCostoUnitario;
+                        pvpMostrar = item.PvpSugerido;
+                    }
+
+                    dgvDetalle.Rows.Add(item.NombreProducto, cantFormateada, costoMostrar, pvpMostrar, item.Subtotal);
                 }
                 else
                 {
@@ -749,24 +788,55 @@ namespace SISTEMAACTUALIZADO
                 return;
             }
 
-            decimal costo = MonedaHelper.Limpiar(txtPrecioCosto.Text);
-            if (!int.TryParse(txtCantidadRecibida.Text.Trim(), out int cant) || cant <= 0 || costo <= 0)
+            // Permitir punto o coma decimal para kilos
+            string cantTexto = txtCantidadRecibida.Text.Trim().Replace(",", ".");
+            if (!decimal.TryParse(cantTexto, System.Globalization.NumberStyles.Any, System.Globalization.CultureInfo.InvariantCulture, out decimal cantIngresada) || cantIngresada <= 0)
             {
-                MessageBox.Show("Ingrese una cantidad y costo válidos.", "Validación", MessageBoxButtons.OK, MessageBoxIcon.Warning);
+                MessageBox.Show("Ingrese una cantidad válida.", "Validación", MessageBoxButtons.OK, MessageBoxIcon.Warning);
+                return;
+            }
+
+            decimal costoIngresado = MonedaHelper.Limpiar(txtPrecioCosto.Text);
+            if (costoIngresado <= 0)
+            {
+                MessageBox.Show("Ingrese un costo válido.", "Validación", MessageBoxButtons.OK, MessageBoxIcon.Warning);
                 return;
             }
 
             decimal pvp = MonedaHelper.Limpiar(txtPvpSugerido.Text);
+
+            int cantStock;
+            decimal subtotalLinea;
+            decimal costoBaseUnitario;
+            decimal pvpBaseUnitario;
+
+            if (_productoSeleccionado.EsPesable)
+            {
+                // En pesables: cantIngresada son Kilos. Se convierte a gramos para la BD
+                cantStock = (int)Math.Round(cantIngresada * 1000m);
+                // El subtotal de la factura es Kilos * Costo del Kilo
+                subtotalLinea = Math.Round(cantIngresada * costoIngresado, 0);
+                // Costo por gramo para el producto
+                costoBaseUnitario = costoIngresado / 1000m;
+                pvpBaseUnitario = pvp / 1000m;
+            }
+            else
+            {
+                cantStock = (int)cantIngresada;
+                subtotalLinea = cantStock * costoIngresado;
+                costoBaseUnitario = costoIngresado;
+                pvpBaseUnitario = pvp > 0 ? pvp : _productoSeleccionado.PrecioUnitario;
+            }
 
             _detalleFactura.Add(new DetalleCompra
             {
                 TipoItem = "MERCADERIA",
                 ProductoID = _productoSeleccionado.ProductoID,
                 NombreProducto = _productoSeleccionado.Nombre,
-                Cantidad = cant,
-                PrecioCostoUnitario = costo,
-                PvpSugerido = pvp > 0 ? pvp : _productoSeleccionado.PrecioUnitario,
-                Subtotal = cant * costo,
+                Cantidad = cantStock, // Gramos en pesables, unidades en unitarios
+                PrecioCostoUnitario = costoBaseUnitario,
+                PvpSugerido = pvpBaseUnitario,
+                Subtotal = subtotalLinea,
                 AfectaStock = true
             });
 
@@ -1109,10 +1179,24 @@ namespace SISTEMAACTUALIZADO
                 txtBuscarProducto.ForeColor = Color.FromArgb(37, 99, 235);
                 lstSugerenciasProductos.Visible = false;
 
-                lblCostoAnterior.Text = $"Costo Ant: {MonedaHelper.Formatear(p.PrecioCosto, conSigno: true)}";
-                txtPrecioCosto.Text = MonedaHelper.Formatear(p.PrecioCosto);
-                CalcularPreviewPrecioVenta();
+                // Detección automática de producto pesable
+                if (p.EsPesable)
+                {
+                    lblTitCantidadRecibida.Text = "CANT. RECIBIDA (KG)";
+                    lblTitCostoNeto.Text = "COSTO NETO / KG ($)";
+                    decimal costoKg = p.PrecioCosto * 1000m;
+                    lblCostoAnterior.Text = $"Costo Ant: {MonedaHelper.Formatear(costoKg, conSigno: true)}/Kg";
+                    txtPrecioCosto.Text = MonedaHelper.Formatear(costoKg);
+                }
+                else
+                {
+                    lblTitCantidadRecibida.Text = "CANT. RECIBIDA";
+                    lblTitCostoNeto.Text = "COSTO NETO ($)";
+                    lblCostoAnterior.Text = $"Costo Ant: {MonedaHelper.Formatear(p.PrecioCosto, conSigno: true)}";
+                    txtPrecioCosto.Text = MonedaHelper.Formatear(p.PrecioCosto);
+                }
 
+                CalcularPreviewPrecioVenta();
                 txtCantidadRecibida.Focus();
                 txtCantidadRecibida.SelectAll();
             }
@@ -1128,6 +1212,9 @@ namespace SISTEMAACTUALIZADO
             txtPrecioCosto.Text = "0";
             lblCostoAnterior.Text = "Costo Ant: $ 0";
             txtPvpSugerido.Text = "0";
+
+            if (lblTitCantidadRecibida != null) lblTitCantidadRecibida.Text = "CANT. RECIBIDA";
+            if (lblTitCostoNeto != null) lblTitCostoNeto.Text = "COSTO NETO ($)";
         }
 
         private void LstSugerenciasProductos_Click(object? sender, EventArgs e)
@@ -1144,7 +1231,9 @@ namespace SISTEMAACTUALIZADO
             {
                 var margenes = ProductoService.ObtenerMargenesConfigurados();
                 decimal margenL1 = _productoSeleccionado.MargenGanancia > 0 ? _productoSeleccionado.MargenGanancia : margenes[0];
-                decimal precioVentaL1 = ProductoService.CalcularPrecioVenta(costo, margenL1);
+                
+                // Si es pesable, 'costo' es por Kilo. Se calcula el precio de venta por Kilo
+                decimal precioVentaL1 = ProductoService.CalcularPrecioVenta(costo, margenL1, redondear: true);
                 txtPvpSugerido.Text = MonedaHelper.Formatear(precioVentaL1);
             }
             else

@@ -17,6 +17,7 @@ namespace SISTEMAACTUALIZADO.Modals
         private ComboBox cbProductos = null!;
         private Label lblCostoReferencia = null!;
         private TextBox txtPrecioEspecial = null!;
+        private Label lblTitPrecioEspecial = null!;
         private DateTimePicker dtpInicio = null!;
         private DateTimePicker dtpFin = null!;
         private Button btnGuardar = null!;
@@ -149,6 +150,7 @@ namespace SISTEMAACTUALIZADO.Modals
             txtPrecioEspecial.KeyPress += (s, e) => { if (!char.IsDigit(e.KeyChar) && !char.IsControl(e.KeyChar)) e.Handled = true; };
             txtPrecioEspecial.TextChanged += (s, e) => MonedaHelper.AplicarMascaraEnVivo(txtPrecioEspecial);
             Panel pnlGrpPrecio = CrearGrupoConCaja("PRECIO ESPECIAL ($)", txtPrecioEspecial, 175);
+            lblTitPrecioEspecial = (Label)pnlGrpPrecio.Controls[0]; // 👈 Guardamos referencia
             pnlGrpPrecio.Location = new Point(385, 2);
 
             pnlFila1.Controls.AddRange(new Control[] { pnlGrpProd, lblCostoReferencia, pnlGrpPrecio });
@@ -260,7 +262,18 @@ namespace SISTEMAACTUALIZADO.Modals
         {
             if (cbProductos.SelectedItem is Producto prod)
             {
-                lblCostoReferencia.Text = $"Costo Neto: {MonedaHelper.Formatear(prod.PrecioCosto, conSigno: true)}  |  P. Venta Normal: {MonedaHelper.Formatear(prod.PrecioUnitario, conSigno: true)}";
+                if (prod.EsPesable)
+                {
+                    decimal costoKg = prod.PrecioCosto * 1000m;
+                    decimal pvpKg = prod.PrecioUnitario * 1000m;
+                    lblCostoReferencia.Text = $"Costo Neto/Kg: {MonedaHelper.Formatear(costoKg, conSigno: true)}  |  P. Venta Normal/Kg: {MonedaHelper.Formatear(pvpKg, conSigno: true)}";
+                    if (lblTitPrecioEspecial != null) lblTitPrecioEspecial.Text = "PRECIO ESPECIAL / KG ($)";
+                }
+                else
+                {
+                    lblCostoReferencia.Text = $"Costo Neto: {MonedaHelper.Formatear(prod.PrecioCosto, conSigno: true)}  |  P. Venta Normal: {MonedaHelper.Formatear(prod.PrecioUnitario, conSigno: true)}";
+                    if (lblTitPrecioEspecial != null) lblTitPrecioEspecial.Text = "PRECIO ESPECIAL ($)";
+                }
             }
         }
 
@@ -363,8 +376,8 @@ namespace SISTEMAACTUALIZADO.Modals
 
         private void BtnGuardar_Click(object? sender, EventArgs e)
         {
-            decimal precio = MonedaHelper.Limpiar(txtPrecioEspecial.Text);
-            if (cbProductos.SelectedItem is not Producto prod || precio <= 0)
+            decimal precioIngresado = MonedaHelper.Limpiar(txtPrecioEspecial.Text);
+            if (cbProductos.SelectedItem is not Producto prod || precioIngresado <= 0)
             {
                 MessageBox.Show("Seleccione un producto y digite un precio especial válido.", "Validación", MessageBoxButtons.OK, MessageBoxIcon.Warning);
                 return;
@@ -388,10 +401,14 @@ namespace SISTEMAACTUALIZADO.Modals
                 return;
             }
 
-            if (precio < prod.PrecioCosto)
+            // Costo comparable según si es pesable o unitario
+            decimal costoComparar = prod.EsPesable ? (prod.PrecioCosto * 1000m) : prod.PrecioCosto;
+
+            if (precioIngresado < costoComparar)
             {
+                string unidad = prod.EsPesable ? "/Kg" : "";
                 var confirmMargenNegativo = MessageBox.Show(
-                    $"⚠️ ADVERTENCIA DE MARGEN NEGATIVO\n\nEl precio pactado ({MonedaHelper.Formatear(precio, conSigno: true)}) es MENOR que el costo neto del producto ({MonedaHelper.Formatear(prod.PrecioCosto, conSigno: true)}).\n\n¿Desea registrarlo de todas formas?",
+                    $"⚠️ ADVERTENCIA DE MARGEN NEGATIVO\n\nEl precio pactado ({MonedaHelper.Formatear(precioIngresado, conSigno: true)}{unidad}) es MENOR que el costo neto ({MonedaHelper.Formatear(costoComparar, conSigno: true)}{unidad}).\n\n¿Desea registrarlo de todas formas?",
                     "Confirmar Precio Bajo Costo",
                     MessageBoxButtons.YesNo,
                     MessageBoxIcon.Warning
@@ -405,11 +422,14 @@ namespace SISTEMAACTUALIZADO.Modals
 
             try
             {
+                // Si es pesable, en la BD se persiste por gramo para que el POS calcule exacto
+                decimal precioFinalBD = prod.EsPesable ? (precioIngresado / 1000m) : precioIngresado;
+
                 var nuevo = new PrecioEspecialCliente
                 {
                     ClienteId = _cliente.IdCliente,
                     ProductoId = prod.ProductoID,
-                    PrecioEspecial = precio,
+                    PrecioEspecial = precioFinalBD,
                     FechaInicio = dtpInicio.Value.Date,
                     FechaFin = dtpFin.Value.Date,
                     Estado = true,

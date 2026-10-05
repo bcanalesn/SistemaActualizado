@@ -27,6 +27,8 @@ namespace SISTEMAACTUALIZADO.Modals
 
         // Configuración Producto Pesable
         private CheckBox chkEsPesable = null!;
+        private Label lblHeaderDesde = null!;
+        private Label lblHeaderHasta = null!;
 
         // Modalidad Precio POS
         private RadioButton rbModoListaFija = null!;
@@ -176,8 +178,12 @@ namespace SISTEMAACTUALIZADO.Modals
 
             Panel pnlHeaderGrid = new Panel { Location = new Point(14, 32), Size = new Size(600, 24), BackColor = Color.Transparent };
             pnlHeaderGrid.Controls.Add(new Label { Text = "Tramo", Location = new Point(4, 4), Size = new Size(45, 18), Font = new Font("Segoe UI", 8F, FontStyle.Bold), ForeColor = Color.FromArgb(100, 116, 139) });
-            pnlHeaderGrid.Controls.Add(new Label { Text = "Desde (unidades)", Location = new Point(70, 4), Size = new Size(110, 18), Font = new Font("Segoe UI", 8F, FontStyle.Bold), ForeColor = Color.FromArgb(100, 116, 139) });
-            pnlHeaderGrid.Controls.Add(new Label { Text = "Hasta (unidades)", Location = new Point(230, 4), Size = new Size(110, 18), Font = new Font("Segoe UI", 8F, FontStyle.Bold), ForeColor = Color.FromArgb(100, 116, 139) });
+
+            lblHeaderDesde = new Label { Text = "Desde (unidades)", Location = new Point(70, 4), Size = new Size(130, 18), Font = new Font("Segoe UI", 8F, FontStyle.Bold), ForeColor = Color.FromArgb(100, 116, 139) };
+            lblHeaderHasta = new Label { Text = "Hasta (unidades)", Location = new Point(230, 4), Size = new Size(130, 18), Font = new Font("Segoe UI", 8F, FontStyle.Bold), ForeColor = Color.FromArgb(100, 116, 139) };
+
+            pnlHeaderGrid.Controls.Add(lblHeaderDesde);
+            pnlHeaderGrid.Controls.Add(lblHeaderHasta);
             pnlHeaderGrid.Controls.Add(new Label { Text = "Lista de Precios", Location = new Point(370, 4), Size = new Size(200, 18), Font = new Font("Segoe UI", 8F, FontStyle.Bold), ForeColor = Color.FromArgb(100, 116, 139) });
 
             flpFilasTramos = new FlowLayoutPanel
@@ -317,6 +323,9 @@ namespace SISTEMAACTUALIZADO.Modals
                 lblSubCosto.Text = "Costo en pesos por kilogramo sin IVA.";
                 lblTitPrecioVenta.Text = "💲 Precio Venta por Kg (IVA Inc.)";
                 lblTitStockActual.Text = "📦 Stock en Gramos (ej: 5000g = 5kg)";
+
+                if (lblHeaderDesde != null) lblHeaderDesde.Text = "Desde (gramos)";
+                if (lblHeaderHasta != null) lblHeaderHasta.Text = "Hasta (gramos)";
             }
             else
             {
@@ -324,6 +333,16 @@ namespace SISTEMAACTUALIZADO.Modals
                 lblSubCosto.Text = "Costo en pesos por unidad sin IVA.";
                 lblTitPrecioVenta.Text = "💲 Precio Venta Base POS (IVA Inc.)";
                 lblTitStockActual.Text = "📦 Stock Actual (Editable)";
+
+                if (lblHeaderDesde != null) lblHeaderDesde.Text = "Desde (unidades)";
+                if (lblHeaderHasta != null) lblHeaderHasta.Text = "Hasta (unidades)";
+            }
+
+            // Si no estamos cargando datos desde la BD, refrescar los tramos con las sugerencias correctas
+            if (!_cargandoDatos && cbCantidadTramos != null)
+            {
+                int cant = cbCantidadTramos.SelectedIndex >= 0 ? cbCantidadTramos.SelectedIndex + 2 : 2;
+                RegenerarFilasTramos(cant);
             }
         }
 
@@ -383,18 +402,20 @@ namespace SISTEMAACTUALIZADO.Modals
             flpFilasTramos.Controls.Clear();
             _filasTramos.Clear();
 
-            decimal ultimoHasta = 5;
+            bool esPesable = chkEsPesable != null && chkEsPesable.Checked;
+            decimal pasoSugerido = esPesable ? 1000m : 5m;
+            decimal ultimoHasta = pasoSugerido;
 
             for (int i = 1; i <= totalTramos; i++)
             {
                 bool esPrimero = i == 1;
                 bool esUltimo = i == totalTramos;
 
-                var fila = new FilaTramoUI(i, esPrimero, esUltimo, ultimoHasta);
+                var fila = new FilaTramoUI(i, esPrimero, esUltimo, ultimoHasta, esPesable);
                 _filasTramos.Add(fila);
                 flpFilasTramos.Controls.Add(fila.Contenedor);
 
-                ultimoHasta = fila.ValorHasta + 5;
+                ultimoHasta = fila.ValorHasta + pasoSugerido;
             }
 
             for (int i = 0; i < _filasTramos.Count - 1; i++)
@@ -653,6 +674,9 @@ namespace SISTEMAACTUALIZADO.Modals
                 productoGuardar.Estado = true;
                 productoGuardar.FchUpd = DateTime.Now;
 
+                var margenesConfig = ProductoService.ObtenerMargenesConfigurados();
+                productoGuardar.MargenGanancia = margenesConfig.Length > 0 ? margenesConfig[0] : 60m;
+
                 // Aplicar costos y listas respetando el costo unitario
                 if (costoBase > 0)
                 {
@@ -698,15 +722,17 @@ namespace SISTEMAACTUALIZADO.Modals
             public ComboBox CbLista { get; }
             public bool EsPrimero { get; }
             public bool EsUltimo { get; }
+            private readonly bool _esPesable;
 
             public decimal ValorDesde => NumDesde?.Value ?? (EsPrimero ? 1m : 1m);
             public decimal ValorHasta => NumHasta?.Value ?? 999999m;
 
-            public FilaTramoUI(int nroTramo, bool esPrimero, bool esUltimo, decimal sugeridoHasta)
+            public FilaTramoUI(int nroTramo, bool esPrimero, bool esUltimo, decimal sugeridoHasta, bool esPesable = false)
             {
                 NumeroTramo = nroTramo;
                 EsPrimero = esPrimero;
                 EsUltimo = esUltimo;
+                _esPesable = esPesable;
 
                 Contenedor = new Panel { Size = new Size(560, 32), Margin = new Padding(0, 0, 0, 4) };
 
@@ -721,13 +747,16 @@ namespace SISTEMAACTUALIZADO.Modals
                     TextAlign = ContentAlignment.MiddleCenter
                 };
 
+                decimal paso = _esPesable ? 1000m : 5m;
+                decimal valorInicialDesde = esPrimero ? 1m : (sugeridoHasta - paso + 1m);
+
                 NumDesde = new NumericUpDown
                 {
                     Location = new Point(50, 4),
                     Size = new Size(95, 24),
                     Minimum = 1,
                     Maximum = 999999,
-                    Value = esPrimero ? 1 : (sugeridoHasta - 4),
+                    Value = Math.Max(1m, valorInicialDesde),
                     Enabled = false,
                     TextAlign = HorizontalAlignment.Center,
                     Font = new Font("Segoe UI", 9F, FontStyle.Bold)
@@ -744,6 +773,7 @@ namespace SISTEMAACTUALIZADO.Modals
                         Size = new Size(95, 24),
                         Minimum = 1,
                         Maximum = 999999,
+                        Increment = _esPesable ? 50m : 1m, // Flechas suben/bajan de 50 en 50g si es pesable
                         Value = sugeridoHasta,
                         TextAlign = HorizontalAlignment.Center,
                         Font = new Font("Segoe UI", 9F, FontStyle.Bold)
@@ -793,7 +823,8 @@ namespace SISTEMAACTUALIZADO.Modals
                     NumDesde.Value = nuevoDesde;
                     if (NumHasta != null && NumHasta.Value <= nuevoDesde)
                     {
-                        NumHasta.Value = nuevoDesde + 4;
+                        decimal salto = _esPesable ? 500m : 4m;
+                        NumHasta.Value = nuevoDesde + salto;
                     }
                 }
             }
