@@ -7,6 +7,7 @@ using System.Windows.Forms;
 using SISTEMAACTUALIZADO.Data;
 using SISTEMAACTUALIZADO.Helpers;
 using SISTEMAACTUALIZADO.Models;
+using SISTEMAACTUALIZADO.Models.Enums;
 
 namespace SISTEMAACTUALIZADO.Services
 {
@@ -109,7 +110,8 @@ namespace SISTEMAACTUALIZADO.Services
                 Rectangle blackBox = new Rectangle(30, y, width - 60, 50);
                 g.DrawRectangle(Pens.Black, blackBox);
 
-                g.DrawString("TICKET DE ATENCIÓN", fontBold, brushText, new RectangleF(30, y + 8, width - 60, 20), centerFormat);
+                string tituloDoc = venta.TipoEntrega == TipoEntrega.Delivery ? "TICKET VENTA DELIVERY" : "TICKET DE ATENCIÓN";
+                g.DrawString(tituloDoc, fontBold, brushText, new RectangleF(30, y + 8, width - 60, 20), centerFormat);
                 g.DrawString($"N° TICKET: {venta.nroDTE:D6}", fontTitle, brushText, new RectangleF(30, y + 26, width - 60, 22), centerFormat);
                 y += 62;
             }
@@ -186,8 +188,6 @@ namespace SISTEMAACTUALIZADO.Services
             foreach (var item in items)
             {
                 string desc = item.Nombre.Length > 19 ? item.Nombre.Substring(0, 19) : item.Nombre;
-                
-                // Detecta si viene marcado como pesable, o si el precio es por gramo (típicamente < 100 pesos) y cantidad >= 50g
                 bool esPesable = item.EsPesable || (item.Cantidad >= 50 && item.PrecioUnitario > 0 && item.PrecioUnitario < 100);
 
                 string textoCantidad;
@@ -216,7 +216,15 @@ namespace SISTEMAACTUALIZADO.Services
 
             g.DrawString("I.V.A. (19%):", fontSub, brushText, 120, y);
             g.DrawString(MonedaHelper.Formatear(venta.IvA, conSigno: true), fontSub, brushText, width - 95, y); 
-            y += 22;
+            y += 18;
+
+            // 👈 Muestra flete de delivery si aplica
+            if (venta.TipoEntrega == TipoEntrega.Delivery || venta.CostoDelivery > 0)
+            {
+                g.DrawString("FLETE DELIVERY:", fontBold, brushText, 100, y);
+                g.DrawString(MonedaHelper.Formatear(venta.CostoDelivery, conSigno: true), fontBold, brushText, width - 95, y);
+                y += 20;
+            }
 
             g.DrawString("TOTAL A PAGAR:", fontTitle, brushText, 90, y);
             g.DrawString(MonedaHelper.Formatear(venta.Total, conSigno: true), fontTitle, brushText, width - 110, y); 
@@ -240,6 +248,124 @@ namespace SISTEMAACTUALIZADO.Services
             y += 25;
 
             g.DrawString(emp.TextoPieTicket, fontBold, brushText, new RectangleF(0, y, width, 20), centerFormat);
+        }
+
+        // 👈 NUEVO: Comanda de despacho impresa para repartidor y cocina
+        // 👈 Comanda de despacho impresa para repartidor y cocina
+        public void ImprimirComandaDelivery(Delivery delivery, TVE2607 venta, List<DetalleCarrito> items)
+        {
+            try
+            {
+                PrintDocument pd = new PrintDocument();
+                pd.PrintController = new StandardPrintController();
+
+                pd.PrintPage += (s, e) =>
+                {
+                    Graphics g = e.Graphics;
+                    if (g == null) return;
+
+                    int width = 285;
+                    int y = 10;
+
+                    using Font fontTitle = new Font("Segoe UI", 12F, FontStyle.Bold);
+                    using Font fontBold = new Font("Segoe UI", 9F, FontStyle.Bold);
+                    using Font fontRegular = new Font("Segoe UI", 8.5F, FontStyle.Regular);
+                    using Font fontSmall = new Font("Segoe UI", 7.5F, FontStyle.Regular);
+                    using Pen penDash = new Pen(Color.Gray, 1) { DashStyle = System.Drawing.Drawing2D.DashStyle.Dash };
+                    using StringFormat sfCenter = new StringFormat { Alignment = StringAlignment.Center };
+                    using StringFormat sfRight = new StringFormat { Alignment = StringAlignment.Far };
+
+                    g.DrawString("🚚 ORDEN DE DESPACHO DELIVERY", fontBold, Brushes.Black, new RectangleF(0, y, width, 20), sfCenter);
+                    y += 20;
+                    g.DrawString($"PEDIDO: {delivery.NumeroPedidoDelivery}", fontTitle, Brushes.Black, new RectangleF(0, y, width, 24), sfCenter);
+                    y += 26;
+
+                    g.DrawString("--------------------------------------------------", fontRegular, Brushes.Black, 0, y);
+                    y += 14;
+
+                    g.DrawString($"Fecha/Hora : {DateTime.Now:dd/MM/yyyy HH:mm}", fontRegular, Brushes.Black, 5, y);
+                    y += 16;
+                    g.DrawString($"Doc Venta  : Folio #{venta.nroDTE:D6}", fontRegular, Brushes.Black, 5, y);
+                    y += 16;
+                    g.DrawString($"Zona       : {delivery.NombreZona}", fontBold, Brushes.Black, 5, y);
+                    y += 16;
+                    g.DrawString($"Tiempo Est.: ~{delivery.TiempoEstimadoMinutos} minutos", fontBold, Brushes.Black, 5, y);
+                    y += 20;
+
+                    g.DrawString("DATOS DEL CLIENTE / RECEPTOR:", fontBold, Brushes.Black, 5, y);
+                    y += 16;
+                    g.DrawString($"Recibe   : {delivery.NombreRecibe}", fontBold, Brushes.Black, 5, y);
+                    y += 16;
+                    g.DrawString($"Teléfono : {delivery.Telefono}", fontBold, Brushes.Black, 5, y);
+                    y += 16;
+                    g.DrawString($"Dirección: {delivery.Direccion} #{delivery.Numero}", fontRegular, Brushes.Black, 5, y);
+                    y += 16;
+                    if (!string.IsNullOrWhiteSpace(delivery.Departamento))
+                    {
+                        g.DrawString($"Depto/Cs : {delivery.Departamento}", fontRegular, Brushes.Black, 5, y);
+                        y += 16;
+                    }
+                    g.DrawString($"Comuna   : {delivery.NombreComuna}", fontRegular, Brushes.Black, 5, y);
+                    y += 18;
+
+                    if (!string.IsNullOrWhiteSpace(delivery.Referencia))
+                    {
+                        g.DrawString($"Ref: {delivery.Referencia}", fontSmall, Brushes.Black, 5, y);
+                        y += 15;
+                    }
+
+                    if (!string.IsNullOrWhiteSpace(delivery.Instrucciones))
+                    {
+                        g.DrawString($"Nota: {delivery.Instrucciones}", fontSmall, Brushes.Black, 5, y);
+                        y += 16;
+                    }
+
+                    g.DrawString("--------------------------------------------------", fontRegular, Brushes.Black, 0, y);
+                    y += 14;
+
+                    g.DrawString("PRODUCTOS A DESPACHAR:", fontBold, Brushes.Black, 5, y);
+                    y += 16;
+
+                    foreach (var item in items)
+                    {
+                        string desc = item.Nombre.Length > 20 ? item.Nombre.Substring(0, 18) + ".." : item.Nombre;
+                        string cantStr = item.EsPesable ? $"{item.Cantidad}g" : $"{item.Cantidad}x";
+                        g.DrawString($"{cantStr,-6} {desc}", fontRegular, Brushes.Black, 5, y);
+                        g.DrawString(MonedaHelper.Formatear(item.Subtotal, conSigno: true), fontRegular, Brushes.Black, new RectangleF(0, y, width - 5, 18), sfRight);
+                        y += 16;
+                    }
+
+                    g.DrawString("--------------------------------------------------", fontRegular, Brushes.Black, 0, y);
+                    y += 14;
+
+                    g.DrawString("Subtotal Carrito :", fontRegular, Brushes.Black, 5, y);
+                    g.DrawString(MonedaHelper.Formatear(venta.SubTotal - venta.Descuento, conSigno: true), fontRegular, Brushes.Black, new RectangleF(0, y, width - 5, 18), sfRight);
+                    y += 16;
+
+                    g.DrawString("Costo Despacho   :", fontRegular, Brushes.Black, 5, y);
+                    g.DrawString(MonedaHelper.Formatear(delivery.CostoDelivery, conSigno: true), fontRegular, Brushes.Black, new RectangleF(0, y, width - 5, 18), sfRight);
+                    y += 18;
+
+                    g.DrawString("TOTAL A COBRAR   :", fontTitle, Brushes.Black, 5, y);
+                    g.DrawString(MonedaHelper.Formatear(delivery.TotalVenta, conSigno: true), fontTitle, Brushes.Black, new RectangleF(0, y, width - 5, 22), sfRight);
+                    y += 24;
+
+                    g.DrawString($"Medio de Pago: {venta.MedioPago}", fontBold, Brushes.Black, 5, y);
+                    y += 20;
+
+                    g.DrawString("--------------------------------------------------", fontRegular, Brushes.Black, 0, y);
+                    y += 14;
+                    g.DrawString("Firma Repartidor / Cliente:", fontSmall, Brushes.Black, 5, y);
+                    y += 35;
+                    g.DrawLine(penDash, 20, y, width - 20, y);
+                };
+
+                pd.Print();
+            }
+            catch (Exception ex)
+            {
+                MessageBox.Show($"No se pudo imprimir la comanda de delivery: {ex.Message}", "Aviso Impresión", MessageBoxButtons.OK, MessageBoxIcon.Warning);
+            }
         }
 
         public void ImprimirTicket(Panel pnlPapel)
@@ -306,8 +432,6 @@ namespace SISTEMAACTUALIZADO.Services
                     foreach (var item in items)
                     {
                         string nom = item.Nombre.Length > 18 ? item.Nombre.Substring(0, 16) + ".." : item.Nombre;
-                        
-                        // Formato limpio: "250g  Queso..." vs "2x    Bebida..."
                         string prefijoCant = item.EsPesable ? $"{item.Cantidad}g" : $"{item.Cantidad}x";
                         g.DrawString($"{prefijoCant,-6} {nom}", fontRegular, Brushes.Black, 5, y);
                         g.DrawString(MonedaHelper.Formatear(item.Subtotal, conSigno: true), fontRegular, Brushes.Black, new RectangleF(0, y, width - 5, 20), sfRight);
@@ -336,6 +460,7 @@ namespace SISTEMAACTUALIZADO.Services
                 MessageBox.Show($"No se pudo conectar a la impresora de tickets: {ex.Message}", "Aviso Impresión", MessageBoxButtons.OK, MessageBoxIcon.Warning);
             }
         }
+
         public void ImprimirComprobanteReserva(Reserva reserva, ReservaPago? abonoInicial, string cajero)
         {
             try

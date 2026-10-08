@@ -26,18 +26,55 @@ namespace SISTEMAACTUALIZADO.Data
         public DbSet<HistorialCondicionesCredito> HistorialCondicionesCredito { get; set; } = null!;
         public DbSet<CajaTurno> CajaTurnos { get; set; } = null!;
 
-        // 👈 Solo estas 3 líneas para reservas
+        // Reservas
         public DbSet<Reserva> Reservas { get; set; } = null!;
         public DbSet<ReservaDetalle> ReservaDetalles { get; set; } = null!;
         public DbSet<ReservaPago> ReservaPagos { get; set; } = null!;
+
+        // 👈 Entidades del Módulo de Delivery
+        public DbSet<ZonaDelivery> ZonasDelivery { get; set; } = null!;
+        public DbSet<ComunaDelivery> ComunasDelivery { get; set; } = null!;
+        public DbSet<Delivery> Deliveries { get; set; } = null!;
 
         protected override void OnConfiguring(DbContextOptionsBuilder optionsBuilder)
         {
             if (!optionsBuilder.IsConfigured)
             {
-                optionsBuilder.UseMySql("Server=localhost;Database=sistemaepos;Uid=root;Pwd=root;", 
+                optionsBuilder.UseMySql("Server=localhost;Database=sistemaepos;Uid=root;Pwd=;", 
                     new MySqlServerVersion(new Version(8, 0, 30)));
             }
+        }
+
+        protected override void OnModelCreating(ModelBuilder modelBuilder)
+        {
+            base.OnModelCreating(modelBuilder);
+
+            // Índice único para correlativo comercial de Delivery (D-XXXXXX)
+            modelBuilder.Entity<Delivery>()
+                .HasIndex(d => d.NumeroPedidoDelivery)
+                .IsUnique()
+                .HasDatabaseName("UK_Delivery_NumeroPedido");
+
+            // Relación Zona -> Comunas (evita eliminación accidental en cascada)
+            modelBuilder.Entity<ZonaDelivery>()
+                .HasMany(z => z.Comunas)
+                .WithOne(c => c.Zona)
+                .HasForeignKey(c => c.ZonaDeliveryId)
+                .OnDelete(DeleteBehavior.Restrict);
+
+            // Relación TVE2607 (Venta) -> Delivery (1 a 0..1)
+            modelBuilder.Entity<TVE2607>()
+                .HasOne(v => v.InformacionDelivery)
+                .WithOne(d => d.Venta)
+                .HasForeignKey<Delivery>(d => d.VentaId)
+                .OnDelete(DeleteBehavior.SetNull);
+
+            // Relación Reserva -> Delivery (opcional para integración futura)
+            modelBuilder.Entity<Delivery>()
+                .HasOne(d => d.Reserva)
+                .WithMany()
+                .HasForeignKey(d => d.ReservaId)
+                .OnDelete(DeleteBehavior.SetNull);
         }
 
         public void AsegurarColumnaEsPesableMySQL()

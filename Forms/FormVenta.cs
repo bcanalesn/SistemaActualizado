@@ -6,8 +6,10 @@ using System.Windows.Forms;
 using SISTEMAACTUALIZADO.Data;
 using SISTEMAACTUALIZADO.Helpers;
 using SISTEMAACTUALIZADO.Models;
+using SISTEMAACTUALIZADO.Models.Enums;
 using SISTEMAACTUALIZADO.Modals;
 using SISTEMAACTUALIZADO.Services;
+using SISTEMAACTUALIZADO.Forms;
 
 namespace SISTEMAACTUALIZADO
 {
@@ -28,9 +30,13 @@ namespace SISTEMAACTUALIZADO
         private VentaService _ventaService = new VentaService();
         private CajaService _cajaService = new CajaService();
         private TicketPrintService _ticketPrintService = new TicketPrintService();
+        private DeliveryService _deliveryService = new DeliveryService();
 
         // Control de Venta en Espera / Edición
         private int _idTveEnEdicion = 0;
+
+        // Estado del Delivery para la venta en curso
+        private Delivery? _deliveryActivo = null;
 
         // Cabecera
         private TextBox txtBuscar = null!;
@@ -51,9 +57,12 @@ namespace SISTEMAACTUALIZADO
         // Totales y Acciones
         private Label lblSubtotalValue = null!;
         private Label lblDescuentoValue = null!;
+        private Label lblDeliveryCap = null!;
+        private Label lblDeliveryValue = null!;
         private Label lblTotalValue = null!;
         private Button btnCliente = null!;
         private Button btnReservar = null!;
+        private Button btnDelivery = null!;
 
         private string _clienteSeleccionadoNombre = "Consumidor Final";
         private string _clienteSeleccionadoRut = "";
@@ -66,45 +75,25 @@ namespace SISTEMAACTUALIZADO
 
         private readonly List<(Color Fondo, Color Texto, Color Borde)> _paletaColores = new List<(Color, Color, Color)>
         {
-            // 1. Azul Cielo
             (Color.FromArgb(240, 249, 255), Color.FromArgb(2, 132, 199), Color.FromArgb(3, 105, 161)),
-            // 2. Rojo Carmesí
             (Color.FromArgb(254, 242, 242), Color.FromArgb(220, 38, 38), Color.FromArgb(185, 28, 28)),
-            // 3. Ámbar / Dorado
             (Color.FromArgb(255, 251, 235), Color.FromArgb(217, 119, 6), Color.FromArgb(180, 83, 9)),
-            // 4. Verde Esmeralda
             (Color.FromArgb(240, 253, 244), Color.FromArgb(22, 163, 74), Color.FromArgb(21, 128, 61)),
-            // 5. Púrpura Intenso
             (Color.FromArgb(250, 245, 255), Color.FromArgb(147, 51, 234), Color.FromArgb(126, 34, 206)),
-            // 6. Naranja Coral
             (Color.FromArgb(255, 247, 237), Color.FromArgb(234, 88, 12), Color.FromArgb(194, 65, 12)),
-            // 7. Marrón Cálido
             (Color.FromArgb(254, 242, 242), Color.FromArgb(180, 83, 9), Color.FromArgb(146, 64, 14)),
-            // 8. Cian / Turquesa
             (Color.FromArgb(236, 254, 255), Color.FromArgb(8, 145, 178), Color.FromArgb(14, 116, 144)),
-            // 9. Verde Lima
             (Color.FromArgb(247, 254, 231), Color.FromArgb(101, 163, 13), Color.FromArgb(77, 124, 15)),
-            // 10. Rosa Fucsia
             (Color.FromArgb(253, 242, 248), Color.FromArgb(219, 39, 119), Color.FromArgb(190, 24, 93)),
-            // 11. Índigo Profundo
             (Color.FromArgb(238, 242, 255), Color.FromArgb(79, 70, 229), Color.FromArgb(67, 56, 202)),
-            // 12. Verde Teal
             (Color.FromArgb(240, 253, 250), Color.FromArgb(13, 148, 136), Color.FromArgb(15, 118, 110)),
-            // 13. Violeta Pastel
             (Color.FromArgb(245, 243, 255), Color.FromArgb(124, 58, 237), Color.FromArgb(109, 40, 217)),
-            // 14. Rosa Palo / Salmón
             (Color.FromArgb(255, 241, 242), Color.FromArgb(225, 29, 72), Color.FromArgb(190, 18, 60)),
-            // 15. Amarillo Ocre
             (Color.FromArgb(254, 252, 232), Color.FromArgb(202, 138, 4), Color.FromArgb(161, 98, 7)),
-            // 16. Azul Marino Claro
             (Color.FromArgb(239, 246, 255), Color.FromArgb(37, 99, 235), Color.FromArgb(29, 78, 216)),
-            // 17. Menta Suave
             (Color.FromArgb(236, 253, 245), Color.FromArgb(5, 150, 105), Color.FromArgb(4, 120, 87)),
-            // 18. Pizarra / Gris Elegante
             (Color.FromArgb(241, 245, 249), Color.FromArgb(71, 85, 105), Color.FromArgb(51, 65, 85)),
-            // 19. Magenta
             (Color.FromArgb(253, 244, 255), Color.FromArgb(192, 38, 211), Color.FromArgb(162, 28, 175)),
-            // 20. Cobre Metálico
             (Color.FromArgb(255, 248, 240), Color.FromArgb(194, 65, 12), Color.FromArgb(154, 52, 18))
         };
 
@@ -116,7 +105,6 @@ namespace SISTEMAACTUALIZADO
             _usuarioActual = usuario;
             InitializeComponent();
 
-            // Evita el parpadeo del scroll y del fondo en la grilla de productos
             if (pnlProductosGrid != null)
             {
                 typeof(Panel).InvokeMember("DoubleBuffered", 
@@ -166,7 +154,7 @@ namespace SISTEMAACTUALIZADO
             this.BackColor = Color.FromArgb(244, 246, 249);
             this.Font = new Font("Segoe UI", 9F, FontStyle.Regular, GraphicsUnit.Point);
 
-            // FOOTER DE ATAJOS (Actualizado con F8)
+            // FOOTER DE ATAJOS (Actualizado con F8 y F9)
             Panel pnlAtajosFooter = new Panel
             {
                 Dock = DockStyle.Bottom,
@@ -177,7 +165,7 @@ namespace SISTEMAACTUALIZADO
 
             Label lblAtajosInfo = new Label
             {
-                Text = "⏱ Atajos:   [F2] Buscar   |   [F3] Cliente   |   [F4] Generar Ticket   |   [F8] Reservar/Encargo   |   [ESC] Limpiar",
+                Text = "⏱ Atajos:   [F2] Buscar   |   [F3] Cliente   |   [F4] Generar Ticket   |   [F8] Reservar   |   [F9] Delivery   |   [ESC] Limpiar",
                 Font = new Font("Segoe UI", 8.5F, FontStyle.Bold),
                 ForeColor = Color.FromArgb(71, 85, 105),
                 Dock = DockStyle.Fill,
@@ -251,9 +239,9 @@ namespace SISTEMAACTUALIZADO
             };
             flowCarritoItems.SizeChanged += (s, e) => ReajustarAnchoFilasCarrito();
 
-            // Altura ampliada de checkout para contener F4 y F8 de forma cómoda
-            Panel pnlBottomCheckout = new Panel { Dock = DockStyle.Bottom, Height = 196, Padding = new Padding(0, 4, 0, 0) };
-            Panel pnlDesgloseTotales = new Panel { Dock = DockStyle.Top, Height = 85, BackColor = Color.FromArgb(241, 245, 249), Padding = new Padding(10) };
+            // Altura de checkout ampliada para albergar Delivery y Desglose completo
+            Panel pnlBottomCheckout = new Panel { Dock = DockStyle.Bottom, Height = 245, Padding = new Padding(0, 4, 0, 0) };
+            Panel pnlDesgloseTotales = new Panel { Dock = DockStyle.Top, Height = 105, BackColor = Color.FromArgb(241, 245, 249), Padding = new Padding(10) };
 
             Label lblSubtotalCap = new Label { Text = "Subtotal", Font = new Font("Segoe UI", 8.5F), ForeColor = Color.FromArgb(100, 116, 139), Location = new Point(6, 6), AutoSize = true };
             lblSubtotalValue = new Label { Text = "$ 0", Font = new Font("Segoe UI", 9F, FontStyle.Bold), ForeColor = Color.FromArgb(15, 23, 42), Location = new Point(210, 6), AutoSize = true };
@@ -261,19 +249,22 @@ namespace SISTEMAACTUALIZADO
             Label lblDescCap = new Label { Text = "Descuento", Font = new Font("Segoe UI", 8.5F), ForeColor = Color.FromArgb(100, 116, 139), Location = new Point(6, 26), AutoSize = true };
             lblDescuentoValue = new Label { Text = "$ 0", Font = new Font("Segoe UI", 9F, FontStyle.Bold), ForeColor = Color.FromArgb(16, 185, 129), Location = new Point(210, 26), AutoSize = true };
 
-            Label lblTotalCap = new Label { Text = "TOTAL", Font = new Font("Segoe UI", 11.5F, FontStyle.Bold), ForeColor = Color.FromArgb(15, 23, 42), Location = new Point(6, 50), AutoSize = true };
-            lblTotalValue = new Label { Text = "$ 0", Font = new Font("Segoe UI", 16F, FontStyle.Bold), ForeColor = Color.FromArgb(0, 102, 255), Location = new Point(170, 44), AutoSize = true };
+            lblDeliveryCap = new Label { Text = "Flete Delivery", Font = new Font("Segoe UI", 8.5F), ForeColor = Color.FromArgb(100, 116, 139), Location = new Point(6, 46), AutoSize = true, Visible = false };
+            lblDeliveryValue = new Label { Text = "$ 0", Font = new Font("Segoe UI", 9F, FontStyle.Bold), ForeColor = Color.FromArgb(2, 132, 199), Location = new Point(210, 46), AutoSize = true, Visible = false };
 
-            pnlDesgloseTotales.Controls.AddRange(new Control[] { lblSubtotalCap, lblSubtotalValue, lblDescCap, lblDescuentoValue, lblTotalCap, lblTotalValue });
+            Label lblTotalCap = new Label { Text = "TOTAL", Font = new Font("Segoe UI", 11.5F, FontStyle.Bold), ForeColor = Color.FromArgb(15, 23, 42), Location = new Point(6, 68), AutoSize = true };
+            lblTotalValue = new Label { Text = "$ 0", Font = new Font("Segoe UI", 16F, FontStyle.Bold), ForeColor = Color.FromArgb(0, 102, 255), Location = new Point(170, 62), AutoSize = true };
 
-            // Panel de Acciones con Cliente, Generar Ticket y Reservar Encargo
-            Panel pnlBotonesAccion = new Panel { Dock = DockStyle.Bottom, Height = 100, Padding = new Padding(0, 4, 0, 0) };
+            pnlDesgloseTotales.Controls.AddRange(new Control[] { lblSubtotalCap, lblSubtotalValue, lblDescCap, lblDescuentoValue, lblDeliveryCap, lblDeliveryValue, lblTotalCap, lblTotalValue });
+
+            // Panel de Acciones con Cliente, Generar Ticket, Delivery y Reservar
+            Panel pnlBotonesAccion = new Panel { Dock = DockStyle.Bottom, Height = 135, Padding = new Padding(0, 4, 0, 0) };
 
             btnCliente = new Button
             {
                 Text = "👤 Consumidor",
                 Location = new Point(0, 4),
-                Size = new Size(110, 44),
+                Size = new Size(110, 42),
                 BackColor = Color.FromArgb(241, 245, 249),
                 ForeColor = Color.FromArgb(30, 41, 59),
                 FlatStyle = FlatStyle.Flat,
@@ -287,7 +278,7 @@ namespace SISTEMAACTUALIZADO
             {
                 Text = "🎟️ F4 GENERAR TICKET",
                 Location = new Point(115, 4),
-                Size = new Size(195, 44),
+                Size = new Size(195, 42),
                 BackColor = Color.FromArgb(16, 185, 129),
                 ForeColor = Color.White,
                 FlatStyle = FlatStyle.Flat,
@@ -297,11 +288,25 @@ namespace SISTEMAACTUALIZADO
             btnGenerarTicket.FlatAppearance.BorderSize = 0;
             btnGenerarTicket.Click += BtnGenerarTicket_Click;
 
+            btnDelivery = new Button
+            {
+                Text = "🚚 F9 DELIVERY (DESACTIVADO)",
+                Location = new Point(0, 50),
+                Size = new Size(310, 38),
+                BackColor = Color.FromArgb(241, 245, 249),
+                ForeColor = Color.FromArgb(71, 85, 105),
+                FlatStyle = FlatStyle.Flat,
+                Font = new Font("Segoe UI", 8.8F, FontStyle.Bold),
+                Cursor = Cursors.Hand
+            };
+            btnDelivery.FlatAppearance.BorderColor = Color.FromArgb(203, 213, 225);
+            btnDelivery.Click += BtnDelivery_Click;
+
             btnReservar = new Button
             {
                 Text = "📅 F8 RESERVAR / PEDIDO POR ENCARGO",
-                Location = new Point(0, 52),
-                Size = new Size(310, 40),
+                Location = new Point(0, 92),
+                Size = new Size(310, 38),
                 BackColor = Color.FromArgb(124, 58, 237),
                 ForeColor = Color.White,
                 FlatStyle = FlatStyle.Flat,
@@ -311,7 +316,7 @@ namespace SISTEMAACTUALIZADO
             btnReservar.FlatAppearance.BorderSize = 0;
             btnReservar.Click += BtnReservarPedido_Click;
 
-            pnlBotonesAccion.Controls.AddRange(new Control[] { btnCliente, btnGenerarTicket, btnReservar });
+            pnlBotonesAccion.Controls.AddRange(new Control[] { btnCliente, btnGenerarTicket, btnDelivery, btnReservar });
             pnlBottomCheckout.Controls.AddRange(new Control[] { pnlBotonesAccion, pnlDesgloseTotales });
 
             pnlDerecha.Controls.AddRange(new Control[] { flowCarritoItems, pnlCarritoVacio, pnlBottomCheckout, pnlCartHeader });
@@ -330,7 +335,7 @@ namespace SISTEMAACTUALIZADO
             pnlIzquierda.RowStyles.Add(new RowStyle(SizeType.Absolute, 70F));
             pnlIzquierda.RowStyles.Add(new RowStyle(SizeType.Percent, 100F));
 
-            // 1. Buscador, Vendedor y Botón de Espera
+            // 1. Buscador, Vendedor y Acciones Superiores
             Panel pnlTopBar = new Panel 
             { 
                 Dock = DockStyle.Fill, 
@@ -950,6 +955,11 @@ namespace SISTEMAACTUALIZADO
                 BtnReservarPedido_Click(this, EventArgs.Empty);
                 return true;
             }
+            else if (keyData == Keys.F9)
+            {
+                BtnDelivery_Click(this, EventArgs.Empty);
+                return true;
+            }
             else if (keyData == Keys.Escape)
             {
                 LimpiarCarritoActual();
@@ -1229,12 +1239,37 @@ namespace SISTEMAACTUALIZADO
             lblCantItemsBadge.Text = totalItemsCount.ToString();
 
             decimal subtotalBruto = cart.Sum(c => c.SubtotalLista1);
-            decimal totalPagar = cart.Sum(c => c.Subtotal);
-            decimal ahorroDescuento = subtotalBruto - totalPagar;
+            decimal subtotalProductos = cart.Sum(c => c.Subtotal);
+            decimal ahorroDescuento = subtotalBruto - subtotalProductos;
             if (ahorroDescuento < 0) ahorroDescuento = 0;
+
+            // Desglose de Delivery si está configurado
+            decimal flete = _deliveryActivo != null ? _deliveryActivo.CostoDelivery : 0m;
+            decimal totalPagar = subtotalProductos + flete;
 
             lblSubtotalValue.Text = MonedaHelper.Formatear(subtotalBruto, conSigno: true);
             lblDescuentoValue.Text = ahorroDescuento > 0 ? $"-{MonedaHelper.Formatear(ahorroDescuento, conSigno: true)}" : "$ 0";
+
+            if (_deliveryActivo != null)
+            {
+                lblDeliveryCap.Visible = true;
+                lblDeliveryValue.Visible = true;
+                lblDeliveryValue.Text = flete > 0 ? MonedaHelper.Formatear(flete, conSigno: true) : "¡GRATIS!";
+                btnDelivery.Text = $"🚚 DELIVERY: {_deliveryActivo.NombreComuna.ToUpper()} (${flete:N0})";
+                btnDelivery.BackColor = Color.FromArgb(239, 246, 255);
+                btnDelivery.ForeColor = Color.FromArgb(2, 132, 199);
+                btnDelivery.FlatAppearance.BorderColor = Color.FromArgb(186, 230, 253);
+            }
+            else
+            {
+                lblDeliveryCap.Visible = false;
+                lblDeliveryValue.Visible = false;
+                btnDelivery.Text = "🚚 F9 DELIVERY (DESACTIVADO)";
+                btnDelivery.BackColor = Color.FromArgb(241, 245, 249);
+                btnDelivery.ForeColor = Color.FromArgb(71, 85, 105);
+                btnDelivery.FlatAppearance.BorderColor = Color.FromArgb(203, 213, 225);
+            }
+
             lblTotalValue.Text = MonedaHelper.Formatear(totalPagar, conSigno: true);
 
             ReajustarAnchoFilasCarrito();
@@ -1270,6 +1305,7 @@ namespace SISTEMAACTUALIZADO
         private void LimpiarCarritoActual()
         {
             _idTveEnEdicion = 0;
+            _deliveryActivo = null;
             var cart = ObtenerCarritoActivo();
             cart.Clear();
 
@@ -1281,6 +1317,12 @@ namespace SISTEMAACTUALIZADO
             lblSubtotalValue.Text = "$ 0";
             lblDescuentoValue.Text = "$ 0";
             lblTotalValue.Text = "$ 0";
+
+            lblDeliveryCap.Visible = false;
+            lblDeliveryValue.Visible = false;
+            btnDelivery.Text = "🚚 F9 DELIVERY (DESACTIVADO)";
+            btnDelivery.BackColor = Color.FromArgb(241, 245, 249);
+            btnDelivery.ForeColor = Color.FromArgb(71, 85, 105);
 
             CargarProductosDesdeBD();
         }
@@ -1324,6 +1366,53 @@ namespace SISTEMAACTUALIZADO
                 if (modalCliente.ShowDialog(this) == DialogResult.OK)
                 {
                     AsignarClienteActivo(modalCliente.ClienteSeleccionado);
+                }
+            }
+        }
+
+        // =========================================================================
+        // ACCIÓN: ACTIVAR / CONFIGURAR MODALIDAD DELIVERY (F9)
+        // =========================================================================
+        private void BtnDelivery_Click(object? sender, EventArgs e)
+        {
+            var cart = ObtenerCarritoActivo();
+            if (cart.Count == 0)
+            {
+                MessageBox.Show("Agregue al menos un producto al carro antes de configurar el despacho.", "Carro Vacío", MessageBoxButtons.OK, MessageBoxIcon.Warning);
+                return;
+            }
+
+            decimal subtotal = cart.Sum(c => c.Subtotal);
+
+            // Si ya hay un delivery configurado, permitir editarlo o desactivarlo
+            if (_deliveryActivo != null)
+            {
+                var opcion = MessageBox.Show(
+                    $"Actualmente tiene configurado delivery hacia {_deliveryActivo.NombreComuna} (${_deliveryActivo.CostoDelivery:N0}).\n\n" +
+                    "¿Desea cambiar los datos de envío?\n(Presione 'No' para cancelar el despacho y volver a Venta Local)",
+                    "Gestión de Delivery",
+                    MessageBoxButtons.YesNoCancel,
+                    MessageBoxIcon.Question
+                );
+
+                if (opcion == DialogResult.No)
+                {
+                    _deliveryActivo = null;
+                    ActualizarCarritoUI();
+                    return;
+                }
+                else if (opcion == DialogResult.Cancel)
+                {
+                    return;
+                }
+            }
+
+            using (var modal = new FormDeliveryModal(subtotal, _deliveryActivo))
+            {
+                if (modal.ShowDialog(this) == DialogResult.OK && modal.DeliveryConfigurado != null)
+                {
+                    _deliveryActivo = modal.DeliveryConfigurado;
+                    ActualizarCarritoUI();
                 }
             }
         }
@@ -1427,6 +1516,9 @@ namespace SISTEMAACTUALIZADO
             }
         }
 
+        // =========================================================================
+        // ACCIÓN: GENERAR TICKET / PROCESAR VENTA (F4)
+        // =========================================================================
         private void BtnGenerarTicket_Click(object? sender, EventArgs e)
         {
             var cart = ObtenerCarritoActivo();
@@ -1437,7 +1529,9 @@ namespace SISTEMAACTUALIZADO
             }
 
             string vendedorNombre = cbVendedor.SelectedItem?.ToString() ?? _vendedorActualNombre;
-            decimal total = cart.Sum(c => c.Subtotal);
+            decimal subtotal = cart.Sum(c => c.Subtotal);
+            decimal fleteDelivery = _deliveryActivo != null ? _deliveryActivo.CostoDelivery : 0m;
+            decimal totalFinal = subtotal + fleteDelivery;
             var cartCopia = cart.ToList();
 
             try
@@ -1446,26 +1540,46 @@ namespace SISTEMAACTUALIZADO
                 if (_idTveEnEdicion > 0)
                 {
                     nroTicket = _ventaService.ActualizarTicketExistenteACaja(_idTveEnEdicion, cartCopia, vendedorNombre, _clienteSeleccionadoNombre, _clienteSeleccionadoRut);
-                    _idTveEnEdicion = 0;
                 }
                 else
                 {
                     nroTicket = _ventaService.GenerarTicketVenta(cartCopia, vendedorNombre, _clienteSeleccionadoNombre, _clienteSeleccionadoRut);
                 }
 
+                // Si la venta es Delivery, vinculamos y persistimos la información de entrega
+                if (_deliveryActivo != null)
+                {
+                    using var db = new AppDbContext();
+                    var ventaDb = db.TVE2607.FirstOrDefault(v => v.NroTicket == nroTicket || v.idTve == _idTveEnEdicion);
+
+                    if (ventaDb != null)
+                    {
+                        ventaDb.TipoEntrega = TipoEntrega.Delivery;
+                        ventaDb.CostoDelivery = fleteDelivery;
+                        ventaDb.Total = totalFinal;
+
+                        _deliveryService.RegistrarDeliveryParaVenta(_deliveryActivo, ventaDb.idTve, subtotal, db);
+                        db.SaveChanges();
+
+                        // Impresión inmediata de Comanda de Despacho
+                        _ticketPrintService.ImprimirComandaDelivery(_deliveryActivo, ventaDb, cartCopia);
+                    }
+                }
+
+                _idTveEnEdicion = 0;
                 LimpiarCarritoActual();
 
-                FormPreVentaModal modalPreVenta = new FormPreVentaModal(nroTicket, vendedorNombre, _clienteSeleccionadoNombre, total, cartCopia);
+                FormPreVentaModal modalPreVenta = new FormPreVentaModal(nroTicket, vendedorNombre, _clienteSeleccionadoNombre, totalFinal, cartCopia);
                 modalPreVenta.ShowDialog(this);
             }
             catch (Exception ex)
             {
-                MessageBox.Show($"Error al generar Ticket de Atención: {ex.Message}", "Error DB", MessageBoxButtons.OK, MessageBoxIcon.Error);
+                MessageBox.Show($"Error al procesar la venta: {ex.Message}", "Error DB", MessageBoxButtons.OK, MessageBoxIcon.Error);
             }
         }
 
         // =========================================================================
-        // ACCIÓN: REGISTRAR RESERVA / ENCARGO
+        // ACCIÓN: REGISTRAR RESERVA / ENCARGO (F8)
         // =========================================================================
         private void BtnReservarPedido_Click(object? sender, EventArgs e)
         {
@@ -1476,7 +1590,6 @@ namespace SISTEMAACTUALIZADO
                 return;
             }
 
-            // 1. Un pedido por encargo no puede ser anónimo
             if (_clienteActual == null || string.IsNullOrWhiteSpace(_clienteSeleccionadoRut) || _clienteSeleccionadoNombre.StartsWith("Consumidor Final", StringComparison.OrdinalIgnoreCase))
             {
                 MessageBox.Show("Para generar un pedido por encargo o reserva debe asociar un cliente con sus datos de contacto.", "Cliente Requerido", MessageBoxButtons.OK, MessageBoxIcon.Information);
@@ -1484,11 +1597,10 @@ namespace SISTEMAACTUALIZADO
 
                 if (_clienteActual == null || string.IsNullOrWhiteSpace(_clienteSeleccionadoRut) || _clienteSeleccionadoNombre.StartsWith("Consumidor Final", StringComparison.OrdinalIgnoreCase))
                 {
-                    return; // Si el usuario canceló la selección de cliente
+                    return;
                 }
             }
 
-            // 2. Obtener turno de caja activo para asentar el abono si existe
             string usuarioOperador = _usuarioActual?.NombreUsuario ?? "admin";
             var turno = _cajaService.ObtenerTurnoAbierto(usuarioOperador);
             int cajaTurnoId = turno?.CajaTurnoID ?? 0;
@@ -1497,7 +1609,6 @@ namespace SISTEMAACTUALIZADO
             var cartCopia = cart.ToList();
             var usuarioSesion = _usuarioActual ?? new Usuario { NombreUsuario = usuarioOperador, NombreCompleto = usuarioOperador };
 
-            // 3. Abrir Modal de Creación de Reserva
             using (var modalReserva = new FormCrearReservaModal(_clienteActual, cartCopia, total, usuarioSesion, cajaTurnoId))
             {
                 if (modalReserva.ShowDialog(this) == DialogResult.OK && modalReserva.ReservaCreada != null)
@@ -1505,11 +1616,9 @@ namespace SISTEMAACTUALIZADO
                     var reservaFinal = modalReserva.ReservaCreada;
                     reservaFinal.NombreCliente = _clienteSeleccionadoNombre;
 
-                    // Imprimir Comprobante Térmico no tributario de Reserva / Anticipo
                     var abonoEfectuado = reservaFinal.Pagos?.FirstOrDefault();
                     _ticketPrintService.ImprimirComprobanteReserva(reservaFinal, abonoEfectuado, usuarioOperador);
 
-                    // Dejar libre el terminal de venta para la siguiente atención
                     LimpiarCarritoActual();
                     AsignarClienteActivo(null);
                 }
@@ -1548,9 +1657,6 @@ namespace SISTEMAACTUALIZADO
         }
     }
 
-    /// <summary>
-    /// PictureBox optimizado con algoritmos de alta definición para reducción de imágenes
-    /// </summary>
     public class PictureBoxCalidadAlta : PictureBox
     {
         protected override void OnPaint(PaintEventArgs pe)
@@ -1562,9 +1668,6 @@ namespace SISTEMAACTUALIZADO
         }
     }
 
-    /// <summary>
-    /// Tarjeta flotante emergente para previsualización ampliada del producto
-    /// </summary>
     public class VentanaPreviewProducto : Form
     {
         private static VentanaPreviewProducto? _instanciaActual;

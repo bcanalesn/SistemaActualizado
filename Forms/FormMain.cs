@@ -59,7 +59,9 @@ namespace SISTEMAACTUALIZADO
                 // Administrador, Supervisor y Cajero inician en Control de Caja
                 AbrirFormEnContent(new FormCaja(_usuarioActual), "Apertura y Cierre de Caja", btnCaja);
             }
+            
         }
+        
 
         private void InitializeComponent()
         {

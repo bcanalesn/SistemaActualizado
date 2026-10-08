@@ -1,5 +1,6 @@
 using System;
 using System.Collections.Generic;
+using SISTEMAACTUALIZADO.Models.Enums;
 using System.ComponentModel.DataAnnotations;
 using System.ComponentModel.DataAnnotations.Schema;
 
@@ -62,5 +63,14 @@ namespace SISTEMAACTUALIZADO.Models
 
         [InverseProperty("VentaEncabezado")]
         public List<TVD2607> Detalles { get; set; } = new List<TVD2607>();
+
+        // --- SOPORTE DELIVERY ---
+        [Column("TipoEntrega")]
+        public TipoEntrega TipoEntrega { get; set; } = TipoEntrega.VentaLocal;
+
+        [Column("CostoDelivery", TypeName = "decimal(12,2)")]
+        public decimal CostoDelivery { get; set; } = 0.00m;
+
+        public virtual Delivery? InformacionDelivery { get; set; }
     }
 }
