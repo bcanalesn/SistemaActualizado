@@ -5,7 +5,7 @@ using System.Windows.Forms;
 using SISTEMAACTUALIZADO.Models;
 using SISTEMAACTUALIZADO.Services;
 
-namespace SISTEMAACTUALIZADO.Forms
+namespace SISTEMAACTUALIZADO.Modals
 {
     public class FormDeliveryModal : Form
     {
@@ -28,6 +28,7 @@ namespace SISTEMAACTUALIZADO.Forms
         private TextBox txtDireccion = null!;
         private TextBox txtNumero = null!;
         private TextBox txtDepto = null!;
+        private TextBox txtCodigoPostal = null!;
         private TextBox txtReferencia = null!;
         private TextBox txtInstrucciones = null!;
 
@@ -51,7 +52,7 @@ namespace SISTEMAACTUALIZADO.Forms
         private void InitializeComponent()
         {
             this.Text = "Configurar Despacho a Domicilio (Delivery)";
-            this.Size = new Size(680, 640);
+            this.Size = new Size(680, 680);
             this.StartPosition = FormStartPosition.CenterParent;
             this.FormBorderStyle = FormBorderStyle.FixedDialog;
             this.MaximizeBox = false;
@@ -157,24 +158,114 @@ namespace SISTEMAACTUALIZADO.Forms
             {
                 Text = "Información del Destinatario",
                 Location = new Point(15, y),
-                Size = new Size(630, 270),
+                Size = new Size(630, 305),
                 Font = new Font("Segoe UI", 9F, FontStyle.Bold)
             };
 
             int yc = 28;
             CrearCampoTexto(gbContacto, "Nombre Recibe (*):", ref txtNombre, 20, ref yc, 350);
+            
+            // Teléfono móvil (+56 y 9 dígitos = 12 caracteres máximos)
             CrearCampoTexto(gbContacto, "Teléfono Móvil (*):", ref txtTelefono, 390, ref yc, 220, salto: true);
+            txtTelefono.MaxLength = 12;
+            txtTelefono.PlaceholderText = "+56912345678";
 
             CrearCampoTexto(gbContacto, "Calle / Dirección (*):", ref txtDireccion, 20, ref yc, 400);
             CrearCampoTexto(gbContacto, "Número (*):", ref txtNumero, 440, ref yc, 170, salto: true);
 
             CrearCampoTexto(gbContacto, "Depto / Casa / Block:", ref txtDepto, 20, ref yc, 200);
-            CrearCampoTexto(gbContacto, "Punto de Referencia:", ref txtReferencia, 240, ref yc, 370, salto: true);
+            
+            // Código postal opcional (hasta 7 dígitos)
+            CrearCampoTexto(gbContacto, "Código Postal (Opcional):", ref txtCodigoPostal, 240, ref yc, 150);
+            txtCodigoPostal.MaxLength = 7;
+            txtCodigoPostal.PlaceholderText = "Ej: 8320000";
+
+            CrearCampoTexto(gbContacto, "Punto de Referencia:", ref txtReferencia, 410, ref yc, 200, salto: true);
 
             CrearCampoTexto(gbContacto, "Instrucciones de Reparto:", ref txtInstrucciones, 20, ref yc, 590, salto: true);
 
+            // ========================================================
+            // RESTRICCIONES DE CARACTERES EN TIEMPO REAL (KeyPress)
+            // ========================================================
+
+            // 1. Nombre: Solo letras y espacios
+            txtNombre.KeyPress += (s, e) =>
+            {
+                if (!char.IsLetter(e.KeyChar) && !char.IsWhiteSpace(e.KeyChar) && !char.IsControl(e.KeyChar))
+                {
+                    e.Handled = true;
+                }
+            };
+
+            // 2. Teléfono: Solo números y '+'
+            txtTelefono.KeyPress += (s, e) =>
+            {
+                if (!char.IsDigit(e.KeyChar) && !char.IsControl(e.KeyChar) && e.KeyChar != '+')
+                {
+                    e.Handled = true;
+                }
+            };
+
+            // 3. Calle / Dirección: Solo letras y espacios
+            txtDireccion.KeyPress += (s, e) =>
+            {
+                if (!char.IsLetter(e.KeyChar) && !char.IsWhiteSpace(e.KeyChar) && !char.IsControl(e.KeyChar))
+                {
+                    e.Handled = true;
+                }
+            };
+
+            // 4. Número: Letras, números, espacio o guion
+            txtNumero.KeyPress += (s, e) =>
+            {
+                if (!char.IsLetterOrDigit(e.KeyChar) && !char.IsWhiteSpace(e.KeyChar) && !char.IsControl(e.KeyChar) && e.KeyChar != '-')
+                {
+                    e.Handled = true;
+                }
+            };
+
+            // 5. Depto / Casa / Block: Solo letras y espacios
+            txtDepto.KeyPress += (s, e) =>
+            {
+                if (!char.IsLetter(e.KeyChar) && !char.IsWhiteSpace(e.KeyChar) && !char.IsControl(e.KeyChar))
+                {
+                    e.Handled = true;
+                }
+            };
+
+            // 6. Código Postal: Solo números (hasta 7 dígitos)
+            txtCodigoPostal.KeyPress += (s, e) =>
+            {
+                if (!char.IsDigit(e.KeyChar) && !char.IsControl(e.KeyChar))
+                {
+                    e.Handled = true;
+                }
+            };
+
+            // 7. Punto de Referencia: Letras y números (alfanumérico y espacios)
+            txtReferencia.KeyPress += (s, e) =>
+            {
+                if (!char.IsLetterOrDigit(e.KeyChar) && !char.IsWhiteSpace(e.KeyChar) && !char.IsControl(e.KeyChar))
+                {
+                    e.Handled = true;
+                }
+            };
+
+            // 8. Instrucciones: Letras, números, espacios, comas y puntos
+            txtInstrucciones.KeyPress += (s, e) =>
+            {
+                if (!char.IsLetterOrDigit(e.KeyChar) && 
+                    !char.IsWhiteSpace(e.KeyChar) && 
+                    !char.IsControl(e.KeyChar) && 
+                    e.KeyChar != ',' && 
+                    e.KeyChar != '.')
+                {
+                    e.Handled = true;
+                }
+            };
+
             pnlBody.Controls.Add(gbContacto);
-            y += 285;
+            y += 320;
 
             // Botones de Acción
             btnConfirmar = new Button
@@ -251,13 +342,56 @@ namespace SISTEMAACTUALIZADO.Forms
             if (cmbZonas.SelectedItem is ZonaDelivery zona)
             {
                 var comunas = zona.Comunas.Where(c => c.Activo).OrderBy(c => c.Nombre).ToList();
+                
+                cmbComunas.SelectedIndexChanged -= CmbComunas_SelectedIndexChanged;
                 cmbComunas.DataSource = comunas;
                 cmbComunas.DisplayMember = "Nombre";
                 cmbComunas.ValueMember = "ComunaDeliveryId";
+                cmbComunas.SelectedIndexChanged += CmbComunas_SelectedIndexChanged;
 
                 if (comunas.Count > 0)
                 {
                     cmbComunas.SelectedIndex = 0;
+                    
+                    int comunaId = comunas[0].ComunaDeliveryId;
+                    _tarifaActual = _deliveryService.EvaluarDelivery(comunaId, _subtotalProductos);
+
+                    if (!_tarifaActual.EsValido)
+                    {
+                        lblTarifaInfo.Text = "Envío No Habilitado";
+                        lblTarifaInfo.ForeColor = Color.FromArgb(220, 38, 38);
+                        lblEstadoPedidoMinimo.Text = _tarifaActual.MensajeError;
+                        lblEstadoPedidoMinimo.ForeColor = Color.FromArgb(220, 38, 38);
+                        btnConfirmar.Enabled = false;
+                    }
+                    else
+                    {
+                        if (_tarifaActual.AplicaEnvioGratis)
+                        {
+                            lblTarifaInfo.Text = "Costo Envío: ¡GRATIS! 🎉";
+                            lblTarifaInfo.ForeColor = Color.FromArgb(16, 185, 129);
+                            lblEstadoPedidoMinimo.Text = "Aplica despacho bonificado por superar el monto requerido.";
+                            lblEstadoPedidoMinimo.ForeColor = Color.FromArgb(16, 185, 129);
+                        }
+                        else
+                        {
+                            lblTarifaInfo.Text = $"Costo Envío: ${_tarifaActual.CostoFinal:N0}";
+                            lblTarifaInfo.ForeColor = Color.FromArgb(0, 102, 255);
+
+                            if (_tarifaActual.MontoFaltanteEnvioGratis > 0)
+                            {
+                                lblEstadoPedidoMinimo.Text = $"💡 Agrega ${_tarifaActual.MontoFaltanteEnvioGratis:N0} más para despacho gratuito.";
+                                lblEstadoPedidoMinimo.ForeColor = Color.FromArgb(100, 116, 139);
+                            }
+                            else
+                            {
+                                lblEstadoPedidoMinimo.Text = "";
+                            }
+                        }
+
+                        lblTiempoEstimado.Text = $"Tiempo Estimado: ~{_tarifaActual.TiempoEstimadoMinutos} min";
+                        btnConfirmar.Enabled = true;
+                    }
                 }
                 else
                 {
@@ -265,52 +399,63 @@ namespace SISTEMAACTUALIZADO.Forms
                     lblTiempoEstimado.Text = "Sin cobertura activa";
                     lblEstadoPedidoMinimo.Text = "No hay comunas habilitadas para esta zona.";
                     _tarifaActual = null;
+                    btnConfirmar.Enabled = false;
                 }
             }
         }
 
         private void CmbComunas_SelectedIndexChanged(object? sender, EventArgs e)
         {
-            if (cmbComunas.SelectedValue is int comunaId && comunaId > 0)
-            {
-                _tarifaActual = _deliveryService.EvaluarDelivery(comunaId, _subtotalProductos);
+            int comunaId = 0;
 
-                if (!_tarifaActual.EsValido)
+            if (cmbComunas.SelectedValue is int idVal)
+            {
+                comunaId = idVal;
+            }
+            else if (cmbComunas.SelectedItem is ComunaDelivery cd)
+            {
+                comunaId = cd.ComunaDeliveryId;
+            }
+
+            if (comunaId <= 0) return;
+
+            _tarifaActual = _deliveryService.EvaluarDelivery(comunaId, _subtotalProductos);
+
+            if (!_tarifaActual.EsValido)
+            {
+                lblTarifaInfo.Text = "Envío No Habilitado";
+                lblTarifaInfo.ForeColor = Color.FromArgb(220, 38, 38);
+                lblEstadoPedidoMinimo.Text = _tarifaActual.MensajeError;
+                lblEstadoPedidoMinimo.ForeColor = Color.FromArgb(220, 38, 38);
+                btnConfirmar.Enabled = false;
+            }
+            else
+            {
+                if (_tarifaActual.AplicaEnvioGratis)
                 {
-                    lblTarifaInfo.Text = "Envío No Habilitado";
-                    lblTarifaInfo.ForeColor = Color.FromArgb(220, 38, 38);
-                    lblEstadoPedidoMinimo.Text = _tarifaActual.MensajeError;
-                    lblEstadoPedidoMinimo.ForeColor = Color.FromArgb(220, 38, 38);
-                    btnConfirmar.Enabled = false;
+                    lblTarifaInfo.Text = "Costo Envío: ¡GRATIS! 🎉";
+                    lblTarifaInfo.ForeColor = Color.FromArgb(16, 185, 129);
+                    lblEstadoPedidoMinimo.Text = "Aplica despacho bonificado por superar el monto requerido.";
+                    lblEstadoPedidoMinimo.ForeColor = Color.FromArgb(16, 185, 129);
                 }
                 else
                 {
-                    if (_tarifaActual.AplicaEnvioGratis)
+                    lblTarifaInfo.Text = $"Costo Envío: ${_tarifaActual.CostoFinal:N0}";
+                    lblTarifaInfo.ForeColor = Color.FromArgb(0, 102, 255);
+
+                    if (_tarifaActual.MontoFaltanteEnvioGratis > 0)
                     {
-                        lblTarifaInfo.Text = "Costo Envío: ¡GRATIS! 🎉";
-                        lblTarifaInfo.ForeColor = Color.FromArgb(16, 185, 129);
-                        lblEstadoPedidoMinimo.Text = "Aplica despacho bonificado por superar el monto requerido.";
-                        lblEstadoPedidoMinimo.ForeColor = Color.FromArgb(16, 185, 129);
+                        lblEstadoPedidoMinimo.Text = $"💡 Agrega ${_tarifaActual.MontoFaltanteEnvioGratis:N0} más para despacho gratuito.";
+                        lblEstadoPedidoMinimo.ForeColor = Color.FromArgb(100, 116, 139);
                     }
                     else
                     {
-                        lblTarifaInfo.Text = $"Costo Envío: ${_tarifaActual.CostoFinal:N0}";
-                        lblTarifaInfo.ForeColor = Color.FromArgb(0, 102, 255);
-
-                        if (_tarifaActual.MontoFaltanteEnvioGratis > 0)
-                        {
-                            lblEstadoPedidoMinimo.Text = $"💡 Agrega ${_tarifaActual.MontoFaltanteEnvioGratis:N0} más para despacho gratuito.";
-                            lblEstadoPedidoMinimo.ForeColor = Color.FromArgb(100, 116, 139);
-                        }
-                        else
-                        {
-                            lblEstadoPedidoMinimo.Text = "";
-                        }
+                        lblEstadoPedidoMinimo.Text = "";
                     }
-
-                    lblTiempoEstimado.Text = $"Tiempo Estimado: ~{_tarifaActual.TiempoEstimadoMinutos} min";
-                    btnConfirmar.Enabled = true;
                 }
+
+                lblTiempoEstimado.Text = $"Tiempo Estimado: ~{_tarifaActual.TiempoEstimadoMinutos} min";
+                btnConfirmar.Enabled = true;
             }
         }
 
@@ -329,11 +474,33 @@ namespace SISTEMAACTUALIZADO.Forms
                 return;
             }
 
-            if (string.IsNullOrWhiteSpace(txtTelefono.Text))
+            string telefono = txtTelefono.Text.Trim();
+            if (string.IsNullOrWhiteSpace(telefono))
             {
                 MessageBox.Show("Ingrese un teléfono de contacto para el repartidor.", "Campo Requerido", MessageBoxButtons.OK, MessageBoxIcon.Warning);
                 txtTelefono.Focus();
                 return;
+            }
+
+            // Validación de longitud de teléfono (+56 con 9 dígitos = 12 caracteres, o 9 dígitos solos)
+            string soloNumeros = new string(telefono.Where(char.IsDigit).ToArray());
+            if (telefono.StartsWith("+56"))
+            {
+                if (telefono.Length != 12 || soloNumeros.Length != 11)
+                {
+                    MessageBox.Show("El teléfono con prefijo debe tener el formato +56 seguido de 9 dígitos (ej: +56912345678).", "Teléfono Inválido", MessageBoxButtons.OK, MessageBoxIcon.Warning);
+                    txtTelefono.Focus();
+                    return;
+                }
+            }
+            else
+            {
+                if (soloNumeros.Length != 9)
+                {
+                    MessageBox.Show("El teléfono móvil debe tener exactamente 9 dígitos (ej: 912345678 o +56912345678).", "Teléfono Inválido", MessageBoxButtons.OK, MessageBoxIcon.Warning);
+                    txtTelefono.Focus();
+                    return;
+                }
             }
 
             if (string.IsNullOrWhiteSpace(txtDireccion.Text) || string.IsNullOrWhiteSpace(txtNumero.Text))
@@ -343,19 +510,37 @@ namespace SISTEMAACTUALIZADO.Forms
                 return;
             }
 
+            int comunaId = 0;
+            if (cmbComunas.SelectedValue is int idVal)
+            {
+                comunaId = idVal;
+            }
+            else if (cmbComunas.SelectedItem is ComunaDelivery cd)
+            {
+                comunaId = cd.ComunaDeliveryId;
+            }
+
+            // Si se ingresó código postal opcional, se concatena a la referencia o instrucciones
+            string? referenciaFinal = string.IsNullOrWhiteSpace(txtReferencia.Text) ? null : txtReferencia.Text.Trim();
+            if (!string.IsNullOrWhiteSpace(txtCodigoPostal.Text))
+            {
+                string cpTexto = $"[CP: {txtCodigoPostal.Text.Trim()}]";
+                referenciaFinal = referenciaFinal != null ? $"{referenciaFinal} {cpTexto}" : cpTexto;
+            }
+
             // Construcción del objeto Delivery con los datos del formulario
             DeliveryConfigurado = new Delivery
             {
                 ZonaDeliveryId = _tarifaActual.ZonaId,
-                ComunaDeliveryId = (int)cmbComunas.SelectedValue,
+                ComunaDeliveryId = comunaId,
                 NombreZona = _tarifaActual.NombreZona,
                 NombreComuna = _tarifaActual.NombreComuna,
                 NombreRecibe = txtNombre.Text.Trim(),
-                Telefono = txtTelefono.Text.Trim(),
+                Telefono = telefono,
                 Direccion = txtDireccion.Text.Trim(),
                 Numero = txtNumero.Text.Trim(),
                 Departamento = string.IsNullOrWhiteSpace(txtDepto.Text) ? null : txtDepto.Text.Trim(),
-                Referencia = string.IsNullOrWhiteSpace(txtReferencia.Text) ? null : txtReferencia.Text.Trim(),
+                Referencia = referenciaFinal,
                 Instrucciones = string.IsNullOrWhiteSpace(txtInstrucciones.Text) ? null : txtInstrucciones.Text.Trim(),
                 CostoDelivery = _tarifaActual.CostoFinal,
                 TiempoEstimadoMinutos = _tarifaActual.TiempoEstimadoMinutos

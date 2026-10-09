@@ -1,6 +1,7 @@
 using System;
 using System.Collections.Generic;
 using System.Drawing;
+using System.Globalization;
 using System.Linq;
 using System.Windows.Forms;
 using SISTEMAACTUALIZADO.Models;
@@ -49,6 +50,10 @@ namespace SISTEMAACTUALIZADO.Forms
 
         public FormConfiguracion()
         {
+            this.DoubleBuffered = true;
+            this.SetStyle(ControlStyles.AllPaintingInWmPaint | ControlStyles.UserPaint | ControlStyles.OptimizedDoubleBuffer | ControlStyles.ResizeRedraw, true);
+            this.UpdateStyles();
+
             InitializeComponent();
             CargarDatosEmpresa();
             CargarZonasDelivery();
@@ -56,11 +61,11 @@ namespace SISTEMAACTUALIZADO.Forms
 
         private void InitializeComponent()
         {
-            this.Text = "Configuración General del Negocio";
-            this.Size = new Size(1020, 680);
+            this.Text = "Configuración General del Negocio y Datos Tributarios";
+            this.Size = new Size(1100, 720);
             this.StartPosition = FormStartPosition.CenterParent;
             this.FormBorderStyle = FormBorderStyle.FixedDialog;
-            this.MaximizeBox = false;
+            this.MaximizeBox = true;
             this.MinimizeBox = false;
             this.BackColor = Color.FromArgb(248, 250, 252);
             this.Font = new Font("Segoe UI", 9F);
@@ -179,13 +184,17 @@ namespace SISTEMAACTUALIZADO.Forms
         // ==========================================
         private void ConstruirPestañaDelivery(TabPage tab)
         {
-            SplitContainer split = new SplitContainer
+            // TableLayoutPanel responsivo: 54% Zonas, 46% Comunas (evita cualquier excepción de splitter)
+            TableLayoutPanel tlpLayout = new TableLayoutPanel
             {
                 Dock = DockStyle.Fill,
-                Orientation = Orientation.Vertical,
-                SplitterDistance = 480,
-                Padding = new Padding(10)
+                ColumnCount = 2,
+                RowCount = 1,
+                Padding = new Padding(12),
+                BackColor = Color.Transparent
             };
+            tlpLayout.ColumnStyles.Add(new ColumnStyle(SizeType.Percent, 54F));
+            tlpLayout.ColumnStyles.Add(new ColumnStyle(SizeType.Percent, 46F));
 
             // PANEL IZQUIERDO: ZONAS
             GroupBox gbZonas = new GroupBox
@@ -193,7 +202,8 @@ namespace SISTEMAACTUALIZADO.Forms
                 Text = "📍 Macro Zonas de Reparto",
                 Dock = DockStyle.Fill,
                 Font = new Font("Segoe UI", 9.5F, FontStyle.Bold),
-                Padding = new Padding(10)
+                Padding = new Padding(10),
+                Margin = new Padding(0, 0, 6, 0)
             };
 
             dgvZonas = CrearGridBasico();
@@ -206,43 +216,51 @@ namespace SISTEMAACTUALIZADO.Forms
             dgvZonas.Columns.Add("Minimo", "Mínimo ($)");
             dgvZonas.Columns.Add("Gratis", "Gratis Desde ($)");
             dgvZonas.Columns.Add("Activo", "Activo");
+
+            dgvZonas.Columns["Nombre"]!.FillWeight = 26;
+            dgvZonas.Columns["Costo"]!.FillWeight = 20;
+            dgvZonas.Columns["Minimo"]!.FillWeight = 20;
+            dgvZonas.Columns["Gratis"]!.FillWeight = 22;
+            dgvZonas.Columns["Activo"]!.FillWeight = 12;
+
             dgvZonas.SelectionChanged += DgvZonas_SelectionChanged;
 
-            Panel pnlEditorZona = new Panel { Dock = DockStyle.Fill, AutoScroll = true };
-            int yz = 10;
+            Panel pnlEditorZona = new Panel { Dock = DockStyle.Fill, AutoScroll = true, Padding = new Padding(4) };
+            int yz = 12;
 
-            pnlEditorZona.Controls.Add(new Label { Text = "Nombre Zona:", Location = new Point(5, yz + 3), AutoSize = true, Font = new Font("Segoe UI", 8.5F, FontStyle.Bold) });
-            txtZonaNombre = new TextBox { Location = new Point(130, yz), Size = new Size(200, 24), Font = new Font("Segoe UI", 9F) };
+            pnlEditorZona.Controls.Add(new Label { Text = "Nombre Zona:", Location = new Point(6, yz + 3), AutoSize = true, Font = new Font("Segoe UI", 8.5F, FontStyle.Bold), ForeColor = Color.FromArgb(51, 65, 85) });
+            txtZonaNombre = new TextBox { Location = new Point(140, yz), Size = new Size(220, 24), Font = new Font("Segoe UI", 9F) };
             pnlEditorZona.Controls.Add(txtZonaNombre);
-            yz += 32;
+            yz += 34;
 
-            pnlEditorZona.Controls.Add(new Label { Text = "Costo Envío ($):", Location = new Point(5, yz + 3), AutoSize = true, Font = new Font("Segoe UI", 8.5F, FontStyle.Bold) });
-            numCostoEnvio = new NumericUpDown { Location = new Point(130, yz), Size = new Size(130, 24), Maximum = 100000, Increment = 500, ThousandsSeparator = true };
+            pnlEditorZona.Controls.Add(new Label { Text = "Costo Envío ($):", Location = new Point(6, yz + 3), AutoSize = true, Font = new Font("Segoe UI", 8.5F, FontStyle.Bold), ForeColor = Color.FromArgb(51, 65, 85) });
+            numCostoEnvio = new NumericUpDown { Location = new Point(140, yz), Size = new Size(130, 24), Maximum = 100000, Increment = 500, ThousandsSeparator = true };
             pnlEditorZona.Controls.Add(numCostoEnvio);
-            yz += 32;
+            yz += 34;
 
-            pnlEditorZona.Controls.Add(new Label { Text = "Pedido Mínimo ($):", Location = new Point(5, yz + 3), AutoSize = true, Font = new Font("Segoe UI", 8.5F, FontStyle.Bold) });
-            numPedidoMinimo = new NumericUpDown { Location = new Point(130, yz), Size = new Size(130, 24), Maximum = 500000, Increment = 1000, ThousandsSeparator = true };
+            pnlEditorZona.Controls.Add(new Label { Text = "Pedido Mínimo ($):", Location = new Point(6, yz + 3), AutoSize = true, Font = new Font("Segoe UI", 8.5F, FontStyle.Bold), ForeColor = Color.FromArgb(51, 65, 85) });
+            numPedidoMinimo = new NumericUpDown { Location = new Point(140, yz), Size = new Size(130, 24), Maximum = 500000, Increment = 1000, ThousandsSeparator = true };
             pnlEditorZona.Controls.Add(numPedidoMinimo);
-            yz += 32;
+            yz += 34;
 
-            pnlEditorZona.Controls.Add(new Label { Text = "Envío Gratis Desde:", Location = new Point(5, yz + 3), AutoSize = true, Font = new Font("Segoe UI", 8.5F, FontStyle.Bold) });
-            numEnvioGratis = new NumericUpDown { Location = new Point(130, yz), Size = new Size(130, 24), Maximum = 500000, Increment = 1000, ThousandsSeparator = true };
+            pnlEditorZona.Controls.Add(new Label { Text = "Envío Gratis Desde:", Location = new Point(6, yz + 3), AutoSize = true, Font = new Font("Segoe UI", 8.5F, FontStyle.Bold), ForeColor = Color.FromArgb(51, 65, 85) });
+            numEnvioGratis = new NumericUpDown { Location = new Point(140, yz), Size = new Size(130, 24), Maximum = 500000, Increment = 1000, ThousandsSeparator = true };
             pnlEditorZona.Controls.Add(numEnvioGratis);
-            yz += 32;
+            yz += 34;
 
-            chkZonaActiva = new CheckBox { Text = "Zona Habilitada", Location = new Point(130, yz), AutoSize = true, Checked = true };
+            chkZonaActiva = new CheckBox { Text = "Zona Habilitada", Location = new Point(140, yz), AutoSize = true, Checked = true, Font = new Font("Segoe UI", 8.5F, FontStyle.Bold) };
             pnlEditorZona.Controls.Add(chkZonaActiva);
-            yz += 35;
+            yz += 36;
 
             btnGuardarZona = new Button
             {
                 Text = "💾 Guardar Zona",
-                Location = new Point(130, yz),
-                Size = new Size(130, 32),
+                Location = new Point(140, yz),
+                Size = new Size(135, 34),
                 BackColor = Color.FromArgb(0, 102, 255),
                 ForeColor = Color.White,
                 FlatStyle = FlatStyle.Flat,
+                Font = new Font("Segoe UI", 8.5F, FontStyle.Bold),
                 Cursor = Cursors.Hand
             };
             btnGuardarZona.FlatAppearance.BorderSize = 0;
@@ -251,11 +269,12 @@ namespace SISTEMAACTUALIZADO.Forms
             btnNuevaZona = new Button
             {
                 Text = "➕ Nueva Zona",
-                Location = new Point(270, yz),
-                Size = new Size(120, 32),
+                Location = new Point(285, yz),
+                Size = new Size(125, 34),
                 BackColor = Color.FromArgb(100, 116, 139),
                 ForeColor = Color.White,
                 FlatStyle = FlatStyle.Flat,
+                Font = new Font("Segoe UI", 8.5F, FontStyle.Bold),
                 Cursor = Cursors.Hand
             };
             btnNuevaZona.FlatAppearance.BorderSize = 0;
@@ -266,7 +285,7 @@ namespace SISTEMAACTUALIZADO.Forms
 
             gbZonas.Controls.Add(pnlEditorZona);
             gbZonas.Controls.Add(dgvZonas);
-            split.Panel1.Controls.Add(gbZonas);
+            tlpLayout.Controls.Add(gbZonas, 0, 0);
 
             // PANEL DERECHO: COMUNAS
             GroupBox gbComunas = new GroupBox
@@ -274,7 +293,8 @@ namespace SISTEMAACTUALIZADO.Forms
                 Text = "🏘️ Comunas Asignadas a la Zona",
                 Dock = DockStyle.Fill,
                 Font = new Font("Segoe UI", 9.5F, FontStyle.Bold),
-                Padding = new Padding(10)
+                Padding = new Padding(10),
+                Margin = new Padding(6, 0, 0, 0)
             };
 
             dgvComunas = CrearGridBasico();
@@ -285,33 +305,39 @@ namespace SISTEMAACTUALIZADO.Forms
             dgvComunas.Columns.Add("Nombre", "Comuna");
             dgvComunas.Columns.Add("Minutos", "T. Estimado (Min)");
             dgvComunas.Columns.Add("Activo", "Activo");
+
+            dgvComunas.Columns["Nombre"]!.FillWeight = 48;
+            dgvComunas.Columns["Minutos"]!.FillWeight = 32;
+            dgvComunas.Columns["Activo"]!.FillWeight = 20;
+
             dgvComunas.SelectionChanged += DgvComunas_SelectionChanged;
 
-            Panel pnlEditorComuna = new Panel { Dock = DockStyle.Fill, AutoScroll = true };
-            int yc = 15;
+            Panel pnlEditorComuna = new Panel { Dock = DockStyle.Fill, AutoScroll = true, Padding = new Padding(4) };
+            int yc = 12;
 
-            pnlEditorComuna.Controls.Add(new Label { Text = "Nombre Comuna:", Location = new Point(5, yc + 3), AutoSize = true, Font = new Font("Segoe UI", 8.5F, FontStyle.Bold) });
-            txtComunaNombre = new TextBox { Location = new Point(140, yc), Size = new Size(220, 24), Font = new Font("Segoe UI", 9F) };
+            pnlEditorComuna.Controls.Add(new Label { Text = "Nombre Comuna:", Location = new Point(6, yc + 3), AutoSize = true, Font = new Font("Segoe UI", 8.5F, FontStyle.Bold), ForeColor = Color.FromArgb(51, 65, 85) });
+            txtComunaNombre = new TextBox { Location = new Point(145, yc), Size = new Size(200, 24), Font = new Font("Segoe UI", 9F) };
             pnlEditorComuna.Controls.Add(txtComunaNombre);
-            yc += 35;
+            yc += 34;
 
-            pnlEditorComuna.Controls.Add(new Label { Text = "Tiempo Est. (min):", Location = new Point(5, yc + 3), AutoSize = true, Font = new Font("Segoe UI", 8.5F, FontStyle.Bold) });
-            numTiempoMinutos = new NumericUpDown { Location = new Point(140, yc), Size = new Size(90, 24), Minimum = 10, Maximum = 180, Value = 45 };
+            pnlEditorComuna.Controls.Add(new Label { Text = "Tiempo Est. (min):", Location = new Point(6, yc + 3), AutoSize = true, Font = new Font("Segoe UI", 8.5F, FontStyle.Bold), ForeColor = Color.FromArgb(51, 65, 85) });
+            numTiempoMinutos = new NumericUpDown { Location = new Point(145, yc), Size = new Size(90, 24), Minimum = 10, Maximum = 180, Value = 45 };
             pnlEditorComuna.Controls.Add(numTiempoMinutos);
-            yc += 35;
+            yc += 34;
 
-            chkComunaActiva = new CheckBox { Text = "Comuna Habilitada", Location = new Point(140, yc), AutoSize = true, Checked = true };
+            chkComunaActiva = new CheckBox { Text = "Comuna Habilitada", Location = new Point(145, yc), AutoSize = true, Checked = true, Font = new Font("Segoe UI", 8.5F, FontStyle.Bold) };
             pnlEditorComuna.Controls.Add(chkComunaActiva);
-            yc += 38;
+            yc += 36;
 
             btnGuardarComuna = new Button
             {
                 Text = "💾 Guardar Comuna",
-                Location = new Point(140, yc),
-                Size = new Size(130, 32),
+                Location = new Point(145, yc),
+                Size = new Size(140, 34),
                 BackColor = Color.FromArgb(16, 185, 129),
                 ForeColor = Color.White,
                 FlatStyle = FlatStyle.Flat,
+                Font = new Font("Segoe UI", 8.5F, FontStyle.Bold),
                 Cursor = Cursors.Hand
             };
             btnGuardarComuna.FlatAppearance.BorderSize = 0;
@@ -320,11 +346,12 @@ namespace SISTEMAACTUALIZADO.Forms
             btnNuevaComuna = new Button
             {
                 Text = "➕ Nueva Comuna",
-                Location = new Point(280, yc),
-                Size = new Size(120, 32),
+                Location = new Point(295, yc),
+                Size = new Size(130, 34),
                 BackColor = Color.FromArgb(100, 116, 139),
                 ForeColor = Color.White,
                 FlatStyle = FlatStyle.Flat,
+                Font = new Font("Segoe UI", 8.5F, FontStyle.Bold),
                 Cursor = Cursors.Hand
             };
             btnNuevaComuna.FlatAppearance.BorderSize = 0;
@@ -335,9 +362,9 @@ namespace SISTEMAACTUALIZADO.Forms
 
             gbComunas.Controls.Add(pnlEditorComuna);
             gbComunas.Controls.Add(dgvComunas);
-            split.Panel2.Controls.Add(gbComunas);
+            tlpLayout.Controls.Add(gbComunas, 1, 0);
 
-            tab.Controls.Add(split);
+            tab.Controls.Add(tlpLayout);
         }
 
         private DataGridView CrearGridBasico()
@@ -345,7 +372,9 @@ namespace SISTEMAACTUALIZADO.Forms
             var grid = new DataGridView
             {
                 BackgroundColor = Color.White,
-                BorderStyle = BorderStyle.Fixed3D,
+                BorderStyle = BorderStyle.None,
+                CellBorderStyle = DataGridViewCellBorderStyle.SingleHorizontal,
+                ColumnHeadersBorderStyle = DataGridViewHeaderBorderStyle.None,
                 RowHeadersVisible = false,
                 AllowUserToAddRows = false,
                 AllowUserToDeleteRows = false,
@@ -353,11 +382,23 @@ namespace SISTEMAACTUALIZADO.Forms
                 SelectionMode = DataGridViewSelectionMode.FullRowSelect,
                 MultiSelect = false,
                 AutoSizeColumnsMode = DataGridViewAutoSizeColumnsMode.Fill,
+                RowTemplate = { Height = 32 },
                 Font = new Font("Segoe UI", 8.5F, FontStyle.Regular)
             };
-            grid.ColumnHeadersDefaultCellStyle.BackColor = Color.FromArgb(241, 245, 249);
-            grid.ColumnHeadersDefaultCellStyle.Font = new Font("Segoe UI", 8.5F, FontStyle.Bold);
+
             grid.EnableHeadersVisualStyles = false;
+            grid.ColumnHeadersDefaultCellStyle.BackColor = Color.FromArgb(15, 23, 42);
+            grid.ColumnHeadersDefaultCellStyle.ForeColor = Color.White;
+            grid.ColumnHeadersDefaultCellStyle.SelectionBackColor = Color.FromArgb(15, 23, 42);
+            grid.ColumnHeadersDefaultCellStyle.SelectionForeColor = Color.White;
+            grid.ColumnHeadersDefaultCellStyle.Font = new Font("Segoe UI", 8.5F, FontStyle.Bold);
+            grid.ColumnHeadersHeight = 34;
+
+            grid.DefaultCellStyle.SelectionBackColor = Color.FromArgb(224, 242, 254);
+            grid.DefaultCellStyle.SelectionForeColor = Color.FromArgb(15, 23, 42);
+            grid.AlternatingRowsDefaultCellStyle.BackColor = Color.FromArgb(248, 250, 252);
+            grid.GridColor = Color.FromArgb(226, 232, 240);
+
             return grid;
         }
 
@@ -427,7 +468,14 @@ namespace SISTEMAACTUALIZADO.Forms
 
                 foreach (var z in zonas)
                 {
-                    dgvZonas.Rows.Add(z.ZonaDeliveryId, z.Nombre, z.CostoEnvio, z.PedidoMinimo, z.MontoEnvioGratis, z.Activo ? "Sí" : "No");
+                    dgvZonas.Rows.Add(
+                        z.ZonaDeliveryId, 
+                        z.Nombre, 
+                        $"$ {z.CostoEnvio:N0}", 
+                        $"$ {z.PedidoMinimo:N0}", 
+                        $"$ {z.MontoEnvioGratis:N0}", 
+                        z.Activo ? "Sí" : "No"
+                    );
                 }
 
                 dgvZonas.SelectionChanged += DgvZonas_SelectionChanged;
@@ -464,16 +512,20 @@ namespace SISTEMAACTUALIZADO.Forms
             _zonaSeleccionadaId = Convert.ToInt32(fila.Cells["Id"].Value);
             txtZonaNombre.Text = fila.Cells["Nombre"].Value?.ToString() ?? "";
 
-            decimal costo = Convert.ToDecimal(fila.Cells["Costo"].Value ?? 0);
-            decimal minimo = Convert.ToDecimal(fila.Cells["Minimo"].Value ?? 0);
-            decimal gratis = Convert.ToDecimal(fila.Cells["Gratis"].Value ?? 0);
-
-            numCostoEnvio.Value = Math.Min(numCostoEnvio.Maximum, Math.Max(numCostoEnvio.Minimum, costo));
-            numPedidoMinimo.Value = Math.Min(numPedidoMinimo.Maximum, Math.Max(numPedidoMinimo.Minimum, minimo));
-            numEnvioGratis.Value = Math.Min(numEnvioGratis.Maximum, Math.Max(numEnvioGratis.Minimum, gratis));
+            // Parseo seguro de moneda
+            numCostoEnvio.Value = ParsearMoneda(fila.Cells["Costo"].Value);
+            numPedidoMinimo.Value = ParsearMoneda(fila.Cells["Minimo"].Value);
+            numEnvioGratis.Value = ParsearMoneda(fila.Cells["Gratis"].Value);
             chkZonaActiva.Checked = (fila.Cells["Activo"].Value?.ToString() == "Sí");
 
             CargarComunasDeZona(_zonaSeleccionadaId);
+        }
+
+        private static decimal ParsearMoneda(object? valor)
+        {
+            if (valor == null) return 0m;
+            string str = valor.ToString()?.Replace("$", "").Replace(".", "").Trim() ?? "0";
+            return decimal.TryParse(str, NumberStyles.Any, CultureInfo.InvariantCulture, out decimal res) ? res : 0m;
         }
 
         private void CargarComunasDeZona(int zonaId)

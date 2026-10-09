@@ -356,32 +356,33 @@ namespace SISTEMAACTUALIZADO
             Label lblVendIcon = new Label 
             { 
                 Text = "👤", 
-                Size = new Size(20, 28), 
-                Font = new Font("Segoe UI", 10F), 
+                Size = new Size(22, 34), 
+                Font = new Font("Segoe UI", 11F), 
                 TextAlign = ContentAlignment.MiddleCenter, 
-                Margin = new Padding(0, 4, 2, 0) 
+                Margin = new Padding(0, 0, 4, 0) 
             };
 
             cbVendedor = new ComboBox
             {
-                Size = new Size(130, 28),
+                Size = new Size(135, 34),
                 DropDownStyle = ComboBoxStyle.DropDownList,
-                Font = new Font("Segoe UI", 9F, FontStyle.Bold),
-                Margin = new Padding(0, 4, 6, 0)
+                Font = new Font("Segoe UI", 9.5F, FontStyle.Bold),
+                Margin = new Padding(0, 3, 8, 0)
             };
             CargarListaVendedoresBD();
             cbVendedor.SelectedIndexChanged += CbVendedor_SelectedIndexChanged;
 
+            // Botón Tickets con altura 34 px (igual que el buscador)
             Button btnVerMisTickets = new Button
             {
                 Text = "📋 Tickets",
-                Size = new Size(82, 30),
+                Size = new Size(95, 34),
                 BackColor = Color.White,
                 ForeColor = Color.FromArgb(37, 99, 235),
                 FlatStyle = FlatStyle.Flat,
-                Font = new Font("Segoe UI", 8F, FontStyle.Bold),
+                Font = new Font("Segoe UI", 8.5F, FontStyle.Bold),
                 Cursor = Cursors.Hand,
-                Margin = new Padding(0, 3, 4, 0)
+                Margin = new Padding(0, 0, 6, 0)
             };
             btnVerMisTickets.FlatAppearance.BorderColor = Color.FromArgb(191, 219, 254);
             btnVerMisTickets.Click += (s, e) =>
@@ -393,16 +394,17 @@ namespace SISTEMAACTUALIZADO
                 modalHistorial.ShowDialog(this);
             };
 
+            // Botón Ventas en Espera con altura 34 px (igual que el buscador)
             Button btnVentasEnEspera = new Button
             {
                 Text = "⏸️ Ventas en Espera",
-                Size = new Size(140, 30),
+                Size = new Size(155, 34),
                 BackColor = Color.FromArgb(254, 243, 199),
                 ForeColor = Color.FromArgb(180, 83, 9),
                 FlatStyle = FlatStyle.Flat,
-                Font = new Font("Segoe UI", 8F, FontStyle.Bold),
+                Font = new Font("Segoe UI", 8.5F, FontStyle.Bold),
                 Cursor = Cursors.Hand,
-                Margin = new Padding(0, 3, 0, 0)
+                Margin = new Padding(0, 0, 0, 0)
             };
             btnVentasEnEspera.FlatAppearance.BorderColor = Color.FromArgb(253, 230, 138);
             btnVentasEnEspera.Click += BtnVentasEnEspera_Click;
@@ -569,8 +571,8 @@ namespace SISTEMAACTUALIZADO
             {
                 if (cat.Equals("Todas", StringComparison.OrdinalIgnoreCase)) continue;
 
-                int colorHash = Math.Abs(cat.Trim().ToLowerInvariant().GetHashCode());
-                var estilo = _paletaColores[colorHash % _paletaColores.Count];
+                // 👈 Obtiene el color personalizado y guardado para esta categoría
+                var estilo = CategoriaColorHelper.ObtenerColor(cat);
                 bool seleccionada = _categoriaActivaNombre.Equals(cat, StringComparison.OrdinalIgnoreCase);
 
                 flowCategorias.Controls.Add(CrearBotonCategoria(

@@ -594,7 +594,7 @@ namespace SISTEMAACTUALIZADO
             using Form modal = new Form
             {
                 Text = "Autorización de Extensión de Turno",
-                Size = new Size(380, 310),
+                Size = new Size(380, 335), // 👈 Aumentado para dar margen de aire abajo
                 StartPosition = FormStartPosition.CenterParent,
                 FormBorderStyle = FormBorderStyle.FixedDialog,
                 MaximizeBox = false,
@@ -617,7 +617,17 @@ namespace SISTEMAACTUALIZADO
             cbH.Items.AddRange(new object[] { "1 Hora", "2 Horas", "3 Horas", "4 Horas" });
             cbH.SelectedIndex = 1;
 
-            Button btnAut = new Button { Text = "✔ Conceder Extensión", Location = new Point(20, 232), Size = new Size(325, 38), BackColor = Color.FromArgb(16, 185, 129), ForeColor = Color.White, FlatStyle = FlatStyle.Flat, Font = new Font("Segoe UI", 9.5F, FontStyle.Bold), Cursor = Cursors.Hand };
+            Button btnAut = new Button 
+            { 
+                Text = "✔ Conceder Extensión", 
+                Location = new Point(20, 232), 
+                Size = new Size(325, 40), 
+                BackColor = Color.FromArgb(16, 185, 129), 
+                ForeColor = Color.White, 
+                FlatStyle = FlatStyle.Flat, 
+                Font = new Font("Segoe UI", 9.5F, FontStyle.Bold), 
+                Cursor = Cursors.Hand 
+            };
             btnAut.FlatAppearance.BorderSize = 0;
 
             btnAut.Click += (s, e) =>
@@ -831,29 +841,20 @@ namespace SISTEMAACTUALIZADO
 
             using Form modalCierre = new Form
             {
-                Text = esCierreForzado ? "⚠️ CIERRE OBLIGATORIO - TURNO EXPIRADO" : "Arqueo y Cierre de Caja",
-                Size = new Size(380, 430),
+                Text = esCierreForzado ? "⚠️ CIERRE DE TURNO EXPIRADO" : "Arqueo y Cierre de Caja",
+                Size = new Size(380, 420),
                 StartPosition = FormStartPosition.CenterParent,
                 FormBorderStyle = FormBorderStyle.FixedDialog,
                 MaximizeBox = false,
                 MinimizeBox = false,
-                ControlBox = !esCierreForzado,
+                ControlBox = true, // 👈 Se habilita siempre la 'X' superior derecha
                 BackColor = Color.White,
                 KeyPreview = true
             };
 
-            modalCierre.FormClosing += (s, ev) =>
-            {
-                if (esCierreForzado && !cierreExitoso)
-                {
-                    ev.Cancel = true;
-                    MessageBox.Show("Debe realizar el conteo de efectivo y confirmar el cierre del turno para continuar.", "Operación Requerida", MessageBoxButtons.OK, MessageBoxIcon.Exclamation);
-                }
-            };
-
             Label lblT = new Label 
             { 
-                Text = esCierreForzado ? $"🔒 CIERRE OBLIGATORIO #{_turnoActual.CajaTurnoID}" : "🔒 ARQUEO Y CIERRE DE TURNO", 
+                Text = esCierreForzado ? $"🔒 CIERRE DE TURNO #{_turnoActual.CajaTurnoID}" : "🔒 ARQUEO Y CIERRE DE TURNO", 
                 Location = new Point(20, 14), 
                 AutoSize = true, 
                 Font = new Font("Segoe UI", 11F, FontStyle.Bold), 
@@ -917,7 +918,7 @@ namespace SISTEMAACTUALIZADO
             {
                 Text = "🔒 Confirmar Cierre Definitivo",
                 Location = new Point(20, 248),
-                Size = new Size(325, 44),
+                Size = new Size(325, 42),
                 BackColor = Color.FromArgb(239, 68, 68),
                 ForeColor = Color.White,
                 FlatStyle = FlatStyle.Flat,
@@ -965,6 +966,20 @@ namespace SISTEMAACTUALIZADO
                 );
             };
 
+            Button btnCancelar = new Button
+            {
+                Text = "✖ Cancelar",
+                Location = new Point(20, 298),
+                Size = new Size(325, 34),
+                BackColor = Color.FromArgb(241, 245, 249),
+                ForeColor = Color.FromArgb(71, 85, 105),
+                FlatStyle = FlatStyle.Flat,
+                Font = new Font("Segoe UI", 9F, FontStyle.Bold),
+                Cursor = Cursors.Hand
+            };
+            btnCancelar.FlatAppearance.BorderSize = 0;
+            btnCancelar.Click += (s, ev) => modalCierre.Close();
+
             // Asignación de tecla Enter al botón de confirmación
             modalCierre.AcceptButton = btnConfirmar;
 
@@ -996,8 +1011,8 @@ namespace SISTEMAACTUALIZADO
                 }
             };
 
-            modalCierre.Controls.AddRange(new Control[] { lblT, lblSubFecha, lblPrompt, txtEfectivoReal, lblResultadoDif, lblObs, txtObs, btnConfirmar });
-            modalCierre.ShowDialog();
+            modalCierre.Controls.AddRange(new Control[] { lblT, lblSubFecha, lblPrompt, txtEfectivoReal, lblResultadoDif, lblObs, txtObs, btnConfirmar, btnCancelar });
+            modalCierre.ShowDialog(this);
             _modalArqueoAbierto = false;
         }
 

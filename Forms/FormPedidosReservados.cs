@@ -4,8 +4,7 @@ using System.Drawing;
 using System.Drawing.Drawing2D;
 using System.Linq;
 using System.Windows.Forms;
-using Microsoft.EntityFrameworkCore;
-using SISTEMAACTUALIZADO.Data; // 👈 AGREGAR ESTA LÍNEA
+using SISTEMAACTUALIZADO.Data;
 using SISTEMAACTUALIZADO.Helpers;
 using SISTEMAACTUALIZADO.Modals;
 using SISTEMAACTUALIZADO.Models;
@@ -55,72 +54,106 @@ namespace SISTEMAACTUALIZADO
         {
             this.SuspendLayout();
             this.BackColor = Color.FromArgb(248, 250, 252);
-            this.Font = new Font("Segoe UI", 9F, FontStyle.Regular, GraphicsUnit.Point);
+            this.Font = new Font("Segoe UI", 9.5F, FontStyle.Regular, GraphicsUnit.Point);
 
-            Panel pnlMain = new Panel
+            Panel pnlPrincipal = new Panel
             {
                 Dock = DockStyle.Fill,
-                Padding = new Padding(14, 10, 14, 12),
+                Padding = new Padding(16, 12, 16, 16),
                 BackColor = Color.FromArgb(248, 250, 252)
             };
 
+            // =========================================================================
             // 1. ENCABEZADO
-            Panel pnlHeader = new Panel { Dock = DockStyle.Top, Height = 52, BackColor = Color.Transparent };
+            // =========================================================================
+            Panel pnlHeader = new Panel 
+            { 
+                Dock = DockStyle.Top, 
+                Height = 56, 
+                BackColor = Color.Transparent, 
+                Padding = new Padding(0, 0, 0, 10) 
+            };
+
             Label lblTitulo = new Label
             {
                 Text = "📅 Pedidos por Encargo y Reservas",
-                Font = new Font("Segoe UI", 16F, FontStyle.Bold),
+                Font = new Font("Segoe UI", 14F, FontStyle.Bold),
                 ForeColor = Color.FromArgb(15, 23, 42),
-                Location = new Point(0, 2),
-                AutoSize = true
+                Dock = DockStyle.Top,
+                Height = 26
             };
-            Label lblSub = new Label
+
+            Label lblSubtitulo = new Label
             {
                 Text = "Seguimiento de pedidos futuros, control de abonos, producción y entrega con boleta",
                 Font = new Font("Segoe UI", 8.2F),
                 ForeColor = Color.FromArgb(100, 116, 139),
-                Location = new Point(2, 30),
-                AutoSize = true
+                Dock = DockStyle.Top,
+                Height = 20
             };
-            pnlHeader.Controls.AddRange(new Control[] { lblTitulo, lblSub });
 
-            // 2. FILTROS
-            Panel pnlFiltros = new Panel { Dock = DockStyle.Top, Height = 58, BackColor = Color.White, Margin = new Padding(0, 0, 0, 10), Padding = new Padding(10, 10, 10, 10) };
-            pnlFiltros.Paint += (s, e) => ControlPaint.DrawBorder(e.Graphics, pnlFiltros.ClientRectangle, Color.FromArgb(226, 232, 240), ButtonBorderStyle.Solid);
+            pnlHeader.Controls.Add(lblSubtitulo);
+            pnlHeader.Controls.Add(lblTitulo);
 
-            Label lblFiltroEst = new Label { Text = "ESTADO:", Location = new Point(10, 18), AutoSize = true, Font = new Font("Segoe UI", 8.5F, FontStyle.Bold), ForeColor = Color.FromArgb(71, 85, 105) };
+            // =========================================================================
+            // 2. SECCIÓN FILTROS Y BÚSQUEDA
+            // =========================================================================
+            Panel pnlFiltrosWrapper = new Panel
+            {
+                Dock = DockStyle.Top,
+                Height = 82,
+                Padding = new Padding(0, 0, 0, 12),
+                BackColor = Color.Transparent
+            };
+
+            Panel pnlFiltrosCard = CrearTarjetaRedondeada(0, 0, 0, 70, Color.White, Color.FromArgb(226, 232, 240));
+            pnlFiltrosCard.Dock = DockStyle.Fill;
+            pnlFiltrosCard.Padding = new Padding(16, 10, 16, 10);
+
+            FlowLayoutPanel flpFiltros = new FlowLayoutPanel
+            {
+                Dock = DockStyle.Fill,
+                WrapContents = false,
+                BackColor = Color.Transparent
+            };
+
             cbFiltroEstado = new ComboBox
             {
-                Location = new Point(75, 14),
                 Size = new Size(160, 26),
                 DropDownStyle = ComboBoxStyle.DropDownList,
-                Font = new Font("Segoe UI", 9F)
+                Font = new Font("Segoe UI", 9.5F)
             };
             cbFiltroEstado.Items.AddRange(new object[] { "Todos", "Reservado", "Listo para Retiro", "Entregado", "Anulado" });
             cbFiltroEstado.SelectedIndex = 0;
             cbFiltroEstado.SelectedIndexChanged += (s, e) => CargarReservas();
+            Panel pnlGrpEstado = CrearGrupoLimpio("ESTADO", cbFiltroEstado, 165);
 
-            Label lblBus = new Label { Text = "BUSCAR:", Location = new Point(255, 18), AutoSize = true, Font = new Font("Segoe UI", 8.5F, FontStyle.Bold), ForeColor = Color.FromArgb(71, 85, 105) };
             txtBuscar = new TextBox
             {
-                Location = new Point(315, 15),
-                Size = new Size(260, 25),
+                Size = new Size(320, 26),
                 Font = new Font("Segoe UI", 9.5F),
+                BorderStyle = BorderStyle.None,
+                BackColor = Color.FromArgb(248, 250, 252),
                 PlaceholderText = "Código, Cliente, RUT..."
             };
             txtBuscar.KeyDown += (s, e) => { if (e.KeyCode == Keys.Enter) { CargarReservas(); e.SuppressKeyPress = true; } };
+            Panel pnlGrpBuscar = CrearGrupoConCaja("BUSCAR RESERVA", txtBuscar, 335);
 
-            Button btnBuscar = new Button { Text = "🔍 Buscar", Location = new Point(585, 14), Size = new Size(85, 27), BackColor = Color.FromArgb(37, 99, 235), ForeColor = Color.White, FlatStyle = FlatStyle.Flat, Font = new Font("Segoe UI", 8.5F, FontStyle.Bold), Cursor = Cursors.Hand };
-            btnBuscar.FlatAppearance.BorderSize = 0;
+            Button btnBuscar = CrearBoton("🔍 Buscar", Color.FromArgb(37, 99, 235), Color.White, new Size(90, 32));
+            btnBuscar.Margin = new Padding(6, 14, 0, 0);
             btnBuscar.Click += (s, e) => CargarReservas();
 
-            Button btnRecargar = new Button { Text = "🔄 Recargar", Location = new Point(678, 14), Size = new Size(95, 27), BackColor = Color.FromArgb(241, 245, 249), ForeColor = Color.FromArgb(30, 41, 59), FlatStyle = FlatStyle.Flat, Font = new Font("Segoe UI", 8.5F, FontStyle.Bold), Cursor = Cursors.Hand };
-            btnRecargar.FlatAppearance.BorderSize = 0;
-            btnRecargar.Click += (s, e) => { txtBuscar.Clear(); cbFiltroEstado.SelectedIndex = 0; CargarReservas(); };
+            Button btnLimpiarFiltros = CrearBoton("🔄 Recargar", Color.FromArgb(241, 245, 249), Color.FromArgb(51, 65, 85), new Size(100, 32));
+            btnLimpiarFiltros.Margin = new Padding(6, 14, 0, 0);
+            btnLimpiarFiltros.Click += (s, e) => { txtBuscar.Clear(); cbFiltroEstado.SelectedIndex = 0; CargarReservas(); };
 
-            pnlFiltros.Controls.AddRange(new Control[] { lblFiltroEst, cbFiltroEstado, lblBus, txtBuscar, btnBuscar, btnRecargar });
+            flpFiltros.Controls.AddRange(new Control[] { pnlGrpEstado, pnlGrpBuscar, btnBuscar, btnLimpiarFiltros });
+            pnlFiltrosCard.Controls.Add(flpFiltros);
+            pnlFiltrosWrapper.Controls.Add(pnlFiltrosCard);
 
-            // 3. CUERPO (GRILLA SUPERIOR + PANELES INFERIORES)
+            // =========================================================================
+            // 3. LAYOUT CENTRAL Y PANELES RESPONSIVOS
+            // =========================================================================
             TableLayoutPanel gridLayout = new TableLayoutPanel
             {
                 Dock = DockStyle.Fill,
@@ -128,82 +161,116 @@ namespace SISTEMAACTUALIZADO
                 ColumnCount = 1,
                 BackColor = Color.Transparent
             };
-            gridLayout.RowStyles.Add(new RowStyle(SizeType.Percent, 55F));
-            gridLayout.RowStyles.Add(new RowStyle(SizeType.Percent, 45F));
+            gridLayout.RowStyles.Add(new RowStyle(SizeType.Percent, 54F));
+            gridLayout.RowStyles.Add(new RowStyle(SizeType.Percent, 46F));
 
-            // GRILLA SUPERIOR: LISTA DE RESERVAS
-            Panel pnlCardReservas = new Panel { Dock = DockStyle.Fill, BackColor = Color.White, Padding = new Padding(8), Margin = new Padding(0, 8, 0, 8) };
-            pnlCardReservas.Paint += (s, e) => ControlPaint.DrawBorder(e.Graphics, pnlCardReservas.ClientRectangle, Color.FromArgb(226, 232, 240), ButtonBorderStyle.Solid);
+            // A) TARJETA GRILLA SUPERIOR
+            Panel pnlCardReservas = CrearTarjetaRedondeada(0, 0, 0, 0, Color.White, Color.FromArgb(226, 232, 240));
+            pnlCardReservas.Dock = DockStyle.Fill;
+            pnlCardReservas.Padding = new Padding(10);
+            pnlCardReservas.Margin = new Padding(0, 0, 0, 8);
 
-            dgvReservas = new DataGridView
-            {
-                Dock = DockStyle.Fill,
-                BackgroundColor = Color.White,
-                BorderStyle = BorderStyle.None,
-                ReadOnly = true,
-                MultiSelect = false,
-                SelectionMode = DataGridViewSelectionMode.FullRowSelect,
-                RowHeadersVisible = false,
-                AllowUserToAddRows = false,
-                AutoSizeColumnsMode = DataGridViewAutoSizeColumnsMode.Fill,
-                AutoGenerateColumns = false
-            };
-            ConfigurarEstiloTabla(dgvReservas);
+            dgvReservas = CrearGrillaBase();
             ConfigurarColumnasReservas();
             dgvReservas.SelectionChanged += DgvReservas_SelectionChanged;
 
-            pnlCardReservas.Controls.Add(dgvReservas);
+            Panel pnlFooter = new Panel { Dock = DockStyle.Bottom, Height = 28, Padding = new Padding(4, 4, 4, 0) };
+            lblContadorFooter = new Label
+            {
+                Text = "Mostrando 0 reservas registradas",
+                Font = new Font("Segoe UI", 8.5F),
+                ForeColor = Color.FromArgb(100, 116, 139),
+                Dock = DockStyle.Fill,
+                TextAlign = ContentAlignment.MiddleLeft
+            };
+            pnlFooter.Controls.Add(lblContadorFooter);
 
-            // PANEL INFERIOR (DETALLE IZQUIERDA + HISTORIAL PAGOS + ACCIONES DERECHA)
+            pnlCardReservas.Controls.Add(dgvReservas);
+            pnlCardReservas.Controls.Add(pnlFooter);
+
+            // B) TARJETA SPLIT INFERIOR (3 Columnas con anchos responsivos y relleno total)
             TableLayoutPanel pnlBottomSplit = new TableLayoutPanel
             {
                 Dock = DockStyle.Fill,
                 ColumnCount = 3,
                 RowCount = 1,
-                BackColor = Color.Transparent
+                BackColor = Color.Transparent,
+                Margin = new Padding(0)
             };
             pnlBottomSplit.ColumnStyles.Add(new ColumnStyle(SizeType.Percent, 42F)); // Detalle Ítems
-            pnlBottomSplit.ColumnStyles.Add(new ColumnStyle(SizeType.Percent, 34F)); // Historial Abonos
-            pnlBottomSplit.ColumnStyles.Add(new ColumnStyle(SizeType.Percent, 24F)); // Botones de Acción
+            pnlBottomSplit.ColumnStyles.Add(new ColumnStyle(SizeType.Percent, 35F)); // Historial Abonos
+            pnlBottomSplit.ColumnStyles.Add(new ColumnStyle(SizeType.Percent, 23F)); // Acciones
 
-            // A) Detalle de Ítems
-            Panel pnlCardDet = new Panel { Dock = DockStyle.Fill, BackColor = Color.White, Padding = new Padding(8), Margin = new Padding(0, 0, 6, 0) };
-            pnlCardDet.Paint += (s, e) => ControlPaint.DrawBorder(e.Graphics, pnlCardDet.ClientRectangle, Color.FromArgb(226, 232, 240), ButtonBorderStyle.Solid);
-            Label lblTitDet = new Label { Text = "PRODUCTOS DEL PEDIDO", Font = new Font("Segoe UI", 8F, FontStyle.Bold), ForeColor = Color.FromArgb(15, 23, 42), Dock = DockStyle.Top, Height = 20 };
-            dgvDetalle = new DataGridView { Dock = DockStyle.Fill, BackgroundColor = Color.White, BorderStyle = BorderStyle.None, ReadOnly = true, MultiSelect = false, RowHeadersVisible = false, AllowUserToAddRows = false, AutoSizeColumnsMode = DataGridViewAutoSizeColumnsMode.Fill, AutoGenerateColumns = false };
-            ConfigurarEstiloTabla(dgvDetalle);
+            // 1. Detalle de Ítems
+            Panel pnlCardDet = CrearTarjetaRedondeada(0, 0, 0, 0, Color.White, Color.FromArgb(226, 232, 240));
+            pnlCardDet.Dock = DockStyle.Fill;
+            pnlCardDet.Padding = new Padding(10);
+            pnlCardDet.Margin = new Padding(0, 0, 6, 0);
+
+            Label lblTitDet = new Label 
+            { 
+                Text = "PRODUCTOS DEL PEDIDO", 
+                Font = new Font("Segoe UI", 8F, FontStyle.Bold), 
+                ForeColor = Color.FromArgb(100, 116, 139), 
+                Dock = DockStyle.Top, 
+                Height = 22 
+            };
+
+            dgvDetalle = CrearGrillaBase();
             ConfigurarColumnasDetalle();
-            pnlCardDet.Controls.AddRange(new Control[] { dgvDetalle, lblTitDet });
+            pnlCardDet.Controls.Add(dgvDetalle);
+            pnlCardDet.Controls.Add(lblTitDet);
 
-            // B) Historial de Abonos
-            Panel pnlCardAbonos = new Panel { Dock = DockStyle.Fill, BackColor = Color.White, Padding = new Padding(8), Margin = new Padding(0, 0, 6, 0) };
-            pnlCardAbonos.Paint += (s, e) => ControlPaint.DrawBorder(e.Graphics, pnlCardAbonos.ClientRectangle, Color.FromArgb(226, 232, 240), ButtonBorderStyle.Solid);
-            Label lblTitAbo = new Label { Text = "HISTORIAL DE PAGOS / ABONOS", Font = new Font("Segoe UI", 8F, FontStyle.Bold), ForeColor = Color.FromArgb(15, 23, 42), Dock = DockStyle.Top, Height = 20 };
-            dgvAbonos = new DataGridView { Dock = DockStyle.Fill, BackgroundColor = Color.White, BorderStyle = BorderStyle.None, ReadOnly = true, MultiSelect = false, RowHeadersVisible = false, AllowUserToAddRows = false, AutoSizeColumnsMode = DataGridViewAutoSizeColumnsMode.Fill, AutoGenerateColumns = false };
-            ConfigurarEstiloTabla(dgvAbonos);
+            // 2. Historial de Abonos
+            Panel pnlCardAbonos = CrearTarjetaRedondeada(0, 0, 0, 0, Color.White, Color.FromArgb(226, 232, 240));
+            pnlCardAbonos.Dock = DockStyle.Fill;
+            pnlCardAbonos.Padding = new Padding(10);
+            pnlCardAbonos.Margin = new Padding(6, 0, 6, 0);
+
+            Label lblTitAbo = new Label 
+            { 
+                Text = "HISTORIAL DE PAGOS / ABONOS", 
+                Font = new Font("Segoe UI", 8F, FontStyle.Bold), 
+                ForeColor = Color.FromArgb(100, 116, 139), 
+                Dock = DockStyle.Top, 
+                Height = 22 
+            };
+
+            dgvAbonos = CrearGrillaBase();
             ConfigurarColumnasAbonos();
-            pnlCardAbonos.Controls.AddRange(new Control[] { dgvAbonos, lblTitAbo });
+            pnlCardAbonos.Controls.Add(dgvAbonos);
+            pnlCardAbonos.Controls.Add(lblTitAbo);
+            // 3. Botones de Acción (Separación vertical limpia)
+            Panel pnlCardAcciones = CrearTarjetaRedondeada(0, 0, 0, 0, Color.White, Color.FromArgb(226, 232, 240));
+            pnlCardAcciones.Dock = DockStyle.Fill;
+            pnlCardAcciones.Padding = new Padding(12);
+            pnlCardAcciones.Margin = new Padding(6, 0, 0, 0);
 
-            // C) Botones de Acción
-            Panel pnlCardAcciones = new Panel { Dock = DockStyle.Fill, BackColor = Color.White, Padding = new Padding(10) };
-            pnlCardAcciones.Paint += (s, e) => ControlPaint.DrawBorder(e.Graphics, pnlCardAcciones.ClientRectangle, Color.FromArgb(226, 232, 240), ButtonBorderStyle.Solid);
-
-            btnEntregarLiquidar = CrearBotonAccion("🚀 ENTREGAR Y COBRAR", Color.FromArgb(16, 185, 129), Color.White, 0);
-            btnEntregarLiquidar.Click += BtnEntregarLiquidar_Click;
-
-            btnRegistrarAbono = CrearBotonAccion("💵 Registrar Abono", Color.FromArgb(37, 99, 235), Color.White, 46);
-            btnRegistrarAbono.Click += BtnRegistrarAbono_Click;
-
-            btnMarcarListo = CrearBotonAccion("📦 Marcar Listo para Retiro", Color.FromArgb(124, 58, 237), Color.White, 92);
-            btnMarcarListo.Click += BtnMarcarListo_Click;
-
-            btnReimprimir = CrearBotonAccion("🖨️ Reimprimir Ticket", Color.FromArgb(241, 245, 249), Color.FromArgb(30, 41, 59), 138);
-            btnReimprimir.Click += BtnReimprimir_Click;
-
-            btnAnular = CrearBotonAccion("🚫 Anular Reserva", Color.FromArgb(254, 242, 242), Color.FromArgb(239, 68, 68), 184);
+            // Se agregan de abajo hacia arriba con DockStyle.Top usando un espaciador entre cada uno
+            btnAnular = CrearBotonAccionDock("🚫 Anular Reserva", Color.FromArgb(254, 242, 242), Color.FromArgb(239, 68, 68));
             btnAnular.Click += BtnAnular_Click;
 
-            pnlCardAcciones.Controls.AddRange(new Control[] { btnEntregarLiquidar, btnRegistrarAbono, btnMarcarListo, btnReimprimir, btnAnular });
+            btnReimprimir = CrearBotonAccionDock("🖨️ Reimprimir Ticket", Color.FromArgb(241, 245, 249), Color.FromArgb(30, 41, 59));
+            btnReimprimir.Click += BtnReimprimir_Click;
+
+            btnMarcarListo = CrearBotonAccionDock("📦 Marcar Listo para Retiro", Color.FromArgb(124, 58, 237), Color.White);
+            btnMarcarListo.Click += BtnMarcarListo_Click;
+
+            btnRegistrarAbono = CrearBotonAccionDock("💵 Registrar Abono", Color.FromArgb(37, 99, 235), Color.White);
+            btnRegistrarAbono.Click += BtnRegistrarAbono_Click;
+
+            btnEntregarLiquidar = CrearBotonAccionDock("🚀 ENTREGAR Y COBRAR", Color.FromArgb(16, 185, 129), Color.White);
+            btnEntregarLiquidar.Click += BtnEntregarLiquidar_Click;
+
+            pnlCardAcciones.Controls.Add(btnAnular);
+            pnlCardAcciones.Controls.Add(CrearEspaciador(8));
+            pnlCardAcciones.Controls.Add(btnReimprimir);
+            pnlCardAcciones.Controls.Add(CrearEspaciador(8));
+            pnlCardAcciones.Controls.Add(btnMarcarListo);
+            pnlCardAcciones.Controls.Add(CrearEspaciador(8));
+            pnlCardAcciones.Controls.Add(btnRegistrarAbono);
+            pnlCardAcciones.Controls.Add(CrearEspaciador(8));
+            pnlCardAcciones.Controls.Add(btnEntregarLiquidar);
 
             pnlBottomSplit.Controls.Add(pnlCardDet, 0, 0);
             pnlBottomSplit.Controls.Add(pnlCardAbonos, 1, 0);
@@ -212,14 +279,52 @@ namespace SISTEMAACTUALIZADO
             gridLayout.Controls.Add(pnlCardReservas, 0, 0);
             gridLayout.Controls.Add(pnlBottomSplit, 0, 1);
 
-            // FOOTER
-            Panel pnlFooter = new Panel { Dock = DockStyle.Bottom, Height = 28, Padding = new Padding(4, 4, 4, 0) };
-            lblContadorFooter = new Label { Text = "0 reservas registradas", Font = new Font("Segoe UI", 8.5F), ForeColor = Color.FromArgb(100, 116, 139), Dock = DockStyle.Fill };
-            pnlFooter.Controls.Add(lblContadorFooter);
+            pnlPrincipal.Controls.Add(gridLayout);
+            pnlPrincipal.Controls.Add(pnlFiltrosWrapper);
+            pnlPrincipal.Controls.Add(pnlHeader);
 
-            pnlMain.Controls.AddRange(new Control[] { gridLayout, pnlFiltros, pnlHeader, pnlFooter });
-            this.Controls.Add(pnlMain);
+            this.Controls.Add(pnlPrincipal);
             this.ResumeLayout(false);
+        }
+
+        private DataGridView CrearGrillaBase()
+        {
+            var dgv = new DataGridView
+            {
+                Dock = DockStyle.Fill,
+                BackgroundColor = Color.White,
+                BorderStyle = BorderStyle.None,
+                CellBorderStyle = DataGridViewCellBorderStyle.SingleHorizontal,
+                ColumnHeadersBorderStyle = DataGridViewHeaderBorderStyle.None,
+                SelectionMode = DataGridViewSelectionMode.FullRowSelect,
+                MultiSelect = false,
+                AllowUserToAddRows = false,
+                ReadOnly = true,
+                RowHeadersVisible = false,
+                ScrollBars = ScrollBars.Both,
+                AutoSizeColumnsMode = DataGridViewAutoSizeColumnsMode.Fill,
+                AutoGenerateColumns = false
+            };
+
+            // Estilo unificado con FormClientes: SelectionBackColor fijo para evitar cabeceras celestes
+            dgv.EnableHeadersVisualStyles = false;
+            dgv.ColumnHeadersDefaultCellStyle.BackColor = Color.FromArgb(15, 23, 42);
+            dgv.ColumnHeadersDefaultCellStyle.ForeColor = Color.White;
+            dgv.ColumnHeadersDefaultCellStyle.SelectionBackColor = Color.FromArgb(15, 23, 42);
+            dgv.ColumnHeadersDefaultCellStyle.SelectionForeColor = Color.White;
+            dgv.ColumnHeadersDefaultCellStyle.Font = new Font("Segoe UI", 8.5F, FontStyle.Bold);
+            dgv.ColumnHeadersHeight = 36;
+
+            dgv.DefaultCellStyle.Font = new Font("Segoe UI", 8.5F);
+            dgv.DefaultCellStyle.ForeColor = Color.FromArgb(15, 23, 42);
+            dgv.DefaultCellStyle.SelectionBackColor = Color.FromArgb(224, 242, 254);
+            dgv.DefaultCellStyle.SelectionForeColor = Color.FromArgb(15, 23, 42);
+            dgv.RowTemplate.Height = 34;
+
+            dgv.AlternatingRowsDefaultCellStyle.BackColor = Color.FromArgb(248, 250, 252);
+            dgv.GridColor = Color.FromArgb(226, 232, 240);
+
+            return dgv;
         }
 
         private void ConfigurarColumnasReservas()
@@ -233,7 +338,7 @@ namespace SISTEMAACTUALIZADO
             colEntrega.DefaultCellStyle.Format = "dd-MM-yyyy HH:mm";
             dgvReservas.Columns.Add(colEntrega);
 
-            var estiloMoneda = new DataGridViewCellStyle { FormatProvider = new System.Globalization.CultureInfo("es-CL"), Format = "$ #,##0", Alignment = DataGridViewContentAlignment.MiddleRight };
+            var estiloMoneda = new DataGridViewCellStyle { FormatProvider = new System.Globalization.CultureInfo("es-CL"), Format = "$ #,##0", Alignment = DataGridViewContentAlignment.MiddleRight, Font = new Font("Segoe UI", 8.5F, FontStyle.Bold) };
             dgvReservas.Columns.Add(new DataGridViewTextBoxColumn { Name = "TotalPedido", DataPropertyName = "TotalPedido", HeaderText = "TOTAL", FillWeight = 18, DefaultCellStyle = estiloMoneda });
             dgvReservas.Columns.Add(new DataGridViewTextBoxColumn { Name = "TotalAbonado", DataPropertyName = "TotalAbonado", HeaderText = "ABONADO", FillWeight = 18, DefaultCellStyle = estiloMoneda });
             dgvReservas.Columns.Add(new DataGridViewTextBoxColumn { Name = "SaldoPendiente", DataPropertyName = "SaldoPendiente", HeaderText = "SALDO", FillWeight = 18, DefaultCellStyle = estiloMoneda });
@@ -457,7 +562,6 @@ namespace SISTEMAACTUALIZADO
             decimal saldo = _reservaSeleccionada.SaldoPendiente;
             string medioPagoFinal = "Efectivo";
 
-            // Si aún queda saldo pendiente por cancelar al momento de retirar
             if (saldo > 0)
             {
                 using Form modalCobro = new Form
@@ -492,7 +596,6 @@ namespace SISTEMAACTUALIZADO
 
             try
             {
-                // 1. Obtener detalles de la reserva y mapearlos a DetalleCarrito
                 var detalles = _reservaService.ObtenerDetallesReserva(_reservaSeleccionada.IdReserva);
                 List<DetalleCarrito> itemsCarrito = detalles.Select(d => new DetalleCarrito
                 {
@@ -503,7 +606,6 @@ namespace SISTEMAACTUALIZADO
                     EsPesable = d.EsPesable
                 }).ToList();
 
-                // 2. Generar el ticket en TVE2607; devuelve el NroTicket generado
                 var ventaService = new VentaService();
                 int nroTicketGenerado = ventaService.GenerarTicketVenta(
                     itemsCarrito, 
@@ -512,7 +614,6 @@ namespace SISTEMAACTUALIZADO
                     _reservaSeleccionada.RutCliente
                 );
 
-                // 3. Obtener el ticket directamente por su NroTicket
                 TVE2607? ticketVenta;
                 using (var db = new AppDbContext())
                 {
@@ -525,7 +626,6 @@ namespace SISTEMAACTUALIZADO
                     return;
                 }
 
-                // 4. Procesar cobro oficial y emisión de Boleta Electrónica en CajaService
                 string medioTexto = saldo > 0 ? $"Reserva (Abonos + {medioPagoFinal})" : "Reserva (Abonos Previos)";
 
                 int folioBoleta = _cajaService.ProcesarCobroTicket(
@@ -537,7 +637,6 @@ namespace SISTEMAACTUALIZADO
                     _usuarioActual.NombreUsuario
                 );
 
-                // 5. Finalizar la reserva en su tabla propia y registrar el abono final (si hubo)
                 _reservaService.EntregarYDescontarStock(
                     _reservaSeleccionada.IdReserva, 
                     saldo, 
@@ -549,7 +648,6 @@ namespace SISTEMAACTUALIZADO
 
                 MessageBox.Show($"¡PEDIDO ENTREGADO CON ÉXITO!\n\n• Boleta Electrónica: N° {folioBoleta}\n• Total: {MonedaHelper.Formatear(_reservaSeleccionada.TotalPedido, conSigno: true)}\n• Estado actualizado a 'Entregado'.", "Entrega Finalizada", MessageBoxButtons.OK, MessageBoxIcon.Information);
 
-                // 6. Visualizar modal del ticket final
                 try
                 {
                     FormTicketModal modalTicket = new FormTicketModal(ticketVenta, itemsCarrito, _reservaSeleccionada.TotalPedido, 0);
@@ -587,13 +685,16 @@ namespace SISTEMAACTUALIZADO
             }
         }
 
-        private Button CrearBotonAccion(string texto, Color bg, Color fore, int top)
+        // =========================================================================
+        // MÉTODOS DE DIBUJO Y DISEÑO (ESTÁNDAR FORMCLIENTES)
+        // =========================================================================
+        private Button CrearBotonAccionDock(string texto, Color bg, Color fore)
         {
             Button btn = new Button
             {
                 Text = texto,
-                Location = new Point(10, top + 8),
-                Size = new Size(205, 38),
+                Dock = DockStyle.Top,
+                Height = 38,
                 BackColor = bg,
                 ForeColor = fore,
                 FlatStyle = FlatStyle.Flat,
@@ -604,20 +705,95 @@ namespace SISTEMAACTUALIZADO
             return btn;
         }
 
-        private void ConfigurarEstiloTabla(DataGridView dgv)
+        private Panel CrearEspaciador(int alto)
         {
-            dgv.EnableHeadersVisualStyles = false;
-            dgv.ColumnHeadersDefaultCellStyle.BackColor = Color.FromArgb(30, 41, 59);
-            dgv.ColumnHeadersDefaultCellStyle.ForeColor = Color.White;
-            dgv.ColumnHeadersDefaultCellStyle.Font = new Font("Segoe UI", 8.5F, FontStyle.Bold);
-            dgv.ColumnHeadersHeight = 32;
+            return new Panel
+            {
+                Dock = DockStyle.Top,
+                Height = alto,
+                BackColor = Color.Transparent
+            };
+        }
 
-            dgv.DefaultCellStyle.Font = new Font("Segoe UI", 9F);
-            dgv.DefaultCellStyle.ForeColor = Color.FromArgb(15, 23, 42);
-            dgv.DefaultCellStyle.SelectionBackColor = Color.FromArgb(224, 242, 254);
-            dgv.DefaultCellStyle.SelectionForeColor = Color.FromArgb(15, 23, 42);
-            dgv.RowTemplate.Height = 30;
-            dgv.GridColor = Color.FromArgb(226, 232, 240);
+        private Panel CrearTarjetaRedondeada(int x, int y, int ancho, int alto, Color colorFondo, Color colorBorde)
+        {
+            Panel pnl = new Panel { Location = new Point(x, y), Size = new Size(ancho, alto), BackColor = colorFondo };
+            pnl.Resize += (s, e) => pnl.Invalidate();
+            pnl.Paint += (s, e) =>
+            {
+                e.Graphics.SmoothingMode = SmoothingMode.AntiAlias;
+                e.Graphics.Clear(pnl.BackColor);
+                Rectangle r = new Rectangle(0, 0, pnl.Width - 1, pnl.Height - 1);
+                using GraphicsPath p = CrearRutaRedondeada(r, 10);
+                using Pen pen = new Pen(colorBorde, 1.2f);
+                e.Graphics.DrawPath(pen, p);
+            };
+            return pnl;
+        }
+
+        private GraphicsPath CrearRutaRedondeada(Rectangle rect, int radio)
+        {
+            GraphicsPath path = new GraphicsPath();
+            int d = radio * 2;
+            path.AddArc(rect.X, rect.Y, d, d, 180, 90);
+            path.AddArc(rect.Right - d, rect.Y, d, d, 270, 90);
+            path.AddArc(rect.Right - d, rect.Bottom - d, d, d, 0, 90);
+            path.AddArc(rect.X, rect.Bottom - d, d, d, 90, 90);
+            path.CloseFigure();
+            return path;
+        }
+
+        private Panel CrearGrupoConCaja(string titulo, Control control, int ancho)
+        {
+            Panel pnl = new Panel { Size = new Size(ancho, 48), Margin = new Padding(0, 0, 8, 0) };
+            Label lbl = new Label { Text = titulo, Font = new Font("Segoe UI", 7.5F, FontStyle.Bold), ForeColor = Color.FromArgb(51, 65, 85), Location = new Point(0, 0), AutoSize = true };
+
+            Panel pnlInputBox = new Panel { Location = new Point(0, 18), Size = new Size(ancho, 28), BackColor = Color.FromArgb(248, 250, 252) };
+            pnlInputBox.Paint += (s, e) =>
+            {
+                e.Graphics.SmoothingMode = SmoothingMode.AntiAlias;
+                Rectangle r = new Rectangle(0, 0, pnlInputBox.Width - 1, pnlInputBox.Height - 1);
+                using GraphicsPath path = CrearRutaRedondeada(r, 6);
+                using Pen pen = new Pen(Color.FromArgb(226, 232, 240), 1f);
+                e.Graphics.DrawPath(pen, path);
+            };
+
+            control.Location = new Point(6, 3);
+            control.Width = ancho - 12;
+            pnlInputBox.Controls.Add(control);
+
+            pnl.Controls.Add(lbl);
+            pnl.Controls.Add(pnlInputBox);
+            return pnl;
+        }
+
+        private Panel CrearGrupoLimpio(string titulo, Control control, int ancho)
+        {
+            Panel pnl = new Panel { Size = new Size(ancho, 48), Margin = new Padding(0, 0, 8, 0) };
+            Label lbl = new Label { Text = titulo, Font = new Font("Segoe UI", 7.5F, FontStyle.Bold), ForeColor = Color.FromArgb(51, 65, 85), Location = new Point(0, 0), AutoSize = true };
+
+            control.Location = new Point(0, 18);
+            control.Width = ancho;
+
+            pnl.Controls.Add(lbl);
+            pnl.Controls.Add(control);
+            return pnl;
+        }
+
+        private Button CrearBoton(string texto, Color back, Color fore, Size size)
+        {
+            Button b = new Button 
+            { 
+                Text = texto, 
+                Size = size, 
+                BackColor = back, 
+                ForeColor = fore, 
+                FlatStyle = FlatStyle.Flat, 
+                Font = new Font("Segoe UI", 8.5F, FontStyle.Bold), 
+                Cursor = Cursors.Hand 
+            };
+            b.FlatAppearance.BorderSize = 0;
+            return b;
         }
     }
 }

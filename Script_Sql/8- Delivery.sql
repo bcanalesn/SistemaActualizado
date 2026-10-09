@@ -76,16 +76,44 @@ ON DUPLICATE KEY UPDATE `Nombre` = VALUES(`Nombre`);
 
 -- 6. Carga de Comunas iniciales
 INSERT INTO `comunas_delivery` (`ZonaDeliveryId`, `Nombre`, `TiempoEstimadoMinutos`, `Activo`) VALUES
-(1, 'Santiago Centro', 35, 1),
-(1, 'Estación Central', 40, 1),
-(2, 'Providencia', 40, 1),
-(2, 'Ñuñoa', 45, 1),
-(2, 'Las Condes', 55, 1),
-(2, 'La Reina', 50, 1),
+-- Zona Centro (ID: 1) - 6 Comunas
+(1, 'Santiago', 35, 1),
+(1, 'San Miguel', 40, 1),
+(1, 'San Joaquín', 40, 1),
+(1, 'Providencia', 40, 1),
+(1, 'Ñuñoa', 45, 1),
+(1, 'Macul', 45, 1),
+
+-- Zona Norte (ID: 3) - 6 Comunas
+(3, 'Renca', 45, 1),
 (3, 'Recoleta', 40, 1),
+(3, 'Quilicura', 55, 1),
 (3, 'Independencia', 40, 1),
-(3, 'Conchalí', 50, 1),
-(4, 'San Miguel', 40, 1),
-(4, 'San Joaquín', 45, 1),
-(5, 'Quinta Normal', 45, 1),
-(5, 'Maipú', 60, 1);
+(3, 'Huechuraba', 50, 1),
+(3, 'Conchalí', 45, 1),
+
+-- Zona Oriente (ID: 2) - 5 Comunas
+(2, 'Vitacura', 50, 1),
+(2, 'Lo Barnechea', 60, 1),
+(2, 'Las Condes', 50, 1),
+(2, 'La Reina', 45, 1),
+(2, 'Peñalolén', 50, 1),
+
+-- Zona Sur (ID: 4) - 6 Comunas
+(4, 'San Ramón', 45, 1),
+(4, 'La Pintana', 55, 1),
+(4, 'La Granja', 45, 1),
+(4, 'La Florida', 45, 1),
+(4, 'La Cisterna', 40, 1),
+(4, 'El Bosque', 50, 1),
+
+-- Zona Poniente (ID: 5) - 9 Comunas
+(5, 'Quinta Normal', 40, 1),
+(5, 'Pudahuel', 55, 1),
+(5, 'Pedro Aguirre Cerda', 40, 1),
+(5, 'Maipú', 55, 1),
+(5, 'Lo Prado', 40, 1),
+(5, 'Lo Espejo', 45, 1),
+(5, 'Estación Central', 35, 1),
+(5, 'Cerro Navia', 45, 1),
+(5, 'Cerrillos', 40, 1);

@@ -88,10 +88,13 @@ namespace SISTEMAACTUALIZADO.Modals
             };
             txtRut.KeyDown += (s, e) =>
             {
-                if (e.KeyCode == Keys.Enter && ClienteSeleccionado != null)
+                if (e.KeyCode == Keys.Enter)
                 {
-                    this.DialogResult = DialogResult.OK;
-                    this.Close();
+                    if (btnAsignar.Enabled)
+                    {
+                        btnAsignar.PerformClick();
+                        e.SuppressKeyPress = true;
+                    }
                 }
             };
 
@@ -146,14 +149,7 @@ namespace SISTEMAACTUALIZADO.Modals
                 Enabled = false
             };
             btnAsignar.FlatAppearance.BorderSize = 0;
-            btnAsignar.Click += (s, e) =>
-            {
-                if (ClienteSeleccionado != null)
-                {
-                    this.DialogResult = DialogResult.OK;
-                    this.Close();
-                }
-            };
+            btnAsignar.Click += BtnAsignar_Click;
 
             btnConsumidorFinal = new Button
             {
@@ -184,6 +180,8 @@ namespace SISTEMAACTUALIZADO.Modals
             {
                 ClienteSeleccionado = null;
                 btnAsignar.Enabled = false;
+                btnAsignar.Text = "✔ Asignar Cliente (Enter)";
+                btnAsignar.BackColor = Color.FromArgb(37, 99, 235);
                 lblNombreCliente.Text = "Ingrese un RUT para consultar";
                 lblEstadoCliente.Text = "Status: --";
                 lblCreditoInfo.Text = "• Crédito: No asignado\n• Cupo Total: $0\n• Deuda Actual: $0\n• Disponible: $0";
@@ -198,7 +196,11 @@ namespace SISTEMAACTUALIZADO.Modals
                 {
                     var cli = info.Cliente;
                     ClienteSeleccionado = cli;
+                    
+                    // Estado: Cliente encontrado -> Botón azul de asignación
                     btnAsignar.Enabled = true;
+                    btnAsignar.Text = "✔ Asignar Cliente (Enter)";
+                    btnAsignar.BackColor = Color.FromArgb(37, 99, 235);
 
                     lblNombreCliente.Text = cli.RazonSocial;
                     lblEstadoCliente.Text = $"Status: [ {cli.EstadoCrediticio} ]  -  Categoría: {cli.CategoriaCliente}";
@@ -225,15 +227,65 @@ namespace SISTEMAACTUALIZADO.Modals
                 else
                 {
                     ClienteSeleccionado = null;
-                    btnAsignar.Enabled = false;
                     lblNombreCliente.Text = "Cliente no encontrado";
                     lblEstadoCliente.Text = "Status: No registrado";
+                    lblEstadoCliente.ForeColor = Color.FromArgb(239, 68, 68);
                     lblCreditoInfo.Text = "El RUT ingresado no pertenece a ningún cliente activo en el sistema.";
+
+                    // Si el RUT ya tiene 8 o 9 dígitos numéricos limpios, activar opción de crear nuevo
+                    if (rutLimpio.Length >= 8)
+                    {
+                        btnAsignar.Enabled = true;
+                        btnAsignar.Text = "➕ Registrar Nuevo Cliente";
+                        btnAsignar.BackColor = Color.FromArgb(16, 185, 129); // Verde esmeralda
+                    }
+                    else
+                    {
+                        btnAsignar.Enabled = false;
+                        btnAsignar.Text = "✔ Asignar Cliente (Enter)";
+                        btnAsignar.BackColor = Color.FromArgb(37, 99, 235);
+                    }
                 }
             }
             catch (Exception ex)
             {
                 lblCreditoInfo.Text = $"Error: {ex.Message}";
+            }
+        }
+
+        private void BtnAsignar_Click(object? sender, EventArgs e)
+        {
+            // Caso 1: El cliente ya existe -> Asignar a la venta
+            if (ClienteSeleccionado != null)
+            {
+                this.DialogResult = DialogResult.OK;
+                this.Close();
+                return;
+            }
+
+            // Caso 2: El cliente no existe -> Abrir modal para crearlo
+            string rutLimpio = RutHelper.Limpiar(txtRut.Text);
+            if (rutLimpio.Length >= 8)
+            {
+                Cliente nuevoCliente = new Cliente
+                {
+                    Rut = rutLimpio
+                };
+
+                using (var modalCrear = new FormNuevoClienteModal(nuevoCliente))
+                {
+                    if (modalCrear.ShowDialog(this) == DialogResult.OK)
+                    {
+                        // Se consulta el cliente recién creado para asignarlo de inmediato
+                        var info = _clienteService.ObtenerInfoCrediticiaPorRut(rutLimpio);
+                        if (info != null)
+                        {
+                            ClienteSeleccionado = info.Cliente;
+                            this.DialogResult = DialogResult.OK;
+                            this.Close();
+                        }
+                    }
+                }
             }
         }
     }

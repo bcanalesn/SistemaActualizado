@@ -21,6 +21,8 @@ namespace SISTEMAACTUALIZADO.Modals
         private TextBox txtNombre = null!;
         private ComboBox cbCategoria = null!;
         private ComboBox cbFamilia = null!;
+        private Button btnColorMuestra = null!; // 👈 Muestra visual del color
+        private ComboBox cbColorCategoria = null!; // 👈 Selector del color
         private TextBox txtPrecioCosto = null!;
         private Label lblTitCosto = null!;
         private Label lblSubCosto = null!;
@@ -107,12 +109,57 @@ namespace SISTEMAACTUALIZADO.Modals
             pnlFila1.Controls.Add(CrearCampo("|||||| Código de Barra / SKU", txtCodigoBarra, 0, 300));
             pnlFila1.Controls.Add(CrearCampo("📦 Nombre del Producto", txtNombre, 320, 310));
 
-            // Fila 2: Categoría y Familia
-            cbCategoria = new ComboBox { Width = 300, Font = new Font("Segoe UI", 9.5F), DropDownStyle = ComboBoxStyle.DropDown };
-            cbFamilia = new ComboBox { Width = 310, Font = new Font("Segoe UI", 9.5F), DropDownStyle = ComboBoxStyle.DropDown };
+            // Fila 2: Categoría, Color y Familia
+            cbCategoria = new ComboBox { Width = 195, Font = new Font("Segoe UI", 9.5F), DropDownStyle = ComboBoxStyle.DropDown };
+            
+            // Selector de color para la categoría
+            btnColorMuestra = new Button
+            {
+                Size = new Size(24, 24),
+                Location = new Point(200, 22),
+                FlatStyle = FlatStyle.Flat,
+                Enabled = false,
+                Cursor = Cursors.Default
+            };
+            btnColorMuestra.FlatAppearance.BorderSize = 1;
+
+            cbColorCategoria = new ComboBox
+            {
+                Location = new Point(228, 20),
+                Size = new Size(90, 26),
+                DropDownStyle = ComboBoxStyle.DropDownList,
+                Font = new Font("Segoe UI", 8.5F, FontStyle.Bold)
+            };
+            foreach (var opc in CategoriaColorHelper.OpcionesPaleta)
+            {
+                cbColorCategoria.Items.Add(opc.Nombre);
+            }
+            cbColorCategoria.SelectedIndex = 0;
+
+            cbColorCategoria.SelectedIndexChanged += (s, e) =>
+            {
+                if (cbColorCategoria.SelectedIndex >= 0)
+                {
+                    var pal = CategoriaColorHelper.OpcionesPaleta[cbColorCategoria.SelectedIndex];
+                    btnColorMuestra.BackColor = pal.Texto;
+                    btnColorMuestra.FlatAppearance.BorderColor = pal.Borde;
+                }
+            };
+
+            cbCategoria.TextChanged += (s, e) => SincronizarColorSegunCategoria();
+
+            cbFamilia = new ComboBox { Width = 300, Font = new Font("Segoe UI", 9.5F), DropDownStyle = ComboBoxStyle.DropDown };
+            
             Panel pnlFila2 = new Panel { Size = new Size(630, 56) };
-            pnlFila2.Controls.Add(CrearCampo("Categoría", cbCategoria, 0, 300));
-            pnlFila2.Controls.Add(CrearCampo("Familia de Producto", cbFamilia, 320, 310));
+            
+            // Contenedor Categoría + Color
+            Panel pnlCatWrapper = new Panel { Location = new Point(0, 0), Size = new Size(320, 52) };
+            pnlCatWrapper.Controls.Add(new Label { Text = "Categoría y Color", Font = new Font("Segoe UI", 8F, FontStyle.Bold), ForeColor = Color.FromArgb(71, 85, 105), Location = new Point(0, 0), AutoSize = true });
+            cbCategoria.Location = new Point(0, 20);
+            pnlCatWrapper.Controls.AddRange(new Control[] { cbCategoria, btnColorMuestra, cbColorCategoria });
+
+            pnlFila2.Controls.Add(pnlCatWrapper);
+            pnlFila2.Controls.Add(CrearCampo("Familia de Producto", cbFamilia, 330, 300));
 
             // Tarjeta Tipo de Venta: Pesable / Unidad
             Panel pnlCardPesable = CrearCardPanel(630, 50);
@@ -204,8 +251,29 @@ namespace SISTEMAACTUALIZADO.Modals
             txtPrecioUnitario.TextChanged += (s, e) => MonedaHelper.AplicarMascaraEnVivo(txtPrecioUnitario);
 
             txtStockActual = new TextBox { Width = 170, Font = new Font("Segoe UI", 10F, FontStyle.Bold), Text = "0" };
-            txtStockActual.KeyPress += (s, e) => { if (!char.IsControl(e.KeyChar) && !char.IsDigit(e.KeyChar)) e.Handled = true; };
-            txtStockActual.TextChanged += (s, e) => MonedaHelper.AplicarMascaraEnVivo(txtStockActual); // 👈 Formato con puntos en vivo
+            txtStockActual.KeyPress += (s, e) =>
+            {
+                if (char.IsControl(e.KeyChar)) return;
+                if (char.IsDigit(e.KeyChar)) return;
+
+                // Si es pesable, permitir coma o punto decimal
+                if (chkEsPesable.Checked && (e.KeyChar == '.' || e.KeyChar == ',') && 
+                    !txtStockActual.Text.Contains('.') && !txtStockActual.Text.Contains(','))
+                {
+                    return;
+                }
+
+                e.Handled = true;
+            };
+
+            txtStockActual.TextChanged += (s, e) =>
+            {
+                // Solo aplicar separadores de miles con máscara si es por unidad
+                if (!chkEsPesable.Checked)
+                {
+                    MonedaHelper.AplicarMascaraEnVivo(txtStockActual);
+                }
+            };
 
             txtStockMinimo = new TextBox { Width = 170, Font = new Font("Segoe UI", 10F), Text = "5" };
             txtStockMinimo.KeyPress += (s, e) => { if (!char.IsControl(e.KeyChar) && !char.IsDigit(e.KeyChar)) e.Handled = true; };
@@ -322,7 +390,7 @@ namespace SISTEMAACTUALIZADO.Modals
                 lblTitCosto.Text = "Costo Neto por Kg ($)";
                 lblSubCosto.Text = "Costo en pesos por kilogramo sin IVA.";
                 lblTitPrecioVenta.Text = "💲 Precio Venta por Kg (IVA Inc.)";
-                lblTitStockActual.Text = "📦 Stock en Gramos (ej: 5000g = 5kg)";
+                lblTitStockActual.Text = "📦 Stock en Kilos (ej: 10.5 Kg)"; // 👈 En Kilos
 
                 if (lblHeaderDesde != null) lblHeaderDesde.Text = "Desde (gramos)";
                 if (lblHeaderHasta != null) lblHeaderHasta.Text = "Hasta (gramos)";
@@ -338,7 +406,6 @@ namespace SISTEMAACTUALIZADO.Modals
                 if (lblHeaderHasta != null) lblHeaderHasta.Text = "Hasta (unidades)";
             }
 
-            // Si no estamos cargando datos desde la BD, refrescar los tramos con las sugerencias correctas
             if (!_cargandoDatos && cbCantidadTramos != null)
             {
                 int cant = cbCantidadTramos.SelectedIndex >= 0 ? cbCantidadTramos.SelectedIndex + 2 : 2;
@@ -475,7 +542,15 @@ namespace SISTEMAACTUALIZADO.Modals
                     int listaIdx = Math.Max(1, Math.Min(10, _productoAEditar.ListaDefectoPOS)) - 1;
                     cbListaPrecioPOS.SelectedIndex = listaIdx;
 
-                    txtStockActual.Text = MonedaHelper.Formatear(_productoAEditar.Stock);
+                    if (_productoAEditar.EsPesable)
+                    {
+                        decimal kilos = _productoAEditar.Stock / 1000m;
+                        txtStockActual.Text = kilos.ToString("0.###", System.Globalization.CultureInfo.InvariantCulture);
+                    }
+                    else
+                    {
+                        txtStockActual.Text = MonedaHelper.Formatear(_productoAEditar.Stock);
+                    }
                     txtStockMinimo.Text = MonedaHelper.Formatear(_productoAEditar.StockMinimo);
 
                     _rutaImagenSeleccionada = _productoAEditar.ImagenPath ?? string.Empty;
@@ -636,16 +711,27 @@ namespace SISTEMAACTUALIZADO.Modals
             decimal costoUI = MonedaHelper.Limpiar(txtPrecioCosto.Text);
             decimal pvpUI = MonedaHelper.Limpiar(txtPrecioUnitario.Text);
             
-            // Lectura correcta del stock ingresado en pantalla
-            decimal stockDigito = MonedaHelper.Limpiar(txtStockActual.Text);
-            int stockFinal = (int)stockDigito;
+            bool esPesable = chkEsPesable.Checked;
+            decimal divisor = esPesable ? 1000m : 1m;
+
+            // Lectura del stock: si es pesable viene en Kilos y se pasa a gramos para la BD
+            int stockFinal = 0;
+            if (esPesable)
+            {
+                string stockTxt = txtStockActual.Text.Trim().Replace(",", ".");
+                if (decimal.TryParse(stockTxt, System.Globalization.NumberStyles.Any, System.Globalization.CultureInfo.InvariantCulture, out decimal kilos))
+                {
+                    stockFinal = (int)Math.Round(kilos * 1000m); // Ej: 10.5 Kg -> 10.500 gramos
+                }
+            }
+            else
+            {
+                stockFinal = (int)MonedaHelper.Limpiar(txtStockActual.Text);
+            }
 
             // Leer stock mínimo usando MonedaHelper para quitar los puntos
             decimal stockMinDigito = MonedaHelper.Limpiar(txtStockMinimo.Text);
             int stockMin = stockMinDigito > 0 ? (int)stockMinDigito : 5;
-
-            bool esPesable = chkEsPesable.Checked;
-            decimal divisor = esPesable ? 1000m : 1m;
 
             // En la base de datos el costo y el PVP se almacenan por gramo si es pesable
             decimal costoBase = costoUI / divisor;
@@ -704,12 +790,37 @@ namespace SISTEMAACTUALIZADO.Modals
                 // Pasamos 0 en cantidadFacturaInicial para que no pise el Stock asignado arriba
                 ProductoResultado = _productoService.GuardarProducto(productoGuardar, tramos, rbModoEscala.Checked, cantidadFacturaInicial: 0);
 
+                // Guardar la asociación del color con el nombre de la categoría
+                if (cbColorCategoria.SelectedIndex >= 0)
+                {
+                    var pal = CategoriaColorHelper.OpcionesPaleta[cbColorCategoria.SelectedIndex];
+                    CategoriaColorHelper.GuardarColor(cbCategoria.Text.Trim(), pal.Fondo, pal.Texto, pal.Borde);
+                }
+
                 this.DialogResult = DialogResult.OK;
                 this.Close();
             }
             catch (Exception ex)
             {
                 MessageBox.Show($"Error al guardar: {ex.Message}", "Error", MessageBoxButtons.OK, MessageBoxIcon.Error);
+            }
+        }
+        private void SincronizarColorSegunCategoria()
+        {
+            string cat = cbCategoria.Text.Trim();
+            if (string.IsNullOrWhiteSpace(cat)) return;
+
+            var estilo = CategoriaColorHelper.ObtenerColor(cat);
+            for (int i = 0; i < CategoriaColorHelper.OpcionesPaleta.Count; i++)
+            {
+                if (CategoriaColorHelper.OpcionesPaleta[i].Texto == estilo.Texto || 
+                    CategoriaColorHelper.OpcionesPaleta[i].Fondo == estilo.Fondo)
+                {
+                    cbColorCategoria.SelectedIndex = i;
+                    btnColorMuestra.BackColor = estilo.Texto;
+                    btnColorMuestra.FlatAppearance.BorderColor = estilo.Borde;
+                    break;
+                }
             }
         }
 
