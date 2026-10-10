@@ -4,6 +4,7 @@ using System.Drawing;
 using System.Drawing.Drawing2D;
 using System.Linq;
 using System.Windows.Forms;
+using SISTEMAACTUALIZADO.Data;
 using SISTEMAACTUALIZADO.Helpers;
 using SISTEMAACTUALIZADO.Modals;
 using SISTEMAACTUALIZADO.Models;
@@ -1167,6 +1168,49 @@ namespace SISTEMAACTUALIZADO
                 int folioOficial = _cajaService.ProcesarCobroTicket(
                     _ticketSeleccionado, tipoDoc, medioPago, vuelto, _turnoActual.CajaTurnoID, cajero
                 );
+                // ========================================================
+                // VINCULACIÓN: Si el ticket cobrado es un Abono o Saldo de Reserva
+                // ========================================================
+                if ((_ticketSeleccionado.idREF.HasValue && _ticketSeleccionado.idREF.Value > 0) || 
+                    (_ticketSeleccionado.Documento != null && _ticketSeleccionado.Documento.Contains("Reserva")))
+                {
+                    using var db = new AppDbContext();
+                    int idRes = _ticketSeleccionado.idREF ?? 0;
+                    var reserva = db.Reservas.FirstOrDefault(r => r.IdReserva == idRes);
+
+                    if (reserva != null)
+                    {
+                        bool esLiquidacion = _ticketSeleccionado.Documento != null && 
+                                             _ticketSeleccionado.Documento.Contains("Saldo");
+
+                        var nuevoPago = new ReservaPago
+                        {
+                            IdReserva = reserva.IdReserva,
+                            Monto = _ticketSeleccionado.Total,
+                            MedioPago = _medioPagoSeleccionado,
+                            FechaPago = DateTime.Now,
+                            CajaTurnoID = _turnoActual.CajaTurnoID,
+                            Usuario = cajero,
+                            EsAbonoInicial = (reserva.TotalAbonado == 0),
+                            EsLiquidacionFinal = esLiquidacion
+                        };
+
+                        db.ReservaPagos.Add(nuevoPago);
+                        reserva.TotalAbonado += _ticketSeleccionado.Total;
+                        reserva.SaldoPendiente = Math.Max(0m, reserva.TotalPedido - reserva.TotalAbonado);
+
+                        // Si es la liquidación final o el saldo queda en 0
+                        if (esLiquidacion || reserva.SaldoPendiente <= 0)
+                        {
+                            reserva.Estado = "Entregado";
+                            reserva.FechaEntregaReal = DateTime.Now;
+                            reserva.UsuarioEntrega = cajero;
+                            reserva.IdDTEGenerado = folioOficial;
+                        }
+
+                        db.SaveChanges();
+                    }
+                }
 
                 if (_medioPagoSeleccionado == "Crédito Comercial")
                 {
