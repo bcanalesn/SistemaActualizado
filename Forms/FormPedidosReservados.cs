@@ -578,114 +578,42 @@ namespace SISTEMAACTUALIZADO
         {
             if (_reservaSeleccionada == null) return;
 
-            var turno = _cajaService.ObtenerTurnoAbierto(_usuarioActual.NombreUsuario);
-            if (turno == null || turno.Estado != "Abierta")
-            {
-                MessageBox.Show("Debe tener un turno de caja abierto para liquidar el pedido y emitir la boleta.", "Caja Cerrada", MessageBoxButtons.OK, MessageBoxIcon.Warning);
-                return;
-            }
-
             decimal saldo = _reservaSeleccionada.SaldoPendiente;
-            string medioPagoFinal = "Efectivo";
 
-            if (saldo > 0)
-            {
-                using Form modalCobro = new Form
-                {
-                    Text = $"Cobro Saldo Final - {_reservaSeleccionada.CodigoReserva}",
-                    Size = new Size(360, 240),
-                    StartPosition = FormStartPosition.CenterParent,
-                    FormBorderStyle = FormBorderStyle.FixedDialog,
-                    MaximizeBox = false,
-                    MinimizeBox = false,
-                    BackColor = Color.White
-                };
+            var r = MessageBox.Show(
+                $"¿Desea generar el ticket de liquidación para el pedido N° {_reservaSeleccionada.CodigoReserva}?\n\n" +
+                $"• Total Pedido: {MonedaHelper.Formatear(_reservaSeleccionada.TotalPedido, conSigno: true)}\n" +
+                $"• Total Abonado: {MonedaHelper.Formatear(_reservaSeleccionada.TotalAbonado, conSigno: true)}\n" +
+                $"• Saldo a Cobrar en Caja: {MonedaHelper.Formatear(saldo, conSigno: true)}\n\n" +
+                "El ticket se enviará a Control de Caja para que el cliente pague el saldo y reciba su boleta.",
+                "Entregar y Cobrar Saldo",
+                MessageBoxButtons.YesNo,
+                MessageBoxIcon.Question
+            );
 
-                Label lblT = new Label { Text = $"SALDO A LIQUIDAR: {MonedaHelper.Formatear(saldo, conSigno: true)}", Location = new Point(20, 16), Font = new Font("Segoe UI", 11F, FontStyle.Bold), ForeColor = Color.FromArgb(124, 58, 237), AutoSize = true };
-                Label lblM = new Label { Text = "Medio de Pago del Saldo:", Location = new Point(20, 52), AutoSize = true, Font = new Font("Segoe UI", 8.5F, FontStyle.Bold) };
-                ComboBox cbM = new ComboBox { Location = new Point(20, 74), Size = new Size(300, 26), DropDownStyle = ComboBoxStyle.DropDownList, Font = new Font("Segoe UI", 9.5F) };
-                cbM.Items.AddRange(new object[] { "Efectivo", "Débito", "Tarjeta Crédito", "Transferencia" });
-                cbM.SelectedIndex = 0;
-
-                Button btnOk = new Button { Text = "✔ Confirmar Pago y Emitir Boleta", Location = new Point(20, 130), Size = new Size(300, 42), BackColor = Color.FromArgb(16, 185, 129), ForeColor = Color.White, FlatStyle = FlatStyle.Flat, Font = new Font("Segoe UI", 9.5F, FontStyle.Bold), Cursor = Cursors.Hand };
-                btnOk.FlatAppearance.BorderSize = 0;
-                btnOk.Click += (s, ev) =>
-                {
-                    medioPagoFinal = cbM.SelectedItem?.ToString() ?? "Efectivo";
-                    modalCobro.DialogResult = DialogResult.OK;
-                    modalCobro.Close();
-                };
-
-                modalCobro.Controls.AddRange(new Control[] { lblT, lblM, cbM, btnOk });
-                if (modalCobro.ShowDialog(this) != DialogResult.OK) return;
-            }
+            if (r != DialogResult.Yes) return;
 
             try
             {
-                var detalles = _reservaService.ObtenerDetallesReserva(_reservaSeleccionada.IdReserva);
-                List<DetalleCarrito> itemsCarrito = detalles.Select(d => new DetalleCarrito
-                {
-                    ProductoID = d.ProductoID,
-                    Nombre = d.NombreProducto,
-                    PrecioUnitario = d.PrecioUnitario,
-                    Cantidad = d.Cantidad,
-                    EsPesable = d.EsPesable
-                }).ToList();
-
-                var ventaService = new VentaService();
-                int nroTicketGenerado = ventaService.GenerarTicketVenta(
-                    itemsCarrito, 
-                    _reservaSeleccionada.UsuarioRegistro, 
-                    _reservaSeleccionada.NombreCliente, 
-                    _reservaSeleccionada.RutCliente
-                );
-
-                TVE2607? ticketVenta;
-                using (var db = new AppDbContext())
-                {
-                    ticketVenta = db.TVE2607.FirstOrDefault(t => t.NroTicket == nroTicketGenerado);
-                }
-
-                if (ticketVenta == null)
-                {
-                    MessageBox.Show($"No se encontró en base de datos el ticket N° {nroTicketGenerado}.", "Error Ticket", MessageBoxButtons.OK, MessageBoxIcon.Error);
-                    return;
-                }
-
-                string medioTexto = saldo > 0 ? $"Reserva (Abonos + {medioPagoFinal})" : "Reserva (Abonos Previos)";
-
-                int folioBoleta = _cajaService.ProcesarCobroTicket(
-                    ticketVenta, 
-                    "Boleta Electrónica", 
-                    medioTexto, 
-                    0, 
-                    turno.CajaTurnoID, 
+                int nroTicket = _reservaService.GenerarTicketLiquidacionCaja(
+                    _reservaSeleccionada.IdReserva,
                     _usuarioActual.NombreUsuario
                 );
 
-                _reservaService.EntregarYDescontarStock(
-                    _reservaSeleccionada.IdReserva, 
-                    saldo, 
-                    medioPagoFinal, 
-                    turno.CajaTurnoID, 
-                    _usuarioActual.NombreUsuario, 
-                    folioBoleta
+                MessageBox.Show(
+                    $"¡TICKET N° {nroTicket} GENERADO CON ÉXITO!\n\n" +
+                    $"Monto por pagar en Caja: {MonedaHelper.Formatear(saldo, conSigno: true)}\n" +
+                    "Pase al cliente a Caja para procesar el cobro y entrega.",
+                    "Ticket Enviado a Caja",
+                    MessageBoxButtons.OK,
+                    MessageBoxIcon.Information
                 );
-
-                MessageBox.Show($"¡PEDIDO ENTREGADO CON ÉXITO!\n\n• Boleta Electrónica: N° {folioBoleta}\n• Total: {MonedaHelper.Formatear(_reservaSeleccionada.TotalPedido, conSigno: true)}\n• Estado actualizado a 'Entregado'.", "Entrega Finalizada", MessageBoxButtons.OK, MessageBoxIcon.Information);
-
-                try
-                {
-                    FormTicketModal modalTicket = new FormTicketModal(ticketVenta, itemsCarrito, _reservaSeleccionada.TotalPedido, 0);
-                    modalTicket.ShowDialog(this);
-                }
-                catch { }
 
                 CargarReservas();
             }
             catch (Exception ex)
             {
-                MessageBox.Show($"Error al liquidar encargo: {ex.Message}", "Error", MessageBoxButtons.OK, MessageBoxIcon.Error);
+                MessageBox.Show($"Error al generar ticket: {ex.Message}", "Error", MessageBoxButtons.OK, MessageBoxIcon.Error);
             }
         }
 

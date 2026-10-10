@@ -1638,12 +1638,6 @@ namespace SISTEMAACTUALIZADO
             {
                 if (modalReserva.ShowDialog(this) == DialogResult.OK && modalReserva.ReservaCreada != null)
                 {
-                    var reservaFinal = modalReserva.ReservaCreada;
-                    reservaFinal.NombreCliente = _clienteSeleccionadoNombre;
-
-                    var abonoEfectuado = reservaFinal.Pagos?.FirstOrDefault();
-                    _ticketPrintService.ImprimirComprobanteReserva(reservaFinal, abonoEfectuado, usuarioOperador);
-
                     LimpiarCarritoActual();
                     AsignarClienteActivo(null);
                 }

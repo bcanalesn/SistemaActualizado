@@ -21,14 +21,17 @@ namespace SISTEMAACTUALIZADO.Modals
         private DateTimePicker dtpFechaEntrega = null!;
         private DateTimePicker dtpHoraEntrega = null!;
         private TextBox txtObservaciones = null!;
+        
+        // Controles de Abono
+        private CheckBox chkAbonar = null!;
         private TextBox txtMontoAbono = null!;
-        private ComboBox cbMedioPagoAbono = null!;
         private Label lblTotalPedidoValor = null!;
         private Label lblSaldoPendienteValor = null!;
         private Button btnConfirmar = null!;
         private Button btnCancelar = null!;
 
         public Reserva? ReservaCreada { get; private set; }
+        public int NroTicketAbonoGenerado { get; private set; } = 0;
 
         public FormCrearReservaModal(Cliente cliente, List<DetalleCarrito> items, decimal total, Usuario usuario, int cajaTurnoId)
         {
@@ -134,7 +137,7 @@ namespace SISTEMAACTUALIZADO.Modals
             };
             pnlCardObs.Controls.AddRange(new Control[] { lblTitObs, txtObservaciones });
 
-            // 4. Tarjeta Abono y Montos
+            // 4. Tarjeta Abono y Montos (SIN MEDIO DE PAGO)
             Panel pnlCardMontos = CrearPanelTarjeta(wCard, 175);
             pnlCardMontos.Dock = DockStyle.Top;
             pnlCardMontos.Margin = new Padding(0, 10, 0, 12);
@@ -144,14 +147,26 @@ namespace SISTEMAACTUALIZADO.Modals
             Label lblTotTxt = new Label { Text = "TOTAL PEDIDO:", Location = new Point(12, 34), Font = new Font("Segoe UI", 9F, FontStyle.Bold), ForeColor = Color.FromArgb(71, 85, 105), AutoSize = true };
             lblTotalPedidoValor = new Label { Text = MonedaHelper.Formatear(_totalPedido, conSigno: true), Location = new Point(130, 32), Size = new Size(180, 22), Font = new Font("Segoe UI", 12F, FontStyle.Bold), ForeColor = Color.FromArgb(15, 23, 42) };
 
-            Label lblAboTxt = new Label { Text = "Monto Abono Inicial ($):", Location = new Point(12, 68), Font = new Font("Segoe UI", 8.5F, FontStyle.Bold), ForeColor = Color.FromArgb(15, 23, 42), AutoSize = true };
+            // CheckBox para registrar intención de abono inicial
+            chkAbonar = new CheckBox
+            {
+                Text = "Cliente pagará Abono Inicial en Caja",
+                Location = new Point(12, 66),
+                AutoSize = true,
+                Font = new Font("Segoe UI", 9F, FontStyle.Bold),
+                ForeColor = Color.FromArgb(37, 99, 235),
+                Cursor = Cursors.Hand
+            };
+
+            Label lblAboTxt = new Label { Text = "Monto Abono Inicial ($):", Location = new Point(12, 94), Font = new Font("Segoe UI", 8.5F, FontStyle.Bold), ForeColor = Color.FromArgb(15, 23, 42), AutoSize = true };
             txtMontoAbono = new TextBox
             {
-                Location = new Point(12, 88),
+                Location = new Point(12, 114),
                 Size = new Size(205, 26),
                 Font = new Font("Segoe UI", 11F, FontStyle.Bold),
                 Text = "0",
-                MaxLength = 10
+                MaxLength = 10,
+                Enabled = false // Inactivo hasta marcar casilla
             };
             txtMontoAbono.KeyPress += (s, e) => { if (!char.IsControl(e.KeyChar) && !char.IsDigit(e.KeyChar)) e.Handled = true; };
             txtMontoAbono.TextChanged += (s, e) =>
@@ -160,21 +175,34 @@ namespace SISTEMAACTUALIZADO.Modals
                 RecalcularSaldos();
             };
 
-            Label lblMedioTxt = new Label { Text = "Medio de Pago Abono:", Location = new Point(230, 68), Font = new Font("Segoe UI", 8.5F, FontStyle.Bold), ForeColor = Color.FromArgb(15, 23, 42), AutoSize = true };
-            cbMedioPagoAbono = new ComboBox
+            chkAbonar.CheckedChanged += (s, e) =>
             {
-                Location = new Point(230, 88),
-                Size = new Size(212, 26),
-                DropDownStyle = ComboBoxStyle.DropDownList,
-                Font = new Font("Segoe UI", 9.5F)
+                txtMontoAbono.Enabled = chkAbonar.Checked;
+                if (!chkAbonar.Checked)
+                {
+                    txtMontoAbono.Text = "0";
+                }
+                else
+                {
+                    txtMontoAbono.Focus();
+                    txtMontoAbono.SelectAll();
+                }
+                RecalcularSaldos();
             };
-            cbMedioPagoAbono.Items.AddRange(new object[] { "Efectivo", "Débito", "Tarjeta Crédito", "Transferencia" });
-            cbMedioPagoAbono.SelectedIndex = 0;
 
-            Label lblSalTxt = new Label { Text = "SALDO PENDIENTE:", Location = new Point(12, 132), Font = new Font("Segoe UI", 9.5F, FontStyle.Bold), ForeColor = Color.FromArgb(239, 68, 68), AutoSize = true };
-            lblSaldoPendienteValor = new Label { Text = MonedaHelper.Formatear(_totalPedido, conSigno: true), Location = new Point(155, 130), Size = new Size(220, 26), Font = new Font("Segoe UI", 14F, FontStyle.Bold), ForeColor = Color.FromArgb(239, 68, 68) };
+            Label lblAvisoCaja = new Label
+            {
+                Text = "ℹ️ El medio de pago se ingresará en Caja al cobrar el ticket de abono.",
+                Location = new Point(230, 94),
+                Size = new Size(215, 45),
+                Font = new Font("Segoe UI", 7.8F, FontStyle.Regular),
+                ForeColor = Color.FromArgb(100, 116, 139)
+            };
 
-            pnlCardMontos.Controls.AddRange(new Control[] { lblTitAbono, lblTotTxt, lblTotalPedidoValor, lblAboTxt, txtMontoAbono, lblMedioTxt, cbMedioPagoAbono, lblSalTxt, lblSaldoPendienteValor });
+            Label lblSalTxt = new Label { Text = "SALDO ESTIMADO:", Location = new Point(12, 146), Font = new Font("Segoe UI", 9.5F, FontStyle.Bold), ForeColor = Color.FromArgb(239, 68, 68), AutoSize = true };
+            lblSaldoPendienteValor = new Label { Text = MonedaHelper.Formatear(_totalPedido, conSigno: true), Location = new Point(155, 144), Size = new Size(220, 26), Font = new Font("Segoe UI", 14F, FontStyle.Bold), ForeColor = Color.FromArgb(239, 68, 68) };
+
+            pnlCardMontos.Controls.AddRange(new Control[] { lblTitAbono, lblTotTxt, lblTotalPedidoValor, chkAbonar, lblAboTxt, txtMontoAbono, lblAvisoCaja, lblSalTxt, lblSaldoPendienteValor });
 
             // Espaciador entre tarjetas y botones
             Panel pnlEspaciador = new Panel { Dock = DockStyle.Top, Height = 12, BackColor = Color.Transparent };
@@ -210,7 +238,6 @@ namespace SISTEMAACTUALIZADO.Modals
             btnCancelar.FlatAppearance.BorderColor = Color.FromArgb(226, 232, 240);
             btnCancelar.Click += (s, e) => this.Close();
 
-            // Se agregan en orden inverso al usar DockStyle.Top
             pnlMain.Controls.Add(btnCancelar);
             pnlMain.Controls.Add(pnlEspaciadorBtn);
             pnlMain.Controls.Add(btnConfirmar);
@@ -226,7 +253,7 @@ namespace SISTEMAACTUALIZADO.Modals
 
         private void RecalcularSaldos()
         {
-            decimal abono = MonedaHelper.Limpiar(txtMontoAbono.Text);
+            decimal abono = chkAbonar.Checked ? MonedaHelper.Limpiar(txtMontoAbono.Text) : 0m;
             if (abono > _totalPedido)
             {
                 abono = _totalPedido;
@@ -240,15 +267,20 @@ namespace SISTEMAACTUALIZADO.Modals
 
         private void BtnConfirmar_Click(object? sender, EventArgs e)
         {
-            decimal abono = MonedaHelper.Limpiar(txtMontoAbono.Text);
-
-            // Unión de la fecha del calendario y la hora seleccionada
+            decimal abono = chkAbonar.Checked ? MonedaHelper.Limpiar(txtMontoAbono.Text) : 0m;
             DateTime fechaCompromiso = dtpFechaEntrega.Value.Date + dtpHoraEntrega.Value.TimeOfDay;
 
             if (fechaCompromiso <= DateTime.Now)
             {
                 MessageBox.Show("La fecha y hora de entrega debe ser posterior al momento actual.", "Fecha Inválida", MessageBoxButtons.OK, MessageBoxIcon.Warning);
                 dtpHoraEntrega.Focus();
+                return;
+            }
+
+            if (chkAbonar.Checked && abono <= 0)
+            {
+                MessageBox.Show("Indicó que se ingresará un abono, pero el monto es $0. Ingrese el monto o desmarque la casilla.", "Monto de Abono", MessageBoxButtons.OK, MessageBoxIcon.Warning);
+                txtMontoAbono.Focus();
                 return;
             }
 
@@ -259,12 +291,14 @@ namespace SISTEMAACTUALIZADO.Modals
                     IdCliente = _cliente.IdCliente,
                     FechaEntregaPactada = fechaCompromiso,
                     TotalPedido = _totalPedido,
+                    TotalAbonado = 0m,               // Se mantiene en $0 hasta que Caja cobre el ticket
+                    SaldoPendiente = _totalPedido,   // Saldo total pendiente hasta que se cobre en caja
                     Observaciones = txtObservaciones.Text.Trim(),
                     UsuarioRegistro = _usuarioActual.NombreUsuario,
                     Detalles = _itemsCarrito.Select(i => new ReservaDetalle
                     {
                         ProductoID = i.ProductoID,
-                        CodigoBarra = i.ProductoID.ToString(), // 👈 Evita que sea null
+                        CodigoBarra = i.ProductoID.ToString(),
                         NombreProducto = i.Nombre ?? "Producto",
                         EsPesable = i.EsPesable,
                         Cantidad = i.Cantidad,
@@ -274,31 +308,29 @@ namespace SISTEMAACTUALIZADO.Modals
                     }).ToList()
                 };
 
-                ReservaPago? abonoPago = null;
-                if (abono > 0)
-                {
-                    abonoPago = new ReservaPago
-                    {
-                        Monto = abono,
-                        MedioPago = cbMedioPagoAbono.SelectedItem?.ToString() ?? "Efectivo",
-                        CajaTurnoID = _cajaTurnoId,
-                        Usuario = _usuarioActual.NombreUsuario
-                    };
-                }
-
                 var service = new ReservaService();
-                ReservaCreada = service.RegistrarNuevaReserva(nuevaReserva, abonoPago);
+                
+                // Si el cliente va a abonar, se genera la reserva Y el ticket pendiente para Caja
+                var resultado = service.RegistrarReservaConTicketAbono(nuevaReserva, abono, _usuarioActual.NombreUsuario);
+                ReservaCreada = resultado.Reserva;
+                NroTicketAbonoGenerado = resultado.NroTicketAbono;
 
                 string nombreMostrado = ObtenerPropiedadCliente(_cliente, "RazonSocial", "Nombres", "Nombre");
                 if (string.IsNullOrWhiteSpace(nombreMostrado)) nombreMostrado = "Cliente";
 
-                MessageBox.Show($"¡Reserva N° {ReservaCreada.CodigoReserva} registrada con éxito!\n\n" +
-                                $"• Cliente: {nombreMostrado}\n" +
-                                $"• Entrega: {ReservaCreada.FechaEntregaPactada:dd/MM/yyyy HH:mm}\n" +
-                                $"• Total: {MonedaHelper.Formatear(ReservaCreada.TotalPedido, conSigno: true)}\n" +
-                                $"• Abono: {MonedaHelper.Formatear(ReservaCreada.TotalAbonado, conSigno: true)}\n" +
-                                $"• Saldo Pendiente: {MonedaHelper.Formatear(ReservaCreada.SaldoPendiente, conSigno: true)}",
-                                "Reserva Confirmada", MessageBoxButtons.OK, MessageBoxIcon.Information);
+                string mensajeExito = $"¡Reserva N° {ReservaCreada.CodigoReserva} registrada con éxito!\n\n" +
+                                      $"• Cliente: {nombreMostrado}\n" +
+                                      $"• Entrega: {ReservaCreada.FechaEntregaPactada:dd/MM/yyyy HH:mm}\n" +
+                                      $"• Total: {MonedaHelper.Formatear(ReservaCreada.TotalPedido, conSigno: true)}";
+
+                if (NroTicketAbonoGenerado > 0)
+                {
+                    mensajeExito += $"\n\n🎟️ TICKET DE ABONO GENERADO: N° {NroTicketAbonoGenerado}\n" +
+                                    $"Monto a cobrar en Caja: {MonedaHelper.Formatear(abono, conSigno: true)}\n" +
+                                    $"(El ticket ya está disponible en Control de Caja para ser cobrado).";
+                }
+
+                MessageBox.Show(mensajeExito, "Reserva Registrada", MessageBoxButtons.OK, MessageBoxIcon.Information);
 
                 this.DialogResult = DialogResult.OK;
                 this.Close();
@@ -319,10 +351,7 @@ namespace SISTEMAACTUALIZADO.Modals
                 if (prop != null)
                 {
                     var val = prop.GetValue(cliente)?.ToString();
-                    if (!string.IsNullOrWhiteSpace(val))
-                    {
-                        return val;
-                    }
+                    if (!string.IsNullOrWhiteSpace(val)) return val;
                 }
             }
             return string.Empty;
