@@ -44,7 +44,7 @@ namespace SISTEMAACTUALIZADO.Modals
         private void InitializeComponent()
         {
             this.Text = "📅 Registrar Pedido por Encargo / Reserva";
-            this.Size = new Size(520, 640);
+            this.ClientSize = new Size(490, 620); // 👈 Ancho y alto de área cliente exactos
             this.StartPosition = FormStartPosition.CenterParent;
             this.FormBorderStyle = FormBorderStyle.FixedDialog;
             this.MaximizeBox = false;
@@ -52,10 +52,22 @@ namespace SISTEMAACTUALIZADO.Modals
             this.BackColor = Color.White;
             this.Font = new Font("Segoe UI", 9F, FontStyle.Regular, GraphicsUnit.Point);
 
-            Panel pnlMain = new Panel { Dock = DockStyle.Fill, Padding = new Padding(24, 16, 24, 16) };
+            // Contenedor principal con margen simétrico de 18 px a cada lado
+            Panel pnlMain = new Panel 
+            { 
+                Dock = DockStyle.Fill, 
+                Padding = new Padding(18, 14, 18, 14),
+                BackColor = Color.White,
+                AutoScroll = true
+            };
 
-            // 1. Tarjeta Cliente (Lectura segura de propiedades)
-            Panel pnlCardCliente = CrearPanelTarjeta(456, 68);
+            const int wCard = 454; // Ancho uniforme para todas las tarjetas
+
+            // 1. Tarjeta Cliente
+            Panel pnlCardCliente = CrearPanelTarjeta(wCard, 68);
+            pnlCardCliente.Dock = DockStyle.Top;
+            pnlCardCliente.Margin = new Padding(0, 0, 0, 10);
+
             Label lblTitCli = new Label { Text = "👤 CLIENTE ASOCIADO", Location = new Point(12, 10), Font = new Font("Segoe UI", 8F, FontStyle.Bold), ForeColor = Color.FromArgb(71, 85, 105), AutoSize = true };
 
             string nombreCli = ObtenerPropiedadCliente(_cliente, "RazonSocial", "Nombres", "Nombre", "Razon_Social");
@@ -71,21 +83,23 @@ namespace SISTEMAACTUALIZADO.Modals
             {
                 Text = $"{nombreCli}{rutTexto}{telTexto}",
                 Location = new Point(12, 28),
-                Size = new Size(430, 28),
+                Size = new Size(wCard - 24, 28),
                 Font = new Font("Segoe UI", 10F, FontStyle.Bold),
                 ForeColor = Color.FromArgb(15, 23, 42)
             };
             pnlCardCliente.Controls.AddRange(new Control[] { lblTitCli, lblNomCli });
 
-            // 2. Tarjeta Fecha y Hora de Entrega (Separadas para evitar mezclas de formato)
-            Panel pnlCardFecha = CrearPanelTarjeta(456, 75);
-            pnlCardFecha.Location = new Point(0, 76);
+            // 2. Tarjeta Fecha y Hora de Entrega
+            Panel pnlCardFecha = CrearPanelTarjeta(wCard, 74);
+            pnlCardFecha.Dock = DockStyle.Top;
+            pnlCardFecha.Margin = new Padding(0, 10, 0, 10);
+
             Label lblTitFecha = new Label { Text = "⏰ FECHA Y HORA COMPROMISO DE ENTREGA", Location = new Point(12, 10), Font = new Font("Segoe UI", 8F, FontStyle.Bold), ForeColor = Color.FromArgb(71, 85, 105), AutoSize = true };
 
             dtpFechaEntrega = new DateTimePicker
             {
                 Location = new Point(12, 32),
-                Size = new Size(270, 26),
+                Size = new Size(265, 26),
                 Font = new Font("Segoe UI", 9.5F, FontStyle.Bold),
                 Format = DateTimePickerFormat.Short,
                 MinDate = DateTime.Now.Date,
@@ -94,25 +108,26 @@ namespace SISTEMAACTUALIZADO.Modals
 
             dtpHoraEntrega = new DateTimePicker
             {
-                Location = new Point(292, 32),
-                Size = new Size(150, 26),
+                Location = new Point(287, 32),
+                Size = new Size(155, 26),
                 Font = new Font("Segoe UI", 9.5F, FontStyle.Bold),
                 Format = DateTimePickerFormat.Custom,
                 CustomFormat = "HH:mm 'hrs'",
                 ShowUpDown = true,
                 Value = DateTime.Today.AddHours(12)
             };
-
             pnlCardFecha.Controls.AddRange(new Control[] { lblTitFecha, dtpFechaEntrega, dtpHoraEntrega });
 
             // 3. Tarjeta Observaciones / Especificaciones
-            Panel pnlCardObs = CrearPanelTarjeta(456, 95);
-            pnlCardObs.Location = new Point(0, 159);
+            Panel pnlCardObs = CrearPanelTarjeta(wCard, 96);
+            pnlCardObs.Dock = DockStyle.Top;
+            pnlCardObs.Margin = new Padding(0, 10, 0, 10);
+
             Label lblTitObs = new Label { Text = "📝 ESPECIFICACIONES / DETALLES DEL ENCARGO", Location = new Point(12, 8), Font = new Font("Segoe UI", 8F, FontStyle.Bold), ForeColor = Color.FromArgb(71, 85, 105), AutoSize = true };
             txtObservaciones = new TextBox
             {
                 Location = new Point(12, 28),
-                Size = new Size(430, 54),
+                Size = new Size(wCard - 24, 56),
                 Multiline = true,
                 Font = new Font("Segoe UI", 9F),
                 PlaceholderText = "Ej: Torta Selva Negra con dedicatoria 'Feliz Cumpleaños', sin nueces..."
@@ -120,19 +135,20 @@ namespace SISTEMAACTUALIZADO.Modals
             pnlCardObs.Controls.AddRange(new Control[] { lblTitObs, txtObservaciones });
 
             // 4. Tarjeta Abono y Montos
-            Panel pnlCardMontos = CrearPanelTarjeta(456, 175);
-            pnlCardMontos.Location = new Point(0, 262);
+            Panel pnlCardMontos = CrearPanelTarjeta(wCard, 175);
+            pnlCardMontos.Dock = DockStyle.Top;
+            pnlCardMontos.Margin = new Padding(0, 10, 0, 12);
 
             Label lblTitAbono = new Label { Text = "💵 GESTIÓN DE ABONO Y SALDOS", Location = new Point(12, 8), Font = new Font("Segoe UI", 8F, FontStyle.Bold), ForeColor = Color.FromArgb(16, 185, 129), AutoSize = true };
 
             Label lblTotTxt = new Label { Text = "TOTAL PEDIDO:", Location = new Point(12, 34), Font = new Font("Segoe UI", 9F, FontStyle.Bold), ForeColor = Color.FromArgb(71, 85, 105), AutoSize = true };
-            lblTotalPedidoValor = new Label { Text = MonedaHelper.Formatear(_totalPedido, conSigno: true), Location = new Point(130, 32), Size = new Size(140, 22), Font = new Font("Segoe UI", 12F, FontStyle.Bold), ForeColor = Color.FromArgb(15, 23, 42) };
+            lblTotalPedidoValor = new Label { Text = MonedaHelper.Formatear(_totalPedido, conSigno: true), Location = new Point(130, 32), Size = new Size(180, 22), Font = new Font("Segoe UI", 12F, FontStyle.Bold), ForeColor = Color.FromArgb(15, 23, 42) };
 
             Label lblAboTxt = new Label { Text = "Monto Abono Inicial ($):", Location = new Point(12, 68), Font = new Font("Segoe UI", 8.5F, FontStyle.Bold), ForeColor = Color.FromArgb(15, 23, 42), AutoSize = true };
             txtMontoAbono = new TextBox
             {
                 Location = new Point(12, 88),
-                Size = new Size(200, 26),
+                Size = new Size(205, 26),
                 Font = new Font("Segoe UI", 11F, FontStyle.Bold),
                 Text = "0",
                 MaxLength = 10
@@ -156,16 +172,19 @@ namespace SISTEMAACTUALIZADO.Modals
             cbMedioPagoAbono.SelectedIndex = 0;
 
             Label lblSalTxt = new Label { Text = "SALDO PENDIENTE:", Location = new Point(12, 132), Font = new Font("Segoe UI", 9.5F, FontStyle.Bold), ForeColor = Color.FromArgb(239, 68, 68), AutoSize = true };
-            lblSaldoPendienteValor = new Label { Text = MonedaHelper.Formatear(_totalPedido, conSigno: true), Location = new Point(155, 130), Size = new Size(180, 26), Font = new Font("Segoe UI", 14F, FontStyle.Bold), ForeColor = Color.FromArgb(239, 68, 68) };
+            lblSaldoPendienteValor = new Label { Text = MonedaHelper.Formatear(_totalPedido, conSigno: true), Location = new Point(155, 130), Size = new Size(220, 26), Font = new Font("Segoe UI", 14F, FontStyle.Bold), ForeColor = Color.FromArgb(239, 68, 68) };
 
             pnlCardMontos.Controls.AddRange(new Control[] { lblTitAbono, lblTotTxt, lblTotalPedidoValor, lblAboTxt, txtMontoAbono, lblMedioTxt, cbMedioPagoAbono, lblSalTxt, lblSaldoPendienteValor });
+
+            // Espaciador entre tarjetas y botones
+            Panel pnlEspaciador = new Panel { Dock = DockStyle.Top, Height = 12, BackColor = Color.Transparent };
 
             // 5. Botones de Acción
             btnConfirmar = new Button
             {
                 Text = "✔ Confirmar y Generar Reserva",
-                Location = new Point(0, 460),
-                Size = new Size(456, 44),
+                Dock = DockStyle.Top,
+                Height = 44,
                 BackColor = Color.FromArgb(16, 185, 129),
                 ForeColor = Color.White,
                 FlatStyle = FlatStyle.Flat,
@@ -175,11 +194,13 @@ namespace SISTEMAACTUALIZADO.Modals
             btnConfirmar.FlatAppearance.BorderSize = 0;
             btnConfirmar.Click += BtnConfirmar_Click;
 
+            Panel pnlEspaciadorBtn = new Panel { Dock = DockStyle.Top, Height = 8, BackColor = Color.Transparent };
+
             btnCancelar = new Button
             {
                 Text = "✕ Cancelar",
-                Location = new Point(0, 514),
-                Size = new Size(456, 36),
+                Dock = DockStyle.Top,
+                Height = 36,
                 BackColor = Color.FromArgb(241, 245, 249),
                 ForeColor = Color.FromArgb(100, 116, 139),
                 FlatStyle = FlatStyle.Flat,
@@ -189,7 +210,16 @@ namespace SISTEMAACTUALIZADO.Modals
             btnCancelar.FlatAppearance.BorderColor = Color.FromArgb(226, 232, 240);
             btnCancelar.Click += (s, e) => this.Close();
 
-            pnlMain.Controls.AddRange(new Control[] { pnlCardCliente, pnlCardFecha, pnlCardObs, pnlCardMontos, btnConfirmar, btnCancelar });
+            // Se agregan en orden inverso al usar DockStyle.Top
+            pnlMain.Controls.Add(btnCancelar);
+            pnlMain.Controls.Add(pnlEspaciadorBtn);
+            pnlMain.Controls.Add(btnConfirmar);
+            pnlMain.Controls.Add(pnlEspaciador);
+            pnlMain.Controls.Add(pnlCardMontos);
+            pnlMain.Controls.Add(pnlCardObs);
+            pnlMain.Controls.Add(pnlCardFecha);
+            pnlMain.Controls.Add(pnlCardCliente);
+
             this.Controls.Add(pnlMain);
             this.CancelButton = btnCancelar;
         }

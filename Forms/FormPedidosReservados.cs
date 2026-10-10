@@ -338,10 +338,30 @@ namespace SISTEMAACTUALIZADO
             colEntrega.DefaultCellStyle.Format = "dd-MM-yyyy HH:mm";
             dgvReservas.Columns.Add(colEntrega);
 
-            var estiloMoneda = new DataGridViewCellStyle { FormatProvider = new System.Globalization.CultureInfo("es-CL"), Format = "$ #,##0", Alignment = DataGridViewContentAlignment.MiddleRight, Font = new Font("Segoe UI", 8.5F, FontStyle.Bold) };
-            dgvReservas.Columns.Add(new DataGridViewTextBoxColumn { Name = "TotalPedido", DataPropertyName = "TotalPedido", HeaderText = "TOTAL", FillWeight = 18, DefaultCellStyle = estiloMoneda });
-            dgvReservas.Columns.Add(new DataGridViewTextBoxColumn { Name = "TotalAbonado", DataPropertyName = "TotalAbonado", HeaderText = "ABONADO", FillWeight = 18, DefaultCellStyle = estiloMoneda });
-            dgvReservas.Columns.Add(new DataGridViewTextBoxColumn { Name = "SaldoPendiente", DataPropertyName = "SaldoPendiente", HeaderText = "SALDO", FillWeight = 18, DefaultCellStyle = estiloMoneda });
+            var estiloMoneda = new DataGridViewCellStyle 
+            { 
+                FormatProvider = new System.Globalization.CultureInfo("es-CL"), 
+                Format = "$ #,##0", 
+                Alignment = DataGridViewContentAlignment.MiddleRight, 
+                Font = new Font("Segoe UI", 8.5F, FontStyle.Bold) 
+            };
+
+            // TOTAL
+            var colTotal = new DataGridViewTextBoxColumn { Name = "TotalPedido", DataPropertyName = "TotalPedido", HeaderText = "TOTAL", FillWeight = 18, DefaultCellStyle = estiloMoneda };
+            colTotal.HeaderCell.Style.Alignment = DataGridViewContentAlignment.MiddleRight;
+            dgvReservas.Columns.Add(colTotal);
+
+            // ABONADO
+            var colAbonado = new DataGridViewTextBoxColumn { Name = "TotalAbonado", DataPropertyName = "TotalAbonado", HeaderText = "ABONADO", FillWeight = 18, DefaultCellStyle = estiloMoneda };
+            colAbonado.HeaderCell.Style.Alignment = DataGridViewContentAlignment.MiddleRight;
+            dgvReservas.Columns.Add(colAbonado);
+
+            // SALDO
+            var colSaldo = new DataGridViewTextBoxColumn { Name = "SaldoPendiente", DataPropertyName = "SaldoPendiente", HeaderText = "SALDO", FillWeight = 18, DefaultCellStyle = estiloMoneda };
+            colSaldo.HeaderCell.Style.Alignment = DataGridViewContentAlignment.MiddleRight;
+            dgvReservas.Columns.Add(colSaldo);
+
+            // ESTADO
             dgvReservas.Columns.Add(new DataGridViewTextBoxColumn { Name = "Estado", DataPropertyName = "Estado", HeaderText = "ESTADO", FillWeight = 22 });
 
             dgvReservas.CellFormatting += (s, e) =>
@@ -370,8 +390,11 @@ namespace SISTEMAACTUALIZADO
             dgvDetalle.Columns.Clear();
             dgvDetalle.Columns.Add(new DataGridViewTextBoxColumn { Name = "NombreProducto", DataPropertyName = "NombreProducto", HeaderText = "PRODUCTO", FillWeight = 50 });
             dgvDetalle.Columns.Add(new DataGridViewTextBoxColumn { Name = "Cantidad", DataPropertyName = "Cantidad", HeaderText = "CANT.", FillWeight = 20 });
+            
             var estiloM = new DataGridViewCellStyle { FormatProvider = new System.Globalization.CultureInfo("es-CL"), Format = "$ #,##0", Alignment = DataGridViewContentAlignment.MiddleRight };
-            dgvDetalle.Columns.Add(new DataGridViewTextBoxColumn { Name = "Subtotal", DataPropertyName = "Subtotal", HeaderText = "SUBTOTAL", FillWeight = 30, DefaultCellStyle = estiloM });
+            var colSubtotal = new DataGridViewTextBoxColumn { Name = "Subtotal", DataPropertyName = "Subtotal", HeaderText = "SUBTOTAL", FillWeight = 30, DefaultCellStyle = estiloM };
+            colSubtotal.HeaderCell.Style.Alignment = DataGridViewContentAlignment.MiddleRight;
+            dgvDetalle.Columns.Add(colSubtotal);
 
             dgvDetalle.CellFormatting += (s, e) =>
             {
@@ -392,7 +415,10 @@ namespace SISTEMAACTUALIZADO
             dgvAbonos.Columns.Add(colF);
 
             var estiloM = new DataGridViewCellStyle { FormatProvider = new System.Globalization.CultureInfo("es-CL"), Format = "$ #,##0", Alignment = DataGridViewContentAlignment.MiddleRight };
-            dgvAbonos.Columns.Add(new DataGridViewTextBoxColumn { Name = "Monto", DataPropertyName = "Monto", HeaderText = "MONTO", FillWeight = 35, DefaultCellStyle = estiloM });
+            var colMonto = new DataGridViewTextBoxColumn { Name = "Monto", DataPropertyName = "Monto", HeaderText = "MONTO", FillWeight = 35, DefaultCellStyle = estiloM };
+            colMonto.HeaderCell.Style.Alignment = DataGridViewContentAlignment.MiddleRight;
+            dgvAbonos.Columns.Add(colMonto);
+
             dgvAbonos.Columns.Add(new DataGridViewTextBoxColumn { Name = "MedioPago", DataPropertyName = "MedioPago", HeaderText = "MEDIO", FillWeight = 30 });
         }
 

@@ -1294,12 +1294,35 @@ namespace SISTEMAACTUALIZADO
                     var btnRestar = row.Controls.Find("btnRestar", false).FirstOrDefault();
                     var lblNombre = row.Controls.Find("lblNombre", false).FirstOrDefault();
 
+                    // Cruz de eliminar fija a la derecha
                     if (btnDeleteRow != null) btnDeleteRow.Location = new Point(anchoContenedor - 24, 14);
-                    if (lblSubtotal != null) lblSubtotal.Location = new Point(anchoContenedor - 95, 16);
-                    if (btnSumar != null) btnSumar.Location = new Point(anchoContenedor - 122, 14);
-                    if (lblQty != null) lblQty.Location = new Point(anchoContenedor - 156, 16);
-                    if (btnRestar != null) btnRestar.Location = new Point(anchoContenedor - 180, 14);
-                    if (lblNombre != null) lblNombre.Width = Math.Max(50, anchoContenedor - 188);
+
+                    // Subtotal antes de la cruz
+                    if (lblSubtotal != null) lblSubtotal.Location = new Point(anchoContenedor - 96, 16);
+
+                    // Detectar si la fila contiene formato de gramos (ej: 1000g)
+                    bool esPesableFila = lblQty != null && lblQty.Text.EndsWith("g");
+                    int anchoBadge = esPesableFila ? 50 : 28;
+
+                    // Posicionamiento en cadena hacia la izquierda sin solapamientos
+                    int xBtnSumar = anchoContenedor - 104 - 22; // Deja espacio holgado con el subtotal
+                    int xLblQty = xBtnSumar - anchoBadge - 2;
+                    int xBtnRestar = xLblQty - 22 - 2;
+
+                    if (btnSumar != null) btnSumar.Location = new Point(xBtnSumar, 14);
+                    if (lblQty != null)
+                    {
+                        lblQty.Size = new Size(anchoBadge, 18);
+                        lblQty.Location = new Point(xLblQty, 16);
+                    }
+                    if (btnRestar != null) btnRestar.Location = new Point(xBtnRestar, 14);
+
+                    // El nombre del producto toma todo el espacio restante a la izquierda
+                    if (lblNombre != null)
+                    {
+                        int espacioDisponibleNombre = Math.Max(50, xBtnRestar - 10);
+                        lblNombre.Width = espacioDisponibleNombre;
+                    }
                 }
             }
         }
