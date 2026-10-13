@@ -25,6 +25,8 @@ namespace SISTEMAACTUALIZADO.Data
         public DbSet<PagoDetalleFactura> PagosDetalleFacturas { get; set; } = null!;
         public DbSet<HistorialCondicionesCredito> HistorialCondicionesCredito { get; set; } = null!;
         public DbSet<CajaTurno> CajaTurnos { get; set; } = null!;
+        public DbSet<ClienteCuentaPuntos> ClienteCuentasPuntos { get; set; } = null!;
+        public DbSet<PuntosMovimiento> PuntosMovimientos { get; set; } = null!;
 
         // Reservas
         public DbSet<Reserva> Reservas { get; set; } = null!;
@@ -55,6 +57,14 @@ namespace SISTEMAACTUALIZADO.Data
                 .IsUnique()
                 .HasDatabaseName("UK_Delivery_NumeroPedido");
 
+            modelBuilder.Entity<PuntosMovimiento>()
+                .HasIndex(m => new { m.IdCliente, m.Fecha })
+                .HasName("IX_PuntosMovimientos_IdCliente_Fecha");
+
+            modelBuilder.Entity<PuntosMovimiento>()
+                .HasIndex(m => m.IdTve)
+                .HasName("IX_PuntosMovimientos_IdTve");
+
             // Relación Zona -> Comunas (evita eliminación accidental en cascada)
             modelBuilder.Entity<ZonaDelivery>()
                 .HasMany(z => z.Comunas)
@@ -75,6 +85,7 @@ namespace SISTEMAACTUALIZADO.Data
                 .WithMany()
                 .HasForeignKey(d => d.ReservaId)
                 .OnDelete(DeleteBehavior.SetNull);
+                
         }
 
         public void AsegurarColumnaEsPesableMySQL()

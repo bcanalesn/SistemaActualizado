@@ -16,6 +16,7 @@ namespace SISTEMAACTUALIZADO.Modals
         private Label lblNombreCliente = null!;
         private Label lblEstadoCliente = null!;
         private Label lblCreditoInfo = null!;
+        private Label lblPuntosFidelizacion = null!;
         private Button btnAsignar = null!;
         private Button btnConsumidorFinal = null!;
 
@@ -34,7 +35,7 @@ namespace SISTEMAACTUALIZADO.Modals
         private void InitializeComponent()
         {
             this.Text = "Asignar Cliente a la Venta";
-            this.Size = new Size(420, 520);
+            this.Size = new Size(420, 545);
             this.StartPosition = FormStartPosition.CenterParent;
             this.FormBorderStyle = FormBorderStyle.FixedDialog;
             this.MaximizeBox = false;
@@ -101,7 +102,7 @@ namespace SISTEMAACTUALIZADO.Modals
             pnlInfoCliente = new Panel
             {
                 Location = new Point(24, 122),
-                Size = new Size(356, 250),
+                Size = new Size(356, 280),
                 BackColor = Color.FromArgb(248, 250, 252),
                 BorderStyle = BorderStyle.FixedSingle,
                 Padding = new Padding(12)
@@ -134,12 +135,22 @@ namespace SISTEMAACTUALIZADO.Modals
                 Size = new Size(330, 170)
             };
 
-            pnlInfoCliente.Controls.AddRange(new Control[] { lblNombreCliente, lblEstadoCliente, lblCreditoInfo });
+            lblPuntosFidelizacion = new Label
+            {
+                Text = "🎁 Puntos Fidelización: --",
+                Font = new Font("Segoe UI", 8.8F, FontStyle.Bold),
+                ForeColor = Color.FromArgb(124, 58, 237),
+                Location = new Point(10, 238),
+                Size = new Size(330, 36),
+                Visible = false
+            };
+
+            pnlInfoCliente.Controls.AddRange(new Control[] { lblNombreCliente, lblEstadoCliente, lblCreditoInfo, lblPuntosFidelizacion });
 
             btnAsignar = new Button
             {
                 Text = "✔ Asignar Cliente (Enter)",
-                Location = new Point(24, 385),
+                Location = new Point(24, 412),
                 Size = new Size(356, 38),
                 BackColor = Color.FromArgb(37, 99, 235),
                 ForeColor = Color.White,
@@ -154,7 +165,7 @@ namespace SISTEMAACTUALIZADO.Modals
             btnConsumidorFinal = new Button
             {
                 Text = "👤 Consumidor Final (Sin RUT)",
-                Location = new Point(24, 430),
+                Location = new Point(24, 456),
                 Size = new Size(356, 32),
                 BackColor = Color.FromArgb(241, 245, 249),
                 ForeColor = Color.FromArgb(51, 65, 85),
@@ -185,6 +196,9 @@ namespace SISTEMAACTUALIZADO.Modals
                 lblNombreCliente.Text = "Ingrese un RUT para consultar";
                 lblEstadoCliente.Text = "Status: --";
                 lblCreditoInfo.Text = "• Crédito: No asignado\n• Cupo Total: $0\n• Deuda Actual: $0\n• Disponible: $0";
+                
+                // 1. Ocultar puntos si no hay RUT completo
+                if (lblPuntosFidelizacion != null) lblPuntosFidelizacion.Visible = false;
                 return;
             }
 
@@ -223,6 +237,17 @@ namespace SISTEMAACTUALIZADO.Modals
                                           $"• Cupo Disponible: ${info.CupoDisponible:N0}\n" +
                                           $"• Lista de Precios: Lista {cli.ListaPrecioDefecto}" +
                                           detalleMora;
+
+                    // 2. AQUÍ: Consultar y mostrar los puntos reales del cliente
+                    if (lblPuntosFidelizacion != null)
+                    {
+                        var fidelizacionService = new FidelizacionService();
+                        var resumen = fidelizacionService.ObtenerResumenPuntos(cli.IdCliente);
+
+                        lblPuntosFidelizacion.Text = $"🎁 PUNTOS DISPONIBLES: {resumen.PuntosDisponibles:N0} pts  (Equiv. ${resumen.EquivalenciaPesosDisponible:N0})\n" +
+                                                     $"   Acumulado histórico: {resumen.PuntosHistoricosAcumulados:N0} pts | Canjeados: {resumen.PuntosHistoricosCanjeados:N0} pts";
+                        lblPuntosFidelizacion.Visible = true;
+                    }
                 }
                 else
                 {
@@ -231,6 +256,9 @@ namespace SISTEMAACTUALIZADO.Modals
                     lblEstadoCliente.Text = "Status: No registrado";
                     lblEstadoCliente.ForeColor = Color.FromArgb(239, 68, 68);
                     lblCreditoInfo.Text = "El RUT ingresado no pertenece a ningún cliente activo en el sistema.";
+
+                    // 3. AQUÍ: Ocultar si el cliente no existe
+                    if (lblPuntosFidelizacion != null) lblPuntosFidelizacion.Visible = false;
 
                     // Si el RUT ya tiene 8 o 9 dígitos numéricos limpios, activar opción de crear nuevo
                     if (rutLimpio.Length >= 8)
@@ -250,9 +278,9 @@ namespace SISTEMAACTUALIZADO.Modals
             catch (Exception ex)
             {
                 lblCreditoInfo.Text = $"Error: {ex.Message}";
+                if (lblPuntosFidelizacion != null) lblPuntosFidelizacion.Visible = false;
             }
         }
-
         private void BtnAsignar_Click(object? sender, EventArgs e)
         {
             // Caso 1: El cliente ya existe -> Asignar a la venta

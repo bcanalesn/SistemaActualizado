@@ -32,6 +32,7 @@ namespace SISTEMAACTUALIZADO
         private Button btnEliminar = null!;
         private Button btnEstado = null!;
         private Button btnPreciosEspeciales = null!;
+        private Button btnPuntos = null!;
 
         // Grilla y Footer
         private DataGridView dgvClientes = null!;
@@ -131,6 +132,18 @@ namespace SISTEMAACTUALIZADO
                     modal.ShowDialog(this);
                 }
             };
+            // 🎁 Botón Puntos de Fidelización
+            btnPuntos = CrearBoton("🎁 Puntos", Color.FromArgb(234, 88, 12), Color.White, new Size(110, 34), 6);
+            btnPuntos.Margin = new Padding(4, 0, 0, 0);
+            btnPuntos.Enabled = false;
+            btnPuntos.Click += (s, e) =>
+            {
+                if (_clienteSeleccionado != null)
+                {
+                    using var modalPuntos = new FormHistorialPuntosModal(_clienteSeleccionado);
+                    modalPuntos.ShowDialog(this);
+                }
+            };
 
             btnEstado = CrearBoton("🔄 Activar / Desactivar", Color.FromArgb(245, 158, 11), Color.White, new Size(165, 34), 6);
             btnEstado.Margin = new Padding(4, 0, 0, 0);
@@ -142,7 +155,8 @@ namespace SISTEMAACTUALIZADO
             btnEliminar.Enabled = false;
             btnEliminar.Click += BtnEliminar_Click;
 
-            pnlBotonesAccion.Controls.AddRange(new Control[] { btnNuevo, btnEditar, btnPreciosEspeciales, btnEstado, btnEliminar });
+            // Se incluye btnPuntos en la colección:
+            pnlBotonesAccion.Controls.AddRange(new Control[] { btnNuevo, btnEditar, btnPreciosEspeciales, btnPuntos, btnEstado, btnEliminar });
             pnlHeader.Controls.Add(pnlBotonesAccion);
             pnlHeader.Controls.Add(pnlTitulos);
 
@@ -464,6 +478,7 @@ namespace SISTEMAACTUALIZADO
                 btnEditar.Enabled = true;
                 btnEliminar.Enabled = true;
                 btnPreciosEspeciales.Enabled = true;
+                btnPuntos.Enabled = true;
                 btnEstado.Enabled = true;
             }
             else
@@ -472,6 +487,7 @@ namespace SISTEMAACTUALIZADO
                 btnEditar.Enabled = false;
                 btnEliminar.Enabled = false;
                 btnPreciosEspeciales.Enabled = false;
+                btnPuntos.Enabled = false;
                 btnEstado.Enabled = false;
             }
         }

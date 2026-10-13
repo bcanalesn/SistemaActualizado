@@ -1165,9 +1165,30 @@ namespace SISTEMAACTUALIZADO
             {
                 string cajero = _usuarioActual?.NombreUsuario ?? "admin";
                 
+                // 1. PROCESAR COBRO OFICIAL DEL TICKET
                 int folioOficial = _cajaService.ProcesarCobroTicket(
                     _ticketSeleccionado, tipoDoc, medioPago, vuelto, _turnoActual.CajaTurnoID, cajero
                 );
+
+                // ========================================================
+                // 🎁 FIDELIZACIÓN: SI LA VENTA APLICÓ CANJE DE PUNTOS
+                // ========================================================
+                if (_ticketSeleccionado.Idcliente > 0 && !string.IsNullOrEmpty(_ticketSeleccionado.Documento))
+                {
+                    var matchCanje = System.Text.RegularExpressions.Regex.Match(_ticketSeleccionado.Documento, @"CANJE:\s*(\d+)");
+                    if (matchCanje.Success && int.TryParse(matchCanje.Groups[1].Value, out int ptsUsados) && ptsUsados > 0)
+                    {
+                        var fidelizacionService = new FidelizacionService();
+                        fidelizacionService.ProcesarCanjePorVenta(
+                            _ticketSeleccionado.Idcliente, 
+                            _ticketSeleccionado.idTve, 
+                            ptsUsados, 
+                            folioOficial, 
+                            cajero
+                        );
+                    }
+                }
+
                 // ========================================================
                 // VINCULACIÓN: Si el ticket cobrado es un Abono o Saldo de Reserva
                 // ========================================================
@@ -1224,14 +1245,13 @@ namespace SISTEMAACTUALIZADO
                     Nombre = item.NmbProducto ?? "Producto",
                     PrecioUnitario = item.Precio,
                     Cantidad = item.Cantidad,
-                    // Si la cantidad es granular (>= 50) y el precio unitario base es menor a 100, es peso en gramos
                     EsPesable = (item.Cantidad >= 50 && item.Precio > 0 && item.Precio < 100)
                 }).ToList();
 
                 MessageBox.Show($"¡{tipoDoc.ToUpper()} N° {folioOficial} PROCESADA CON ÉXITO!\n\n" +
-                                $"• Medio de Pago: {medioPago}\n" +
-                                $"• Total: {MonedaHelper.Formatear(_ticketSeleccionado.Total, conSigno: true)}\n" +
-                                $"• Vuelto: {MonedaHelper.Formatear(vuelto, conSigno: true)}",
+                                $"Medio de Pago: {medioPago}\n" +
+                                $"Total: {MonedaHelper.Formatear(_ticketSeleccionado.Total, conSigno: true)}\n" +
+                                $"Vuelto: {MonedaHelper.Formatear(vuelto, conSigno: true)}",
                                 "Cobro Finalizado", MessageBoxButtons.OK, MessageBoxIcon.Information);
 
                 FormTicketModal formTicket = new FormTicketModal(_ticketSeleccionado, itemsCarrito, pagaCon, vuelto);
@@ -1246,7 +1266,6 @@ namespace SISTEMAACTUALIZADO
                 MessageBox.Show($"Error al procesar el cobro: {ex.Message}", "Error DB", MessageBoxButtons.OK, MessageBoxIcon.Error);
             }
         }
-
         private void LimpiarSeleccionVista()
         {
             _ticketSeleccionado = null;

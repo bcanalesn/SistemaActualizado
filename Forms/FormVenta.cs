@@ -31,6 +31,11 @@ namespace SISTEMAACTUALIZADO
         private CajaService _cajaService = new CajaService();
         private TicketPrintService _ticketPrintService = new TicketPrintService();
         private DeliveryService _deliveryService = new DeliveryService();
+        // Canje de puntos de fidelización
+        private int _puntosACanjearVenta = 0;
+        private Label lblDescuentoPuntosCap = null!;
+        private Label lblDescuentoPuntosVal = null!;
+        private Button btnCanjearPuntos = null!;
 
         // Control de Venta en Espera / Edición
         private int _idTveEnEdicion = 0;
@@ -242,6 +247,8 @@ namespace SISTEMAACTUALIZADO
             // Altura de checkout ampliada para albergar Delivery y Desglose completo
             Panel pnlBottomCheckout = new Panel { Dock = DockStyle.Bottom, Height = 245, Padding = new Padding(0, 4, 0, 0) };
             Panel pnlDesgloseTotales = new Panel { Dock = DockStyle.Top, Height = 105, BackColor = Color.FromArgb(241, 245, 249), Padding = new Padding(10) };
+            lblDescuentoPuntosCap = new Label { Text = "🎁 Dcto. Puntos", Font = new Font("Segoe UI", 8.5F, FontStyle.Bold), ForeColor = Color.FromArgb(124, 58, 237), Location = new Point(6, 46), AutoSize = true, Visible = false };
+            lblDescuentoPuntosVal = new Label { Text = "$ 0", Font = new Font("Segoe UI", 9F, FontStyle.Bold), ForeColor = Color.FromArgb(124, 58, 237), Location = new Point(210, 46), AutoSize = true, Visible = false };
 
             Label lblSubtotalCap = new Label { Text = "Subtotal", Font = new Font("Segoe UI", 8.5F), ForeColor = Color.FromArgb(100, 116, 139), Location = new Point(6, 6), AutoSize = true };
             lblSubtotalValue = new Label { Text = "$ 0", Font = new Font("Segoe UI", 9F, FontStyle.Bold), ForeColor = Color.FromArgb(15, 23, 42), Location = new Point(210, 6), AutoSize = true };
@@ -315,6 +322,22 @@ namespace SISTEMAACTUALIZADO
             };
             btnReservar.FlatAppearance.BorderSize = 0;
             btnReservar.Click += BtnReservarPedido_Click;
+            btnCanjearPuntos = new Button
+            {
+                Text = "🎁 CANJEAR PUNTOS",
+                Location = new Point(0, 48), // ubicado entre el botón cliente y delivery
+                Size = new Size(310, 32),
+                BackColor = Color.FromArgb(245, 243, 255),
+                ForeColor = Color.FromArgb(124, 58, 237),
+                FlatStyle = FlatStyle.Flat,
+                Font = new Font("Segoe UI", 8.5F, FontStyle.Bold),
+                Cursor = Cursors.Hand,
+                Visible = false // Se muestra solo si el cliente tiene puntos
+            };
+            btnCanjearPuntos.FlatAppearance.BorderColor = Color.FromArgb(221, 214, 254);
+            btnCanjearPuntos.Click += BtnCanjearPuntos_Click;
+            pnlBotonesAccion.Controls.Add(btnCanjearPuntos);
+            
 
             pnlBotonesAccion.Controls.AddRange(new Control[] { btnCliente, btnGenerarTicket, btnDelivery, btnReservar });
             pnlBottomCheckout.Controls.AddRange(new Control[] { pnlBotonesAccion, pnlDesgloseTotales });
@@ -1245,9 +1268,43 @@ namespace SISTEMAACTUALIZADO
             decimal ahorroDescuento = subtotalBruto - subtotalProductos;
             if (ahorroDescuento < 0) ahorroDescuento = 0;
 
-            // Desglose de Delivery si está configurado
+            // 1. Declarar flete antes de calcular el total a pagar
             decimal flete = _deliveryActivo != null ? _deliveryActivo.CostoDelivery : 0m;
-            decimal totalPagar = subtotalProductos + flete;
+
+            // 2. Descuento por puntos y cálculo de totalPagar (una sola vez)
+            decimal descuentoPuntosPesos = _puntosACanjearVenta * FidelizacionConfig.ValorPesoPorPunto;
+            decimal totalPagar = Math.Max(0, subtotalProductos + flete - descuentoPuntosPesos);
+
+            if (_puntosACanjearVenta > 0)
+            {
+                lblDescuentoPuntosCap.Visible = true;
+                lblDescuentoPuntosVal.Visible = true;
+                lblDescuentoPuntosVal.Text = $"-{MonedaHelper.Formatear(descuentoPuntosPesos, conSigno: true)}";
+                btnCanjearPuntos.Text = $"🎁 PUNTOS APLICADOS: -{MonedaHelper.Formatear(descuentoPuntosPesos, conSigno: true)} ({_puntosACanjearVenta} pts)";
+                btnCanjearPuntos.BackColor = Color.FromArgb(240, 253, 244);
+                btnCanjearPuntos.ForeColor = Color.FromArgb(22, 163, 74);
+            }
+            else
+            {
+                lblDescuentoPuntosCap.Visible = false;
+                lblDescuentoPuntosVal.Visible = false;
+                btnCanjearPuntos.Text = "🎁 CANJEAR PUNTOS DISPONIBLES";
+                btnCanjearPuntos.BackColor = Color.FromArgb(245, 243, 255);
+                btnCanjearPuntos.ForeColor = Color.FromArgb(124, 58, 237);
+            }
+
+            // Mostrar el botón solo si el cliente tiene puntos
+            if (_clienteActual != null && _clienteActual.IdCliente > 0)
+            {
+                var fidelizacionService = new FidelizacionService();
+                var resumen = fidelizacionService.ObtenerResumenPuntos(_clienteActual.IdCliente);
+                btnCanjearPuntos.Visible = (resumen.PuntosDisponibles > 0 || _puntosACanjearVenta > 0);
+            }
+            else
+            {
+                btnCanjearPuntos.Visible = false;
+                _puntosACanjearVenta = 0;
+            }
 
             lblSubtotalValue.Text = MonedaHelper.Formatear(subtotalBruto, conSigno: true);
             lblDescuentoValue.Text = ahorroDescuento > 0 ? $"-{MonedaHelper.Formatear(ahorroDescuento, conSigno: true)}" : "$ 0";
@@ -1276,7 +1333,6 @@ namespace SISTEMAACTUALIZADO
 
             ReajustarAnchoFilasCarrito();
         }
-
         private void ReajustarAnchoFilasCarrito()
         {
             int anchoContenedor = flowCarritoItems.ClientSize.Width > 180 ? flowCarritoItems.ClientSize.Width - 6 : 280;
@@ -1439,6 +1495,39 @@ namespace SISTEMAACTUALIZADO
                     _deliveryActivo = modal.DeliveryConfigurado;
                     ActualizarCarritoUI();
                 }
+            }
+        }
+        private void BtnCanjearPuntos_Click(object? sender, EventArgs e)
+        {
+            if (_clienteActual == null || _clienteActual.IdCliente <= 0)
+            {
+                MessageBox.Show("Seleccione un cliente registrado antes de canjear puntos.", "Atención", MessageBoxButtons.OK, MessageBoxIcon.Information);
+                return;
+            }
+
+            var cart = ObtenerCarritoActivo();
+            if (cart.Count == 0)
+            {
+                MessageBox.Show("Agregue productos al carro antes de aplicar un descuento por puntos.", "Carro Vacío", MessageBoxButtons.OK, MessageBoxIcon.Warning);
+                return;
+            }
+
+            var fidelizacionService = new FidelizacionService();
+            var resumen = fidelizacionService.ObtenerResumenPuntos(_clienteActual.IdCliente);
+
+            if (resumen.PuntosDisponibles <= 0 && _puntosACanjearVenta <= 0)
+            {
+                MessageBox.Show("El cliente no dispone de puntos acumulados para canjear.", "Sin Puntos", MessageBoxButtons.OK, MessageBoxIcon.Information);
+                return;
+            }
+
+            decimal subtotal = cart.Sum(c => c.Subtotal) + (_deliveryActivo?.CostoDelivery ?? 0m);
+
+            using var modal = new FormCanjearPuntosModal(resumen.PuntosDisponibles + _puntosACanjearVenta, subtotal, _puntosACanjearVenta);
+            if (modal.ShowDialog(this) == DialogResult.OK)
+            {
+                _puntosACanjearVenta = modal.PuntosSeleccionados;
+                ActualizarCarritoUI();
             }
         }
 
@@ -1676,6 +1765,7 @@ namespace SISTEMAACTUALIZADO
         }
     }
 
+        
     public class PictureBoxCalidadAlta : PictureBox
     {
         protected override void OnPaint(PaintEventArgs pe)

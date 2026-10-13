@@ -309,6 +309,23 @@ namespace SISTEMAACTUALIZADO.Services
             ticket.Fono1 = ticketBd.Fono1;
             ticket.email = ticketBd.email;
 
+            // 5. Acumulación automática de puntos de fidelización (solo clientes formales registrados)
+            if (ticketBd.Idcliente > 0 && ticketBd.Total >= FidelizacionConfig.MontoMinimoAcumulacion)
+            {
+                try
+                {
+                    var fidelizacionService = new FidelizacionService();
+                    fidelizacionService.ProcesarAcumulacionPorVenta(
+                        ticketBd.Idcliente, 
+                        ticketBd.idTve, 
+                        ticketBd.Total, 
+                        folioOficial, 
+                        cajeroUsuario
+                    );
+                }
+                catch { }
+            }
+
             return folioOficial;
         }
 
@@ -332,6 +349,20 @@ namespace SISTEMAACTUALIZADO.Services
             }
 
             db.SaveChanges();
+
+            // ========================================================
+            // 🎁 REVERSA AUTOMÁTICA DE PUNTOS DE FIDELIZACIÓN
+            // ========================================================
+            try
+            {
+                string usuarioCajero = !string.IsNullOrWhiteSpace(ticket.UserDTE) ? ticket.UserDTE : "admin";
+                var fidelizacionService = new FidelizacionService();
+                fidelizacionService.ReversarPuntosPorAnulacion(idTve, usuarioCajero);
+            }
+            catch
+            {
+                // Manejo silencioso para no interrumpir el flujo si no había movimientos vinculados
+            }
         }
 
         // 4. CÁLCULO DE EFECTIVO AISLADO POR TURNO
