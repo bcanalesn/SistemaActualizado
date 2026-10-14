@@ -5,6 +5,7 @@ using System.Drawing.Drawing2D;
 using System.Linq;
 using System.Windows.Forms;
 using SISTEMAACTUALIZADO.Data;
+using Microsoft.EntityFrameworkCore;
 using SISTEMAACTUALIZADO.Helpers;
 using SISTEMAACTUALIZADO.Modals;
 using SISTEMAACTUALIZADO.Models;
@@ -1173,19 +1174,25 @@ namespace SISTEMAACTUALIZADO
                 // ========================================================
                 // 🎁 FIDELIZACIÓN: SI LA VENTA APLICÓ CANJE DE PUNTOS
                 // ========================================================
-                if (_ticketSeleccionado.Idcliente > 0 && !string.IsNullOrEmpty(_ticketSeleccionado.Documento))
+                if (_ticketSeleccionado.Idcliente > 0)
                 {
-                    var matchCanje = System.Text.RegularExpressions.Regex.Match(_ticketSeleccionado.Documento, @"CANJE:\s*(\d+)");
-                    if (matchCanje.Success && int.TryParse(matchCanje.Groups[1].Value, out int ptsUsados) && ptsUsados > 0)
+                    using var dbPuntos = new AppDbContext();
+                    var ticketReal = dbPuntos.TVE2607.AsNoTracking().FirstOrDefault(t => t.idTve == _ticketSeleccionado.idTve);
+                    
+                    if (ticketReal != null && !string.IsNullOrEmpty(ticketReal.Documento))
                     {
-                        var fidelizacionService = new FidelizacionService();
-                        fidelizacionService.ProcesarCanjePorVenta(
-                            _ticketSeleccionado.Idcliente, 
-                            _ticketSeleccionado.idTve, 
-                            ptsUsados, 
-                            folioOficial, 
-                            cajero
-                        );
+                        var matchCanje = System.Text.RegularExpressions.Regex.Match(ticketReal.Documento, @"CANJE:\s*(\d+)", System.Text.RegularExpressions.RegexOptions.IgnoreCase);
+                        if (matchCanje.Success && int.TryParse(matchCanje.Groups[1].Value, out int ptsUsados) && ptsUsados > 0)
+                        {
+                            var fidelizacionService = new FidelizacionService();
+                            fidelizacionService.ProcesarCanjePorVenta(
+                                ticketReal.Idcliente, 
+                                ticketReal.idTve, 
+                                ptsUsados, 
+                                folioOficial, 
+                                cajero
+                            );
+                        }
                     }
                 }
 
@@ -1746,6 +1753,7 @@ namespace SISTEMAACTUALIZADO
                 dgvTicketsPendientes.DataSource = null;
                 dgvTicketsPendientes.DataSource = pendientes;
 
+                // Una sola columna de N° TICKET visible
                 if (dgvTicketsPendientes.Columns["nroDTE"] != null) dgvTicketsPendientes.Columns["nroDTE"].HeaderText = "N° TICKET";
                 if (dgvTicketsPendientes.Columns["FecDoc"] != null) { dgvTicketsPendientes.Columns["FecDoc"].HeaderText = "HORA"; dgvTicketsPendientes.Columns["FecDoc"].DefaultCellStyle.Format = "HH:mm:ss"; }
                 if (dgvTicketsPendientes.Columns["RazonSocial"] != null) dgvTicketsPendientes.Columns["RazonSocial"].HeaderText = "CLIENTE";
@@ -1761,7 +1769,14 @@ namespace SISTEMAACTUALIZADO
                 }
                 if (dgvTicketsPendientes.Columns["UserDTE"] != null) dgvTicketsPendientes.Columns["UserDTE"].HeaderText = "VENDEDOR";
 
-                string[] ocultar = new string[] { "idTve", "CajaTurnoID", "idLocal", "nmbLocal", "iddocDTE", "Documento", "nroInT", "SubTotal", "Descuento", "Neto", "Impto1", "Impto2", "Impto3", "IvA", "Vendedor", "nroZ", "Url", "nPAX", "Idcliente", "DNI", "RuT", "dv", "Giro", "Direccion", "idcomuna", "nComuna", "idCiudad", "nCiudad", "Fono1", "Fono2", "email", "status", "idREF", "nroREF", "codigoREF", "FechaREF", "HoraDoc", "Detalles", "MedioPago", "Vuelto" };
+                // Se agrega "NroTicket" y "FechaTicket" a la lista para ocultar la columna duplicada
+                string[] ocultar = new string[] { 
+                    "idTve", "NroTicket", "FechaTicket", "CajaTurnoID", "idLocal", "nmbLocal", "iddocDTE", 
+                    "Documento", "nroInT", "SubTotal", "Descuento", "Neto", "Impto1", "Impto2", "Impto3", 
+                    "IvA", "Vendedor", "nroZ", "Url", "nPAX", "Idcliente", "DNI", "RuT", "dv", "Giro", 
+                    "Direccion", "idcomuna", "nComuna", "idCiudad", "nCiudad", "Fono1", "Fono2", "email", 
+                    "status", "idREF", "nroREF", "codigoREF", "FechaREF", "HoraDoc", "Detalles", "MedioPago", "Vuelto" 
+                };
                 foreach (var col in ocultar)
                 {
                     if (dgvTicketsPendientes.Columns[col] != null) dgvTicketsPendientes.Columns[col].Visible = false;

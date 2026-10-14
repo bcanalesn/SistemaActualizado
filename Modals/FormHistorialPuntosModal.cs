@@ -26,7 +26,7 @@ namespace SISTEMAACTUALIZADO.Modals
         private void InitializeComponent()
         {
             this.Text = $"Puntos de Fidelización - {_cliente.RazonSocial}";
-            this.ClientSize = new Size(680, 520);
+            this.ClientSize = new Size(680, 470); // Altura optimizada sin footer
             this.StartPosition = FormStartPosition.CenterParent;
             this.FormBorderStyle = FormBorderStyle.FixedDialog;
             this.MaximizeBox = false;
@@ -37,28 +37,26 @@ namespace SISTEMAACTUALIZADO.Modals
             Panel pnlHeader = new Panel
             {
                 Dock = DockStyle.Top,
-                Height = 110,
+                Height = 105,
                 BackColor = Color.FromArgb(248, 250, 252),
-                Padding = new Padding(16, 12, 16, 12)
+                Padding = new Padding(16, 10, 16, 10)
             };
 
             Label lblTit = new Label
             {
                 Text = $"🎁 Historial de Puntos: {_cliente.RazonSocial} (RUT: {_cliente.Rut})",
-                Font = new Font("Segoe UI", 10.5F, FontStyle.Bold),
+                Font = new Font("Segoe UI", 10F, FontStyle.Bold),
                 ForeColor = Color.FromArgb(15, 23, 42),
                 Location = new Point(14, 8),
                 AutoSize = true
             };
 
-            // Métricas en tarjetas
-            Panel card1 = CrearCardMetrica("DISPONIBLES", "0 pts", Color.FromArgb(124, 58, 237), new Point(14, 38), out lblDisponibles);
-            Panel card2 = CrearCardMetrica("TOTAL ACUMULADO", "0 pts", Color.FromArgb(22, 163, 74), new Point(230, 38), out lblAcumulados);
-            Panel card3 = CrearCardMetrica("TOTAL CANJEADO", "0 pts", Color.FromArgb(239, 68, 68), new Point(446, 38), out lblCanjeados);
+            Panel card1 = CrearCardMetrica("DISPONIBLES", "0 pts", Color.FromArgb(124, 58, 237), new Point(14, 34), out lblDisponibles);
+            Panel card2 = CrearCardMetrica("TOTAL ACUMULADO", "0 pts", Color.FromArgb(22, 163, 74), new Point(230, 34), out lblAcumulados);
+            Panel card3 = CrearCardMetrica("TOTAL CANJEADO", "0 pts", Color.FromArgb(239, 68, 68), new Point(446, 34), out lblCanjeados);
 
             pnlHeader.Controls.AddRange(new Control[] { lblTit, card1, card2, card3 });
 
-            // Grilla de movimientos
             dgvMovimientos = new DataGridView
             {
                 Dock = DockStyle.Fill,
@@ -72,46 +70,38 @@ namespace SISTEMAACTUALIZADO.Modals
                 RowHeadersVisible = false,
                 AutoGenerateColumns = false,
                 AllowUserToAddRows = false,
-                RowTemplate = { Height = 30 }
+                RowTemplate = { Height = 32 }
             };
 
             ConfigurarColumnasGrilla();
 
-            Panel pnlFooter = new Panel { Dock = DockStyle.Bottom, Height = 48, BackColor = Color.White, Padding = new Padding(0, 6, 16, 0) };
-            Button btnCerrar = new Button
-            {
-                Text = "Cerrar",
-                Dock = DockStyle.Right,
-                Width = 100,
-                Height = 34,
-                BackColor = Color.FromArgb(241, 245, 249),
-                ForeColor = Color.FromArgb(51, 65, 85),
-                FlatStyle = FlatStyle.Flat,
-                Font = new Font("Segoe UI", 8.5F, FontStyle.Bold),
-                Cursor = Cursors.Hand
-            };
-            btnCerrar.FlatAppearance.BorderColor = Color.FromArgb(226, 232, 240);
-            btnCerrar.Click += (s, e) => this.Close();
-            pnlFooter.Controls.Add(btnCerrar);
-
+            // Solo se agrega la grilla y el header (se elimina el pnlFooter con el botón Cerrar)
             this.Controls.Add(dgvMovimientos);
-            this.Controls.Add(pnlFooter);
             this.Controls.Add(pnlHeader);
         }
 
         private void ConfigurarColumnasGrilla()
         {
             dgvMovimientos.EnableHeadersVisualStyles = false;
+            
+            // Colores oscuros fijos sin permitir que la selección de filas altere el encabezado
             dgvMovimientos.ColumnHeadersDefaultCellStyle.BackColor = Color.FromArgb(15, 23, 42);
             dgvMovimientos.ColumnHeadersDefaultCellStyle.ForeColor = Color.White;
+            dgvMovimientos.ColumnHeadersDefaultCellStyle.SelectionBackColor = Color.FromArgb(15, 23, 42);
+            dgvMovimientos.ColumnHeadersDefaultCellStyle.SelectionForeColor = Color.White;
             dgvMovimientos.ColumnHeadersDefaultCellStyle.Font = new Font("Segoe UI", 8.5F, FontStyle.Bold);
-            dgvMovimientos.ColumnHeadersHeight = 32;
+            dgvMovimientos.ColumnHeadersHeight = 34;
 
+            // Color de selección de fila suave (no azul invasivo)
+            dgvMovimientos.DefaultCellStyle.SelectionBackColor = Color.FromArgb(241, 245, 249);
+            dgvMovimientos.DefaultCellStyle.SelectionForeColor = Color.FromArgb(15, 23, 42);
+
+            dgvMovimientos.Columns.Clear();
             dgvMovimientos.Columns.Add(new DataGridViewTextBoxColumn { Name = "Fecha", DataPropertyName = "Fecha", HeaderText = "FECHA / HORA", Width = 130, DefaultCellStyle = new DataGridViewCellStyle { Format = "dd-MM-yyyy HH:mm" } });
             dgvMovimientos.Columns.Add(new DataGridViewTextBoxColumn { Name = "Tipo", DataPropertyName = "Tipo", HeaderText = "TIPO", Width = 110 });
             dgvMovimientos.Columns.Add(new DataGridViewTextBoxColumn { Name = "Puntos", DataPropertyName = "Puntos", HeaderText = "PUNTOS", Width = 90, DefaultCellStyle = new DataGridViewCellStyle { Alignment = DataGridViewContentAlignment.MiddleCenter, Font = new Font("Segoe UI", 8.5F, FontStyle.Bold) } });
             dgvMovimientos.Columns.Add(new DataGridViewTextBoxColumn { Name = "Descripcion", DataPropertyName = "Descripcion", HeaderText = "DESCRIPCIÓN", AutoSizeMode = DataGridViewAutoSizeColumnMode.Fill });
-            dgvMovimientos.Columns.Add(new DataGridViewTextBoxColumn { Name = "Usuario", DataPropertyName = "Usuario", HeaderText = "USUARIO", Width = 90 });
+            dgvMovimientos.Columns.Add(new DataGridViewTextBoxColumn { Name = "Usuario", DataPropertyName = "Usuario", HeaderText = "USUARIO", Width = 95 });
 
             dgvMovimientos.CellFormatting += (s, e) =>
             {

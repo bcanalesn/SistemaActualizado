@@ -210,6 +210,14 @@ namespace SISTEMAACTUALIZADO.Services
             g.DrawLine(penDash, 15, y, width - 15, y);
             y += 12;
 
+            // 1. Si hubo descuento (por lista o por puntos de fidelización), se desglosa claramente
+            if (venta.Descuento > 0)
+            {
+                g.DrawString("DESCUENTO:", fontBold, Brushes.Green, 120, y);
+                g.DrawString($"-{MonedaHelper.Formatear(venta.Descuento, conSigno: true)}", fontBold, Brushes.Green, width - 95, y);
+                y += 18;
+            }
+
             g.DrawString("MONTO NETO:", fontSub, brushText, 120, y);
             g.DrawString(MonedaHelper.Formatear(venta.Neto, conSigno: true), fontSub, brushText, width - 95, y); 
             y += 18;
@@ -218,7 +226,7 @@ namespace SISTEMAACTUALIZADO.Services
             g.DrawString(MonedaHelper.Formatear(venta.IvA, conSigno: true), fontSub, brushText, width - 95, y); 
             y += 18;
 
-            // 👈 Muestra flete de delivery si aplica
+            // 2. Muestra flete de delivery si aplica
             if (venta.TipoEntrega == TipoEntrega.Delivery || venta.CostoDelivery > 0)
             {
                 g.DrawString("FLETE DELIVERY:", fontBold, brushText, 100, y);

@@ -1308,8 +1308,13 @@ namespace SISTEMAACTUALIZADO
                 _puntosACanjearVenta = 0;
             }
 
+            // Descuento total visual = ahorro por lista de precios + descuento canjeado por puntos
+            decimal descuentoTotalVisual = ahorroDescuento + descuentoPuntosPesos;
+
             lblSubtotalValue.Text = MonedaHelper.Formatear(subtotalBruto, conSigno: true);
-            lblDescuentoValue.Text = ahorroDescuento > 0 ? $"-{MonedaHelper.Formatear(ahorroDescuento, conSigno: true)}" : "$ 0";
+            lblDescuentoValue.Text = descuentoTotalVisual > 0 
+                ? $"-{MonedaHelper.Formatear(descuentoTotalVisual, conSigno: true)}" 
+                : "$ 0";
 
             if (_deliveryActivo != null)
             {
