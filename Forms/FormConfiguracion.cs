@@ -47,6 +47,15 @@ namespace SISTEMAACTUALIZADO.Forms
 
         private int _zonaSeleccionadaId = 0;
         private int _comunaSeleccionadaId = 0;
+        // --- Controles Pestaña Fidelización ---
+        private CheckBox chkProgramaPuntosActivo = null!;
+        private NumericUpDown numMontoPorPunto = null!;
+        private NumericUpDown numPuntosEntregados = null!;
+        private NumericUpDown numMontoMinimoAcumular = null!;
+        private NumericUpDown numValorPesoPorPunto = null!;
+        private Label lblEjemploAcumulacion = null!;
+        private Label lblEjemploCanje = null!;
+        private Button btnGuardarPuntosConfig = null!;
 
         public FormConfiguracion()
         {
@@ -105,8 +114,13 @@ namespace SISTEMAACTUALIZADO.Forms
             tabDelivery.BackColor = Color.FromArgb(248, 250, 252);
             ConstruirPestañaDelivery(tabDelivery);
 
+            TabPage tabFidelizacion = new TabPage("🎁 Puntos y Fidelización");
+            tabFidelizacion.BackColor = Color.FromArgb(248, 250, 252);
+            ConstruirPestañaFidelizacion(tabFidelizacion);
+
             tabPrincipal.TabPages.Add(tabEmpresa);
             tabPrincipal.TabPages.Add(tabDelivery);
+            tabPrincipal.TabPages.Add(tabFidelizacion); // 👈 Pestaña añadida
 
             this.Controls.Add(tabPrincipal);
             this.Controls.Add(pnlHeader);
@@ -365,6 +379,170 @@ namespace SISTEMAACTUALIZADO.Forms
             tlpLayout.Controls.Add(gbComunas, 1, 0);
 
             tab.Controls.Add(tlpLayout);
+        }
+        // ==========================================
+        // 3. PESTAÑA: PUNTOS Y FIDELIZACIÓN
+        // ==========================================
+        private void ConstruirPestañaFidelizacion(TabPage tab)
+        {
+            Panel pnlBody = new Panel
+            {
+                Dock = DockStyle.Fill,
+                Padding = new Padding(25),
+                AutoScroll = true
+            };
+
+            // Switch General
+            Panel pnlSwitch = new Panel
+            {
+                Location = new Point(20, 15),
+                Size = new Size(650, 50),
+                BackColor = Color.White,
+                BorderStyle = BorderStyle.FixedSingle
+            };
+
+            chkProgramaPuntosActivo = new CheckBox
+            {
+                Text = "⚡ Habilitar Programa de Fidelización (Puntos en Ventas y Clientes)",
+                Location = new Point(16, 12),
+                AutoSize = true,
+                Font = new Font("Segoe UI", 10F, FontStyle.Bold),
+                ForeColor = Color.FromArgb(124, 58, 237),
+                Checked = true
+            };
+            pnlSwitch.Controls.Add(chkProgramaPuntosActivo);
+            pnlBody.Controls.Add(pnlSwitch);
+
+            // GroupBox Acumulación
+            GroupBox gbAcumulacion = new GroupBox
+            {
+                Text = "📈 Reglas de Acumulación (Ganar Puntos)",
+                Location = new Point(20, 80),
+                Size = new Size(650, 165),
+                Font = new Font("Segoe UI", 9.5F, FontStyle.Bold),
+                ForeColor = Color.FromArgb(15, 23, 42),
+                Padding = new Padding(15)
+            };
+
+            Label lblMontoBase = new Label { Text = "Monto de compra para ganar puntos ($):", Location = new Point(20, 32), AutoSize = true, Font = new Font("Segoe UI", 8.5F, FontStyle.Bold), ForeColor = Color.FromArgb(51, 65, 85) };
+            numMontoPorPunto = new NumericUpDown { Location = new Point(340, 30), Size = new Size(130, 24), Minimum = 100, Maximum = 1000000, Increment = 500, Value = 1000, ThousandsSeparator = true };
+
+            Label lblPuntosBase = new Label { Text = "Puntos a entregar por cada bloque:", Location = new Point(20, 68), AutoSize = true, Font = new Font("Segoe UI", 8.5F, FontStyle.Bold), ForeColor = Color.FromArgb(51, 65, 85) };
+            numPuntosEntregados = new NumericUpDown { Location = new Point(340, 66), Size = new Size(130, 24), Minimum = 1, Maximum = 1000, Value = 1 };
+
+            Label lblMinimo = new Label { Text = "Compra mínima para acumular ($):", Location = new Point(20, 104), AutoSize = true, Font = new Font("Segoe UI", 8.5F, FontStyle.Bold), ForeColor = Color.FromArgb(51, 65, 85) };
+            numMontoMinimoAcumular = new NumericUpDown { Location = new Point(340, 102), Size = new Size(130, 24), Minimum = 0, Maximum = 1000000, Increment = 500, Value = 1000, ThousandsSeparator = true };
+
+            lblEjemploAcumulacion = new Label
+            {
+                Text = "💡 Ejemplo: Por una compra de $ 10.000 el cliente acumulará 10 puntos.",
+                Location = new Point(20, 136),
+                AutoSize = true,
+                Font = new Font("Segoe UI", 8F, FontStyle.Italic),
+                ForeColor = Color.FromArgb(22, 163, 74)
+            };
+
+            gbAcumulacion.Controls.AddRange(new Control[] { lblMontoBase, numMontoPorPunto, lblPuntosBase, numPuntosEntregados, lblMinimo, numMontoMinimoAcumular, lblEjemploAcumulacion });
+            pnlBody.Controls.Add(gbAcumulacion);
+
+            // GroupBox Canje
+            GroupBox gbCanje = new GroupBox
+            {
+                Text = "🎁 Reglas de Canje (Descuentos en Pesos)",
+                Location = new Point(20, 260),
+                Size = new Size(650, 130),
+                Font = new Font("Segoe UI", 9.5F, FontStyle.Bold),
+                ForeColor = Color.FromArgb(15, 23, 42),
+                Padding = new Padding(15)
+            };
+
+            Label lblValorPunto = new Label { Text = "Valor en pesos de cada punto ($):", Location = new Point(20, 36), AutoSize = true, Font = new Font("Segoe UI", 8.5F, FontStyle.Bold), ForeColor = Color.FromArgb(51, 65, 85) };
+            numValorPesoPorPunto = new NumericUpDown { Location = new Point(340, 34), Size = new Size(130, 24), Minimum = 1, Maximum = 10000, Increment = 5, Value = 10, DecimalPlaces = 0, ThousandsSeparator = true };
+
+            lblEjemploCanje = new Label
+            {
+                Text = "💡 Ejemplo: Si el cliente canjea 50 puntos, obtendrá -$ 500 de descuento.",
+                Location = new Point(20, 80),
+                AutoSize = true,
+                Font = new Font("Segoe UI", 8F, FontStyle.Italic),
+                ForeColor = Color.FromArgb(124, 58, 237)
+            };
+
+            gbCanje.Controls.AddRange(new Control[] { lblValorPunto, numValorPesoPorPunto, lblEjemploCanje });
+            pnlBody.Controls.Add(gbCanje);
+
+            // Botón Guardar
+            btnGuardarPuntosConfig = new Button
+            {
+                Text = "💾 Guardar Parámetros de Fidelización",
+                Location = new Point(20, 410),
+                Size = new Size(340, 42),
+                BackColor = Color.FromArgb(124, 58, 237),
+                ForeColor = Color.White,
+                FlatStyle = FlatStyle.Flat,
+                Font = new Font("Segoe UI", 9.5F, FontStyle.Bold),
+                Cursor = Cursors.Hand
+            };
+            btnGuardarPuntosConfig.FlatAppearance.BorderSize = 0;
+            btnGuardarPuntosConfig.Click += BtnGuardarPuntosConfig_Click;
+            pnlBody.Controls.Add(btnGuardarPuntosConfig);
+
+            // Actualización dinámica de los textos de ejemplo
+            Action actualizarEjemplos = () =>
+            {
+                int montoBase = (int)numMontoPorPunto.Value;
+                int pts = (int)numPuntosEntregados.Value;
+                decimal valPunto = numValorPesoPorPunto.Value;
+
+                int ejemploCompra = Math.Max(10000, montoBase * 5);
+                int puntosGanados = (ejemploCompra / montoBase) * pts;
+                lblEjemploAcumulacion.Text = $"💡 Ejemplo: Por una compra de ${ejemploCompra:N0} el cliente acumulará {puntosGanados} puntos.";
+
+                int ejemploPtsCanje = 50;
+                decimal dctoPesos = ejemploPtsCanje * valPunto;
+                lblEjemploCanje.Text = $"💡 Ejemplo: Si el cliente canjea {ejemploPtsCanje} puntos, obtendrá -${dctoPesos:N0} de descuento.";
+            };
+
+            numMontoPorPunto.ValueChanged += (s, e) => actualizarEjemplos();
+            numPuntosEntregados.ValueChanged += (s, e) => actualizarEjemplos();
+            numValorPesoPorPunto.ValueChanged += (s, e) => actualizarEjemplos();
+
+            tab.Controls.Add(pnlBody);
+            CargarDatosFidelizacionUI();
+        }
+
+        private void CargarDatosFidelizacionUI()
+        {
+            var cfg = FidelizacionConfig.ObtenerConfiguracionActual();
+            chkProgramaPuntosActivo.Checked = cfg.Activo;
+            numMontoPorPunto.Value = cfg.MontoBasePorPunto;
+            numPuntosEntregados.Value = cfg.PuntosPorBloque;
+            numMontoMinimoAcumular.Value = cfg.MontoMinimoAcumulacion;
+            numValorPesoPorPunto.Value = cfg.ValorPesoPorPunto;
+        }
+
+        private void BtnGuardarPuntosConfig_Click(object? sender, EventArgs e)
+        {
+            try
+            {
+                var cfg = new PuntosConfiguracion
+                {
+                    IdConfig = 1,
+                    Activo = chkProgramaPuntosActivo.Checked,
+                    MontoBasePorPunto = (int)numMontoPorPunto.Value,
+                    PuntosPorBloque = (int)numPuntosEntregados.Value,
+                    MontoMinimoAcumulacion = (int)numMontoMinimoAcumular.Value,
+                    ValorPesoPorPunto = numValorPesoPorPunto.Value
+                };
+
+                FidelizacionConfig.GuardarConfiguracion(cfg, "admin");
+                MessageBox.Show("Parámetros del programa de fidelización guardados exitosamente.", "Fidelización", MessageBoxButtons.OK, MessageBoxIcon.Information);
+                CargarDatosFidelizacionUI();
+            }
+            catch (Exception ex)
+            {
+                MessageBox.Show($"Error al guardar configuración de fidelización: {ex.Message}", "Error", MessageBoxButtons.OK, MessageBoxIcon.Error);
+            }
         }
 
         private DataGridView CrearGridBasico()

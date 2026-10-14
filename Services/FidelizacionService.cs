@@ -7,6 +7,69 @@ using SISTEMAACTUALIZADO.Models;
 
 namespace SISTEMAACTUALIZADO.Services
 {
+    // =========================================================================
+    // 1. CONFIGURACIÓN DINÁMICA DE REGLAS DE PUNTOS
+    // =========================================================================
+    public static class FidelizacionConfig
+    {
+        private const int MONTO_BASE_DEFECTO = 1000;
+        private const int PUNTOS_BLOQUE_DEFECTO = 1;
+        private const int MINIMO_DEFECTO = 1000;
+        private const decimal VALOR_PESO_DEFECTO = 10.00m;
+
+        public static PuntosConfiguracion ObtenerConfiguracionActual()
+        {
+            try
+            {
+                using var db = new AppDbContext();
+                var cfg = db.PuntosConfiguracion.FirstOrDefault(c => c.IdConfig == 1);
+                if (cfg != null) return cfg;
+
+                var nueva = new PuntosConfiguracion { IdConfig = 1 };
+                db.PuntosConfiguracion.Add(nueva);
+                db.SaveChanges();
+                return nueva;
+            }
+            catch
+            {
+                return new PuntosConfiguracion();
+            }
+        }
+
+        public static bool ProgramaActivo => ObtenerConfiguracionActual().Activo;
+        public static int MontoBasePorPunto => ObtenerConfiguracionActual().MontoBasePorPunto;
+        public static int PuntosPorBloque => ObtenerConfiguracionActual().PuntosPorBloque;
+        public static int MontoMinimoAcumulacion => ObtenerConfiguracionActual().MontoMinimoAcumulacion;
+        public static decimal ValorPesoPorPunto => ObtenerConfiguracionActual().ValorPesoPorPunto;
+
+        public static void GuardarConfiguracion(PuntosConfiguracion nuevaConfig, string usuario)
+        {
+            using var db = new AppDbContext();
+            var actual = db.PuntosConfiguracion.FirstOrDefault(c => c.IdConfig == 1);
+            if (actual == null)
+            {
+                nuevaConfig.IdConfig = 1;
+                nuevaConfig.FechaModificacion = DateTime.Now;
+                nuevaConfig.UsuarioModifica = usuario;
+                db.PuntosConfiguracion.Add(nuevaConfig);
+            }
+            else
+            {
+                actual.Activo = nuevaConfig.Activo;
+                actual.MontoBasePorPunto = nuevaConfig.MontoBasePorPunto;
+                actual.PuntosPorBloque = nuevaConfig.PuntosPorBloque;
+                actual.MontoMinimoAcumulacion = nuevaConfig.MontoMinimoAcumulacion;
+                actual.ValorPesoPorPunto = nuevaConfig.ValorPesoPorPunto;
+                actual.FechaModificacion = DateTime.Now;
+                actual.UsuarioModifica = usuario;
+            }
+            db.SaveChanges();
+        }
+    }
+
+    // =========================================================================
+    // 2. DTOS PARA HISTORIAL Y RESUMEN
+    // =========================================================================
     public class ResumenPuntosDTO
     {
         public int IdCliente { get; set; }
@@ -27,11 +90,11 @@ namespace SISTEMAACTUALIZADO.Services
         public int? IdTve { get; set; }
     }
 
+    // =========================================================================
+    // 3. SERVICIO DE OPERACIONES TRANSACCIONALES DE PUNTOS
+    // =========================================================================
     public class FidelizacionService
     {
-        // =========================================================================
-        // 1. CONSULTAS
-        // =========================================================================
         public ResumenPuntosDTO ObtenerResumenPuntos(int idCliente)
         {
             if (idCliente <= 0) return new ResumenPuntosDTO();
@@ -83,15 +146,18 @@ namespace SISTEMAACTUALIZADO.Services
 
         public int CalcularPuntosPorMonto(decimal montoElegible)
         {
+            if (!FidelizacionConfig.ProgramaActivo) return 0;
             if (montoElegible < FidelizacionConfig.MontoMinimoAcumulacion) return 0;
-            return (int)Math.Floor(montoElegible / FidelizacionConfig.MontoBasePorPunto) * FidelizacionConfig.PuntosPorBloque;
+
+            int montoBase = FidelizacionConfig.MontoBasePorPunto > 0 ? FidelizacionConfig.MontoBasePorPunto : 1000;
+            int puntosBloque = FidelizacionConfig.PuntosPorBloque > 0 ? FidelizacionConfig.PuntosPorBloque : 1;
+
+            return (int)Math.Floor(montoElegible / montoBase) * puntosBloque;
         }
 
-        // =========================================================================
-        // 2. ACUMULACIÓN AUTOMÁTICA POR VENTA CONFIRMADA
-        // =========================================================================
         public int ProcesarAcumulacionPorVenta(int idCliente, int idTve, decimal montoElegiblePagado, int folioDte, string usuarioCajero)
         {
+            if (!FidelizacionConfig.ProgramaActivo) return 0;
             if (idCliente <= 0 || montoElegiblePagado < FidelizacionConfig.MontoMinimoAcumulacion) return 0;
 
             int puntosAGanar = CalcularPuntosPorMonto(montoElegiblePagado);
@@ -101,7 +167,6 @@ namespace SISTEMAACTUALIZADO.Services
             using var tr = db.Database.BeginTransaction();
             try
             {
-                // Validación de idempotencia: evita duplicar acumulación si se reintenta
                 bool yaAcumulo = db.PuntosMovimientos.Any(m => m.IdTve == idTve && m.Tipo == "ACUMULACION");
                 if (yaAcumulo)
                 {
@@ -157,9 +222,6 @@ namespace SISTEMAACTUALIZADO.Services
             }
         }
 
-        // =========================================================================
-        // 3. CANJE / UTILIZACIÓN DE PUNTOS COMO DESCUENTO
-        // =========================================================================
         public (bool Exito, string Mensaje) ProcesarCanjePorVenta(int idCliente, int idTve, int puntosACanjear, int folioDte, string usuarioCajero)
         {
             if (idCliente <= 0 || puntosACanjear <= 0) 
@@ -169,7 +231,6 @@ namespace SISTEMAACTUALIZADO.Services
             using var tr = db.Database.BeginTransaction();
             try
             {
-                // Validación de idempotencia: no registrar dos veces el mismo canje para esta venta
                 bool yaCanjeo = db.PuntosMovimientos.Any(m => m.IdTve == idTve && m.Tipo == "CANJE");
                 if (yaCanjeo)
                 {
@@ -216,9 +277,6 @@ namespace SISTEMAACTUALIZADO.Services
             }
         }
 
-        // =========================================================================
-        // 4. REVERSA DE PUNTOS POR ANULACIÓN DE VENTA
-        // =========================================================================
         public void ReversarPuntosPorAnulacion(int idTve, string usuarioCajero)
         {
             using var db = new AppDbContext();
@@ -237,7 +295,6 @@ namespace SISTEMAACTUALIZADO.Services
 
                     if (mov.Tipo == "ACUMULACION")
                     {
-                        // Se retiran los puntos que se habían otorgado
                         cuenta.PuntosDisponibles = Math.Max(0, cuenta.PuntosDisponibles - mov.Puntos);
                         cuenta.PuntosAcumuladosHistorico = Math.Max(0, cuenta.PuntosAcumuladosHistorico - mov.Puntos);
 
@@ -255,7 +312,6 @@ namespace SISTEMAACTUALIZADO.Services
                     }
                     else if (mov.Tipo == "CANJE")
                     {
-                        // Se restituyen los puntos que el cliente había utilizado
                         int puntosDevueltos = Math.Abs(mov.Puntos);
                         cuenta.PuntosDisponibles += puntosDevueltos;
                         cuenta.PuntosCanjeadosHistorico = Math.Max(0, cuenta.PuntosCanjeadosHistorico - puntosDevueltos);

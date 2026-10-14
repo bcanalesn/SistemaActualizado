@@ -49,17 +49,4 @@ namespace SISTEMAACTUALIZADO.Models
         [MaxLength(50)]
         public string Usuario { get; set; } = "admin";
     }
-
-    public static class FidelizacionConfig
-    {
-        // $1.000 pagados = 1 punto acumulado
-        public const decimal MontoBasePorPunto = 1000m;
-        public const int PuntosPorBloque = 1;
-
-        // 1 punto = $10 CLP de descuento
-        public const decimal ValorPesoPorPunto = 10m;
-
-        // Monto mínimo para poder acumular
-        public const decimal MontoMinimoAcumulacion = 1000m;
-    }
 }

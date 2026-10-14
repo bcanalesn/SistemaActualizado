@@ -9,6 +9,7 @@ namespace SISTEMAACTUALIZADO.Data
         public DbSet<Producto> Productos { get; set; } = null!;
         public DbSet<ConfiguracionMargen> ConfiguracionMargenes { get; set; } = null!;
         public DbSet<ConfiguracionEmpresa> ConfiguracionEmpresa { get; set; } = null!;
+        public DbSet<PuntosConfiguracion> PuntosConfiguracion { get; set; }
         public DbSet<PrecioQ> PreciosQ { get; set; } = null!;
         public DbSet<TVE2607> TVE2607 { get; set; } = null!;
         public DbSet<TVD2607> TVD2607 { get; set; } = null!;
