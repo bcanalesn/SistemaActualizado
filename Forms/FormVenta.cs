@@ -245,7 +245,7 @@ namespace SISTEMAACTUALIZADO
             flowCarritoItems.SizeChanged += (s, e) => ReajustarAnchoFilasCarrito();
 
             // Altura de checkout ampliada para albergar Delivery y Desglose completo
-            Panel pnlBottomCheckout = new Panel { Dock = DockStyle.Bottom, Height = 245, Padding = new Padding(0, 4, 0, 0) };
+            Panel pnlBottomCheckout = new Panel { Dock = DockStyle.Bottom, Height = 285, Padding = new Padding(0, 4, 0, 0) };
             Panel pnlDesgloseTotales = new Panel { Dock = DockStyle.Top, Height = 105, BackColor = Color.FromArgb(241, 245, 249), Padding = new Padding(10) };
             lblDescuentoPuntosCap = new Label { Text = "🎁 Dcto. Puntos", Font = new Font("Segoe UI", 8.5F, FontStyle.Bold), ForeColor = Color.FromArgb(124, 58, 237), Location = new Point(6, 46), AutoSize = true, Visible = false };
             lblDescuentoPuntosVal = new Label { Text = "$ 0", Font = new Font("Segoe UI", 9F, FontStyle.Bold), ForeColor = Color.FromArgb(124, 58, 237), Location = new Point(210, 46), AutoSize = true, Visible = false };
@@ -265,13 +265,13 @@ namespace SISTEMAACTUALIZADO
             pnlDesgloseTotales.Controls.AddRange(new Control[] { lblSubtotalCap, lblSubtotalValue, lblDescCap, lblDescuentoValue, lblDeliveryCap, lblDeliveryValue, lblTotalCap, lblTotalValue });
 
             // Panel de Acciones con Cliente, Generar Ticket, Delivery y Reservar
-            Panel pnlBotonesAccion = new Panel { Dock = DockStyle.Bottom, Height = 135, Padding = new Padding(0, 4, 0, 0) };
+            Panel pnlBotonesAccion = new Panel { Dock = DockStyle.Bottom, Height = 175, Padding = new Padding(0, 4, 0, 0) };
 
             btnCliente = new Button
             {
                 Text = "👤 Consumidor",
                 Location = new Point(0, 4),
-                Size = new Size(110, 42),
+                Size = new Size(110, 38),
                 BackColor = Color.FromArgb(241, 245, 249),
                 ForeColor = Color.FromArgb(30, 41, 59),
                 FlatStyle = FlatStyle.Flat,
@@ -285,7 +285,7 @@ namespace SISTEMAACTUALIZADO
             {
                 Text = "🎟️ F4 GENERAR TICKET",
                 Location = new Point(115, 4),
-                Size = new Size(195, 42),
+                Size = new Size(195, 38),
                 BackColor = Color.FromArgb(16, 185, 129),
                 ForeColor = Color.White,
                 FlatStyle = FlatStyle.Flat,
@@ -295,51 +295,53 @@ namespace SISTEMAACTUALIZADO
             btnGenerarTicket.FlatAppearance.BorderSize = 0;
             btnGenerarTicket.Click += BtnGenerarTicket_Click;
 
-            btnDelivery = new Button
-            {
-                Text = "🚚 F9 DELIVERY (DESACTIVADO)",
-                Location = new Point(0, 50),
-                Size = new Size(310, 38),
-                BackColor = Color.FromArgb(241, 245, 249),
-                ForeColor = Color.FromArgb(71, 85, 105),
-                FlatStyle = FlatStyle.Flat,
-                Font = new Font("Segoe UI", 8.8F, FontStyle.Bold),
-                Cursor = Cursors.Hand
-            };
-            btnDelivery.FlatAppearance.BorderColor = Color.FromArgb(203, 213, 225);
-            btnDelivery.Click += BtnDelivery_Click;
-
-            btnReservar = new Button
-            {
-                Text = "📅 F8 RESERVAR / PEDIDO POR ENCARGO",
-                Location = new Point(0, 92),
-                Size = new Size(310, 38),
-                BackColor = Color.FromArgb(124, 58, 237),
-                ForeColor = Color.White,
-                FlatStyle = FlatStyle.Flat,
-                Font = new Font("Segoe UI", 8.8F, FontStyle.Bold),
-                Cursor = Cursors.Hand
-            };
-            btnReservar.FlatAppearance.BorderSize = 0;
-            btnReservar.Click += BtnReservarPedido_Click;
+            // Botón Canjear Puntos (Fila 2)
             btnCanjearPuntos = new Button
             {
-                Text = "🎁 CANJEAR PUNTOS",
-                Location = new Point(0, 48), // ubicado entre el botón cliente y delivery
+                Text = "🎁 CANJEAR PUNTOS DISPONIBLES",
+                Location = new Point(0, 46),
                 Size = new Size(310, 32),
                 BackColor = Color.FromArgb(245, 243, 255),
                 ForeColor = Color.FromArgb(124, 58, 237),
                 FlatStyle = FlatStyle.Flat,
                 Font = new Font("Segoe UI", 8.5F, FontStyle.Bold),
                 Cursor = Cursors.Hand,
-                Visible = false // Se muestra solo si el cliente tiene puntos
+                Visible = false
             };
             btnCanjearPuntos.FlatAppearance.BorderColor = Color.FromArgb(221, 214, 254);
             btnCanjearPuntos.Click += BtnCanjearPuntos_Click;
-            pnlBotonesAccion.Controls.Add(btnCanjearPuntos);
-            
 
-            pnlBotonesAccion.Controls.AddRange(new Control[] { btnCliente, btnGenerarTicket, btnDelivery, btnReservar });
+            // Botón Delivery (Fila 3) - Ahora claramente visible para clic con mouse
+            btnDelivery = new Button
+            {
+                Text = "🚚 F9 DELIVERY (DESACTIVADO)",
+                Location = new Point(0, 82),
+                Size = new Size(310, 34),
+                BackColor = Color.FromArgb(241, 245, 249),
+                ForeColor = Color.FromArgb(71, 85, 105),
+                FlatStyle = FlatStyle.Flat,
+                Font = new Font("Segoe UI", 8.5F, FontStyle.Bold),
+                Cursor = Cursors.Hand
+            };
+            btnDelivery.FlatAppearance.BorderColor = Color.FromArgb(203, 213, 225);
+            btnDelivery.Click += BtnDelivery_Click;
+
+            // Botón Reservar (Fila 4)
+            btnReservar = new Button
+            {
+                Text = "📅 F8 RESERVAR / PEDIDO POR ENCARGO",
+                Location = new Point(0, 120),
+                Size = new Size(310, 34),
+                BackColor = Color.FromArgb(124, 58, 237),
+                ForeColor = Color.White,
+                FlatStyle = FlatStyle.Flat,
+                Font = new Font("Segoe UI", 8.5F, FontStyle.Bold),
+                Cursor = Cursors.Hand
+            };
+            btnReservar.FlatAppearance.BorderSize = 0;
+            btnReservar.Click += BtnReservarPedido_Click;
+
+            pnlBotonesAccion.Controls.AddRange(new Control[] { btnCliente, btnGenerarTicket, btnCanjearPuntos, btnDelivery, btnReservar });
             pnlBottomCheckout.Controls.AddRange(new Control[] { pnlBotonesAccion, pnlDesgloseTotales });
 
             pnlDerecha.Controls.AddRange(new Control[] { flowCarritoItems, pnlCarritoVacio, pnlBottomCheckout, pnlCartHeader });
@@ -1645,19 +1647,23 @@ namespace SISTEMAACTUALIZADO
             string vendedorNombre = cbVendedor.SelectedItem?.ToString() ?? _vendedorActualNombre;
             decimal subtotal = cart.Sum(c => c.Subtotal);
             decimal fleteDelivery = _deliveryActivo != null ? _deliveryActivo.CostoDelivery : 0m;
-            decimal totalFinal = subtotal + fleteDelivery;
+            decimal descuentoPuntosPesos = _puntosACanjearVenta * FidelizacionConfig.ValorPesoPorPunto;
+            
+            // Total final real descontando los puntos aplicados
+            decimal totalFinal = Math.Max(0, subtotal + fleteDelivery - descuentoPuntosPesos);
             var cartCopia = cart.ToList();
+            int puntosUsados = _puntosACanjearVenta;
 
             try
             {
                 int nroTicket;
                 if (_idTveEnEdicion > 0)
                 {
-                    nroTicket = _ventaService.ActualizarTicketExistenteACaja(_idTveEnEdicion, cartCopia, vendedorNombre, _clienteSeleccionadoNombre, _clienteSeleccionadoRut);
+                    nroTicket = _ventaService.ActualizarTicketExistenteACaja(_idTveEnEdicion, cartCopia, vendedorNombre, _clienteSeleccionadoNombre, _clienteSeleccionadoRut, puntosUsados);
                 }
                 else
                 {
-                    nroTicket = _ventaService.GenerarTicketVenta(cartCopia, vendedorNombre, _clienteSeleccionadoNombre, _clienteSeleccionadoRut);
+                    nroTicket = _ventaService.GenerarTicketVenta(cartCopia, vendedorNombre, _clienteSeleccionadoNombre, _clienteSeleccionadoRut, puntosUsados);
                 }
 
                 // Si la venta es Delivery, vinculamos y persistimos la información de entrega
@@ -1675,14 +1681,15 @@ namespace SISTEMAACTUALIZADO
                         _deliveryService.RegistrarDeliveryParaVenta(_deliveryActivo, ventaDb.idTve, subtotal, db);
                         db.SaveChanges();
 
-                        // Impresión inmediata de Comanda de Despacho
                         _ticketPrintService.ImprimirComandaDelivery(_deliveryActivo, ventaDb, cartCopia);
                     }
                 }
 
                 _idTveEnEdicion = 0;
+                _puntosACanjearVenta = 0; // Reiniciar puntos para la siguiente venta
                 LimpiarCarritoActual();
 
+                // Mostrar el modal con el total rebajado con el descuento de puntos
                 FormPreVentaModal modalPreVenta = new FormPreVentaModal(nroTicket, vendedorNombre, _clienteSeleccionadoNombre, totalFinal, cartCopia);
                 modalPreVenta.ShowDialog(this);
             }

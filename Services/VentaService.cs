@@ -11,7 +11,7 @@ namespace SISTEMAACTUALIZADO.Services
     public class VentaService
     {
         // 1. GENERACIÓN DE TICKET DIRECTO A CAJA
-        public int GenerarTicketVenta(List<DetalleCarrito> carrito, string vendedor, string clienteNombre, string clienteRut)
+        public int GenerarTicketVenta(List<DetalleCarrito> carrito, string vendedor, string clienteNombre, string clienteRut, int puntosCanjeados = 0)
         {
             using var db = new AppDbContext();
             DateTime ahora = DateTime.Now;
@@ -22,13 +22,26 @@ namespace SISTEMAACTUALIZADO.Services
             string rutLimpio = RutHelper.Limpiar(clienteRut ?? "");
             var clienteDb = db.Clientes.FirstOrDefault(c => !string.IsNullOrEmpty(rutLimpio) && (c.Rut == rutLimpio || c.Rut == clienteRut));
 
-            decimal totalCobrado = carrito.Sum(c => c.Subtotal);
             decimal subtotalLista1 = carrito.Sum(c => c.SubtotalLista1);
-            decimal descuentoGlobal = subtotalLista1 - totalCobrado;
-            if (descuentoGlobal < 0) descuentoGlobal = 0;
+            decimal subtotalConListaCliente = carrito.Sum(c => c.Subtotal);
+            decimal ahorroListaPrecios = subtotalLista1 - subtotalConListaCliente;
+            if (ahorroListaPrecios < 0) ahorroListaPrecios = 0;
+
+            // Descuento por puntos de fidelización
+            decimal descuentoPuntosPesos = puntosCanjeados * FidelizacionConfig.ValorPesoPorPunto;
+
+            // Descuento total = Descuento de Lista del Cliente + Descuento por Puntos
+            decimal descuentoTotal = ahorroListaPrecios + descuentoPuntosPesos;
+
+            // Monto real final que debe cobrarse en caja
+            decimal totalCobrado = Math.Max(0, subtotalConListaCliente - descuentoPuntosPesos);
 
             decimal neto = Math.Round(totalCobrado / 1.19m, 0);
             decimal iva = totalCobrado - neto;
+
+            string glosaDocumento = puntosCanjeados > 0
+                ? $"Ticket Venta [CANJE: {puntosCanjeados} PTS]"
+                : "Ticket de Atención";
 
             try
             {
@@ -37,17 +50,17 @@ namespace SISTEMAACTUALIZADO.Services
                     idLocal = 1,
                     nmbLocal = "Local Principal",
                     iddocDTE = 0,
-                    Documento = "Ticket de Atención",
+                    Documento = glosaDocumento,
                     NroTicket = nroTicketAtencion,
                     FechaTicket = ahora,
                     nroDTE = nroTicketAtencion,
                     nroInT = siguienteNroInT,
                     FecDoc = ahora,
                     SubTotal = subtotalLista1,    // Monto original Lista 1
-                    Descuento = descuentoGlobal,  // Descuento comercial aplicado
+                    Descuento = descuentoTotal,   // Descuento comercial + Descuento puntos
                     Neto = neto,                  // Afecto real
                     IvA = iva,                    // IVA 19%
-                    Total = totalCobrado,         // Monto real que ingresa a caja
+                    Total = totalCobrado,         // Monto real con canje aplicado
                     UserDTE = vendedor,
                     Vendedor = vendedor,
                     Idcliente = clienteDb?.IdCliente ?? 0,
@@ -75,7 +88,7 @@ namespace SISTEMAACTUALIZADO.Services
                         idTve = nuevaVenta.idTve,
                         idLocal = 1,
                         iddocDTE = 0,
-                        Documento = "Ticket de Atención",
+                        Documento = glosaDocumento,
                         NroDTE = nroTicketAtencion,
                         NroInT = siguienteNroInT,
                         FecMoV = ahora,
@@ -285,30 +298,37 @@ namespace SISTEMAACTUALIZADO.Services
         }
 
         // 5. ENVIAR A CAJA VENTA EN ESPERA
-        public int ActualizarTicketExistenteACaja(int idTve, List<DetalleCarrito> carrito, string vendedor, string clienteNombre, string clienteRut)
+        public int ActualizarTicketExistenteACaja(int idTve, List<DetalleCarrito> carrito, string vendedor, string clienteNombre, string clienteRut, int puntosCanjeados = 0)
         {
             using var db = new AppDbContext();
             var venta = db.TVE2607.FirstOrDefault(v => v.idTve == idTve);
             if (venta == null)
             {
-                return GenerarTicketVenta(carrito, vendedor, clienteNombre, clienteRut);
+                return GenerarTicketVenta(carrito, vendedor, clienteNombre, clienteRut, puntosCanjeados);
             }
 
             DateTime ahora = DateTime.Now;
             string rutLimpio = RutHelper.Limpiar(clienteRut ?? "");
             var clienteDb = db.Clientes.FirstOrDefault(c => !string.IsNullOrEmpty(rutLimpio) && (c.Rut == rutLimpio || c.Rut == clienteRut));
 
-            decimal totalCobrado = carrito.Sum(c => c.Subtotal);
             decimal subtotalLista1 = carrito.Sum(c => c.SubtotalLista1);
-            decimal descuentoGlobal = subtotalLista1 - totalCobrado;
-            if (descuentoGlobal < 0) descuentoGlobal = 0;
+            decimal subtotalConListaCliente = carrito.Sum(c => c.Subtotal);
+            decimal ahorroListaPrecios = subtotalLista1 - subtotalConListaCliente;
+            if (ahorroListaPrecios < 0) ahorroListaPrecios = 0;
+
+            decimal descuentoPuntosPesos = puntosCanjeados * FidelizacionConfig.ValorPesoPorPunto;
+            decimal descuentoTotal = ahorroListaPrecios + descuentoPuntosPesos;
+            decimal totalCobrado = Math.Max(0, subtotalConListaCliente - descuentoPuntosPesos);
 
             decimal neto = Math.Round(totalCobrado / 1.19m, 0);
+            string glosaDocumento = puntosCanjeados > 0
+                ? $"Ticket Venta [CANJE: {puntosCanjeados} PTS]"
+                : "Ticket de Atención";
 
             try
             {
                 venta.SubTotal = subtotalLista1;
-                venta.Descuento = descuentoGlobal;
+                venta.Descuento = descuentoTotal;
                 venta.Neto = neto;
                 venta.IvA = totalCobrado - neto;
                 venta.Total = totalCobrado;
@@ -316,7 +336,7 @@ namespace SISTEMAACTUALIZADO.Services
                 venta.Vendedor = vendedor;
                 venta.FecDoc = ahora;
                 if (!venta.FechaTicket.HasValue) venta.FechaTicket = ahora;
-                venta.Documento = "Ticket de Atención";
+                venta.Documento = glosaDocumento;
                 venta.status = "Pendiente";
 
                 if (clienteDb != null)
@@ -340,7 +360,7 @@ namespace SISTEMAACTUALIZADO.Services
                         idTve = venta.idTve,
                         idLocal = 1,
                         iddocDTE = 0,
-                        Documento = "Ticket de Atención",
+                        Documento = glosaDocumento,
                         NroDTE = venta.nroDTE,
                         NroInT = venta.nroInT,
                         FecMoV = ahora,
