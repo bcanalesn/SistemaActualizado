@@ -1165,35 +1165,50 @@ namespace SISTEMAACTUALIZADO
             try
             {
                 string cajero = _usuarioActual?.NombreUsuario ?? "admin";
-                
-                // 1. PROCESAR COBRO OFICIAL DEL TICKET
+
+                // =========================================================================
+                // 1. DETECTAR SI TRAE CANJE ANTES DE QUE SE EMITA EL DTE Y SE LIMPIE LA GLOSA
+                // =========================================================================
+                int puntosACanjearDetectados = 0;
+                int idClienteCanje = _ticketSeleccionado.Idcliente;
+                int idTveCanje = _ticketSeleccionado.idTve;
+
+                if (idClienteCanje > 0)
+                {
+                    using var dbCheck = new AppDbContext();
+                    var ticketOriginal = dbCheck.TVE2607.FirstOrDefault(t => t.idTve == idTveCanje);
+                    string docGlosa = ticketOriginal?.Documento ?? _ticketSeleccionado.Documento ?? "";
+
+                    if (!string.IsNullOrEmpty(docGlosa))
+                    {
+                        var match = System.Text.RegularExpressions.Regex.Match(docGlosa, @"CANJE:\s*(\d+)", System.Text.RegularExpressions.RegexOptions.IgnoreCase);
+                        if (match.Success && int.TryParse(match.Groups[1].Value, out int pts) && pts > 0)
+                        {
+                            puntosACanjearDetectados = pts;
+                        }
+                    }
+                }
+
+                // =========================================================================
+                // 2. PROCESAR COBRO OFICIAL DEL TICKET EN CAJA
+                // =========================================================================
                 int folioOficial = _cajaService.ProcesarCobroTicket(
                     _ticketSeleccionado, tipoDoc, medioPago, vuelto, _turnoActual.CajaTurnoID, cajero
                 );
 
-                // ========================================================
-                // 🎁 FIDELIZACIÓN: SI LA VENTA APLICÓ CANJE DE PUNTOS
-                // ========================================================
-                if (_ticketSeleccionado.Idcliente > 0)
+                // =========================================================================
+                // 3. DESCONTAR LOS PUNTOS SOLO TRAS HABER CONFIRMADO EL PAGO
+                // =========================================================================
+                if (puntosACanjearDetectados > 0 && idClienteCanje > 0)
                 {
-                    using var dbPuntos = new AppDbContext();
-                    var ticketReal = dbPuntos.TVE2607.AsNoTracking().FirstOrDefault(t => t.idTve == _ticketSeleccionado.idTve);
-                    
-                    if (ticketReal != null && !string.IsNullOrEmpty(ticketReal.Documento))
-                    {
-                        var matchCanje = System.Text.RegularExpressions.Regex.Match(ticketReal.Documento, @"CANJE:\s*(\d+)", System.Text.RegularExpressions.RegexOptions.IgnoreCase);
-                        if (matchCanje.Success && int.TryParse(matchCanje.Groups[1].Value, out int ptsUsados) && ptsUsados > 0)
-                        {
-                            var fidelizacionService = new FidelizacionService();
-                            fidelizacionService.ProcesarCanjePorVenta(
-                                ticketReal.Idcliente, 
-                                ticketReal.idTve, 
-                                ptsUsados, 
-                                folioOficial, 
-                                cajero
-                            );
-                        }
-                    }
+                    var fidelizacionService = new FidelizacionService();
+                    fidelizacionService.ProcesarCanjePorVenta(
+                        idClienteCanje,
+                        idTveCanje,
+                        puntosACanjearDetectados,
+                        folioOficial,
+                        cajero
+                    );
                 }
 
                 // ========================================================

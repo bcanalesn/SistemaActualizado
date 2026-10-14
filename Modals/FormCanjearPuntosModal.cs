@@ -3,6 +3,7 @@ using System.Drawing;
 using System.Windows.Forms;
 using SISTEMAACTUALIZADO.Helpers;
 using SISTEMAACTUALIZADO.Models;
+using SISTEMAACTUALIZADO.Services;
 
 namespace SISTEMAACTUALIZADO.Modals
 {
@@ -22,9 +23,9 @@ namespace SISTEMAACTUALIZADO.Modals
 
         public FormCanjearPuntosModal(int puntosDisponibles, decimal totalVenta, int puntosYaAplicados = 0)
         {
-            _puntosDisponibles = puntosDisponibles;
-            _totalVenta = totalVenta;
-            PuntosSeleccionados = puntosYaAplicados;
+            _puntosDisponibles = Math.Max(0, puntosDisponibles);
+            _totalVenta = Math.Max(0m, totalVenta);
+            PuntosSeleccionados = Math.Min(puntosYaAplicados, _puntosDisponibles);
 
             InitializeComponent();
         }
@@ -40,7 +41,7 @@ namespace SISTEMAACTUALIZADO.Modals
             this.BackColor = Color.White;
             this.Font = new Font("Segoe UI", 9F, FontStyle.Regular, GraphicsUnit.Point);
 
-            // Máximo de puntos que puede usar sin exceder el total de la venta
+            // Máximo de puntos que puede usar sin exceder el total de la venta ni el saldo del cliente
             int maxPuntosPorTotal = (int)Math.Floor(_totalVenta / FidelizacionConfig.ValorPesoPorPunto);
             int maximoPermitido = Math.Min(_puntosDisponibles, maxPuntosPorTotal);
 
@@ -53,9 +54,10 @@ namespace SISTEMAACTUALIZADO.Modals
                 ForeColor = Color.FromArgb(124, 58, 237)
             };
 
+            decimal equivPesos = _puntosDisponibles * FidelizacionConfig.ValorPesoPorPunto;
             Label lblDisp = new Label
             {
-                Text = $"Puntos disponibles: {_puntosDisponibles:N0} pts  (Equiv. ${_puntosDisponibles * FidelizacionConfig.ValorPesoPorPunto:N0})",
+                Text = $"Puntos disponibles: {_puntosDisponibles:N0} pts  (Equiv. {MonedaHelper.Formatear(equivPesos, conSigno: true)})",
                 Location = new Point(20, 38),
                 AutoSize = true,
                 Font = new Font("Segoe UI", 8.2F, FontStyle.Bold),
@@ -78,7 +80,7 @@ namespace SISTEMAACTUALIZADO.Modals
                 Font = new Font("Segoe UI", 11F, FontStyle.Bold),
                 Minimum = 0,
                 Maximum = Math.Max(0, maximoPermitido),
-                Value = Math.Min(PuntosSeleccionados, maximoPermitido),
+                Value = Math.Min(PuntosSeleccionados, Math.Max(0, maximoPermitido)),
                 TextAlign = HorizontalAlignment.Center
             };
 
@@ -151,7 +153,15 @@ namespace SISTEMAACTUALIZADO.Modals
             btnAplicar.FlatAppearance.BorderSize = 0;
             btnAplicar.Click += (s, e) =>
             {
-                PuntosSeleccionados = (int)numPuntos.Value;
+                int seleccion = (int)numPuntos.Value;
+                if (seleccion > _puntosDisponibles)
+                {
+                    MessageBox.Show($"No puede utilizar más puntos de los que el cliente posee ({_puntosDisponibles} pts).", "Saldo Insuficiente", MessageBoxButtons.OK, MessageBoxIcon.Warning);
+                    numPuntos.Value = _puntosDisponibles;
+                    return;
+                }
+
+                PuntosSeleccionados = seleccion;
                 this.DialogResult = DialogResult.OK;
                 this.Close();
             };

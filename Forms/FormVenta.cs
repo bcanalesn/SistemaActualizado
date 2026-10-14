@@ -1394,6 +1394,8 @@ namespace SISTEMAACTUALIZADO
         {
             _idTveEnEdicion = 0;
             _deliveryActivo = null;
+            _puntosACanjearVenta = 0; // 👈 1. Resetear puntos aplicados
+
             var cart = ObtenerCarritoActivo();
             cart.Clear();
 
@@ -1411,6 +1413,17 @@ namespace SISTEMAACTUALIZADO
             btnDelivery.Text = "🚚 F9 DELIVERY (DESACTIVADO)";
             btnDelivery.BackColor = Color.FromArgb(241, 245, 249);
             btnDelivery.ForeColor = Color.FromArgb(71, 85, 105);
+
+            // 👈 2. Restablecer el botón de puntos a su estado neutro oculto
+            if (btnCanjearPuntos != null)
+            {
+                btnCanjearPuntos.Visible = false;
+                btnCanjearPuntos.Text = "🎁 CANJEAR PUNTOS DISPONIBLES";
+                btnCanjearPuntos.BackColor = Color.FromArgb(245, 243, 255);
+                btnCanjearPuntos.ForeColor = Color.FromArgb(124, 58, 237);
+            }
+            if (lblDescuentoPuntosCap != null) lblDescuentoPuntosCap.Visible = false;
+            if (lblDescuentoPuntosVal != null) lblDescuentoPuntosVal.Visible = false;
 
             CargarProductosDesdeBD();
         }
@@ -1519,6 +1532,7 @@ namespace SISTEMAACTUALIZADO
                 return;
             }
 
+            // Consultar SIEMPRE el saldo fresco y real de la base de datos
             var fidelizacionService = new FidelizacionService();
             var resumen = fidelizacionService.ObtenerResumenPuntos(_clienteActual.IdCliente);
 
@@ -1530,10 +1544,12 @@ namespace SISTEMAACTUALIZADO
 
             decimal subtotal = cart.Sum(c => c.Subtotal) + (_deliveryActivo?.CostoDelivery ?? 0m);
 
-            using var modal = new FormCanjearPuntosModal(resumen.PuntosDisponibles + _puntosACanjearVenta, subtotal, _puntosACanjearVenta);
+            // 👈 AQUÍ: Pasamos el saldo real directamente (resumen.PuntosDisponibles), NUNCA sumar _puntosACanjearVenta
+            using var modal = new FormCanjearPuntosModal(resumen.PuntosDisponibles, subtotal, _puntosACanjearVenta);
             if (modal.ShowDialog(this) == DialogResult.OK)
             {
-                _puntosACanjearVenta = modal.PuntosSeleccionados;
+                // Candado de seguridad en FormVenta: nunca permitir más del saldo disponible
+                _puntosACanjearVenta = Math.Min(modal.PuntosSeleccionados, resumen.PuntosDisponibles);
                 ActualizarCarritoUI();
             }
         }
@@ -1691,8 +1707,10 @@ namespace SISTEMAACTUALIZADO
                 }
 
                 _idTveEnEdicion = 0;
-                _puntosACanjearVenta = 0; // Reiniciar puntos para la siguiente venta
                 LimpiarCarritoActual();
+                
+                // 👈 Restablecer cliente a Consumidor Final para el próximo ticket
+                AsignarClienteActivo(null);
 
                 // Mostrar el modal con el total rebajado con el descuento de puntos
                 FormPreVentaModal modalPreVenta = new FormPreVentaModal(nroTicket, vendedorNombre, _clienteSeleccionadoNombre, totalFinal, cartCopia);
