@@ -1114,7 +1114,8 @@ namespace SISTEMAACTUALIZADO
 
             decimal precioBaseVenta = ObtenerPrecioActivoProducto(prod);
 
-            using (FormCantidadModal modal = new FormCantidadModal(prod.Nombre, precioBaseVenta, cantidadInicial, prod.Stock, prod.ImagenPath, esPorGramos))
+            // Se le pasa el producto completo y la lista activa del cliente para evaluar si conviene mostrar tramos
+            using (FormCantidadModal modal = new FormCantidadModal(prod, _listaClienteActivo, precioBaseVenta, cantidadInicial, prod.Stock, prod.ImagenPath, esPorGramos))
             {
                 if (modal.ShowDialog(this) == DialogResult.OK)
                 {

@@ -1,18 +1,27 @@
 using System;
+using System.Collections.Generic;
 using System.Drawing;
-using System.IO;
+using System.Linq;
 using System.Windows.Forms;
 using SISTEMAACTUALIZADO.Helpers;
+using SISTEMAACTUALIZADO.Models;
+using SISTEMAACTUALIZADO.Services;
 
 namespace SISTEMAACTUALIZADO.Modals
 {
     public class FormCantidadModal : Form
     {
+        private readonly ProductoService _productoService = new ProductoService();
+
         private int _cantidad = 1;
         private decimal _precioUnitario;
+        private readonly decimal _precioBaseSinTramo;
         private int _stockDisponible;
         private bool _esPrimerDigito = true;
         private readonly bool _esPorGramos = false;
+        private readonly Producto? _producto;
+        private readonly int _listaCliente = 1;
+        private List<PrecioQ> _reglasTramos = new List<PrecioQ>();
 
         private Label lblCantidadDisplay = null!;
         private Label lblTotalPreview = null!;
@@ -21,11 +30,24 @@ namespace SISTEMAACTUALIZADO.Modals
         private Button btnToggleKeypad = null!;
         private FlowLayoutPanel flowRapidas = null!;
 
+        // Banner informativo limpio
+        private Panel pnlBannerSugerencia = null!;
+        private Label lblTextoPromo = null!;
+
         public int CantidadSeleccionada => _cantidad;
 
         public FormCantidadModal(string nombreProducto, decimal precioUnitario, int cantidadInicial, int stockDisponible = 9999, string? imagenPath = null, bool esPorGramos = false)
+            : this(null, 1, precioUnitario, cantidadInicial, stockDisponible, imagenPath, esPorGramos, nombreProducto)
         {
-            _esPorGramos = esPorGramos || EsNombrePorGramos(nombreProducto);
+        }
+
+        public FormCantidadModal(Producto? producto, int listaCliente, decimal precioUnitario, int cantidadInicial, int stockDisponible = 9999, string? imagenPath = null, bool esPorGramos = false, string? nombreAlternativo = null)
+        {
+            _producto = producto;
+            _listaCliente = Math.Max(1, listaCliente);
+
+            string nombre = _producto?.Nombre ?? nombreAlternativo ?? "Producto";
+            _esPorGramos = esPorGramos || EsNombrePorGramos(nombre);
 
             if (_esPorGramos)
             {
@@ -36,12 +58,54 @@ namespace SISTEMAACTUALIZADO.Modals
                 _cantidad = cantidadInicial > 0 ? cantidadInicial : 1;
             }
 
+            _precioBaseSinTramo = precioUnitario;
             _precioUnitario = precioUnitario;
             _stockDisponible = stockDisponible > 0 ? stockDisponible : 1;
 
             if (_cantidad > _stockDisponible) _cantidad = _stockDisponible;
 
-            InitializeComponent(nombreProducto, imagenPath);
+            CargarYFiltrarTramosSegunCliente();
+            InitializeComponent(nombre, imagenPath ?? _producto?.ImagenPath);
+            RecalcularSegunCantidad();
+        }
+
+        private void CargarYFiltrarTramosSegunCliente()
+        {
+            if (_producto == null) return;
+
+            var tramosBD = _productoService.ObtenerReglasEscala(_producto.ProductoID)
+                                          .Where(t => t.Bloqueo == 0)
+                                          .OrderBy(t => t.Qini)
+                                          .ToList();
+
+            if (tramosBD.Count < 2) return;
+
+            decimal precioCliente = _productoService.ObtenerPrecioPorNumeroLista(_producto, _listaCliente);
+
+            bool conviene = false;
+            foreach (var t in tramosBD)
+            {
+                int listaTramo = ObtenerIndiceLista(t.IdPrecio);
+                decimal precioTramo = _productoService.ObtenerPrecioPorNumeroLista(_producto, listaTramo);
+
+                if (precioTramo > 0 && precioTramo < precioCliente)
+                {
+                    conviene = true;
+                    break;
+                }
+            }
+
+            if (conviene)
+            {
+                _reglasTramos = tramosBD;
+            }
+        }
+
+        private static int ObtenerIndiceLista(string? idPrecio)
+        {
+            if (string.IsNullOrEmpty(idPrecio)) return 1;
+            string clean = idPrecio.Trim().ToLower().Replace("precio", "").Replace("d", "1");
+            return int.TryParse(clean, out int idx) && idx >= 1 && idx <= 10 ? idx : 1;
         }
 
         private static bool EsNombrePorGramos(string nombre)
@@ -55,7 +119,11 @@ namespace SISTEMAACTUALIZADO.Modals
         {
             this.SuspendLayout();
             this.Text = "Agregar a la Venta";
-            this.Size = new Size(390, 500);
+
+            bool tieneTramos = _reglasTramos.Count >= 2;
+            int altoVentana = tieneTramos ? 525 : 485;
+
+            this.Size = new Size(390, altoVentana);
             this.StartPosition = FormStartPosition.CenterParent;
             this.FormBorderStyle = FormBorderStyle.FixedDialog;
             this.MaximizeBox = false;
@@ -97,8 +165,8 @@ namespace SISTEMAACTUALIZADO.Modals
                 : $"Stock: {_stockDisponible} un.";
 
             string precioTexto = _esPorGramos 
-                ? $"Precio: {MonedaHelper.Formatear(_precioUnitario, conSigno: true)}/g | {stockTexto}" 
-                : $"Precio: {MonedaHelper.Formatear(_precioUnitario, conSigno: true)} | {stockTexto}";
+                ? $"Precio: {MonedaHelper.Formatear(_precioBaseSinTramo, conSigno: true)}/g | {stockTexto}" 
+                : $"Precio: {MonedaHelper.Formatear(_precioBaseSinTramo, conSigno: true)} | {stockTexto}";
 
             Label lblSub = new Label { Text = precioTexto, Font = new Font("Segoe UI", 8F, FontStyle.Bold), ForeColor = Color.FromArgb(2, 132, 199), Location = new Point(75, 40), AutoSize = true };
             Label lblDivider = new Label { Height = 1, BackColor = Color.FromArgb(226, 232, 240), Location = new Point(15, 68), Width = 355 };
@@ -133,7 +201,7 @@ namespace SISTEMAACTUALIZADO.Modals
                 { 
                     _cantidad -= paso; 
                     _esPrimerDigito = false; 
-                    ActualizarValores(); 
+                    RecalcularSegunCantidad(); 
                 } 
                 btnAgregarAccion.Focus(); 
             };
@@ -168,7 +236,7 @@ namespace SISTEMAACTUALIZADO.Modals
                 {
                     _cantidad += paso;
                     _esPrimerDigito = false;
-                    ActualizarValores();
+                    RecalcularSegunCantidad();
                 }
                 else
                 {
@@ -182,12 +250,12 @@ namespace SISTEMAACTUALIZADO.Modals
                 Text = "CANTIDADES RÁPIDAS", 
                 Font = new Font("Segoe UI", 7.5F, FontStyle.Bold), 
                 ForeColor = Color.FromArgb(148, 163, 184), 
-                Location = new Point(15, 148), 
+                Location = new Point(15, 146), 
                 Width = 355, 
                 TextAlign = ContentAlignment.MiddleCenter 
             };
 
-            flowRapidas = new FlowLayoutPanel { Location = new Point(25, 168), Size = new Size(335, 38), WrapContents = false };
+            flowRapidas = new FlowLayoutPanel { Location = new Point(25, 166), Size = new Size(335, 36), WrapContents = false };
             
             int[] cantidades = _esPorGramos 
                 ? new int[] { 100, 200, 250, 500, 1000 } 
@@ -201,7 +269,7 @@ namespace SISTEMAACTUALIZADO.Modals
                 Button btnQ = new Button
                 {
                     Text = txtBtn,
-                    Size = new Size(anchoBtn, 32),
+                    Size = new Size(anchoBtn, 30),
                     BackColor = (_cantidad == c) ? Color.FromArgb(0, 102, 255) : Color.FromArgb(248, 250, 252),
                     ForeColor = (_cantidad == c) ? Color.White : Color.FromArgb(15, 23, 42),
                     FlatStyle = FlatStyle.Flat,
@@ -227,17 +295,46 @@ namespace SISTEMAACTUALIZADO.Modals
 
                     _esPrimerDigito = true;
                     ResaltarBotonRapido(val);
-                    ActualizarValores();
+                    RecalcularSegunCantidad();
                     btnAgregarAccion.Focus();
                 };
                 flowRapidas.Controls.Add(btnQ);
             }
 
+            int currentY = 208;
+
+            // =========================================================================
+            // TARJETA DE SUGERENCIA / PROMOCIÓN ACTIVA (UNA LÍNEA SIN BARRAS DE SCROLL)
+            // =========================================================================
+            pnlBannerSugerencia = new Panel
+            {
+                Location = new Point(25, currentY),
+                Size = new Size(335, 36),
+                BackColor = Color.FromArgb(240, 253, 244),
+                BorderStyle = BorderStyle.FixedSingle,
+                Visible = tieneTramos,
+                Cursor = Cursors.Hand
+            };
+
+            lblTextoPromo = new Label
+            {
+                Dock = DockStyle.Fill,
+                Font = new Font("Segoe UI", 8.2F, FontStyle.Bold),
+                ForeColor = Color.FromArgb(22, 101, 52),
+                TextAlign = ContentAlignment.MiddleCenter
+            };
+            pnlBannerSugerencia.Controls.Add(lblTextoPromo);
+
+            if (tieneTramos)
+            {
+                currentY += 42;
+            }
+
             btnToggleKeypad = new Button
             {
                 Text = "⌨️ Mostrar Teclado Numérico Táctil",
-                Location = new Point(25, 218),
-                Size = new Size(335, 30),
+                Location = new Point(25, currentY),
+                Size = new Size(335, 28),
                 BackColor = Color.FromArgb(241, 245, 249),
                 ForeColor = Color.FromArgb(51, 65, 85),
                 FlatStyle = FlatStyle.Flat,
@@ -246,18 +343,18 @@ namespace SISTEMAACTUALIZADO.Modals
                 Cursor = Cursors.Hand
             };
             btnToggleKeypad.FlatAppearance.BorderSize = 0;
+            currentY += 34;
 
             pnlKeypadContainer = new Panel
             {
-                Location = new Point(25, 256),
+                Location = new Point(25, currentY),
                 Size = new Size(335, 130),
                 Visible = false,
                 BackColor = Color.FromArgb(248, 250, 252)
             };
-
             ConstruirTecladoNumericoUI(pnlKeypadContainer);
 
-            Panel pnlTotalBox = new Panel { Name = "pnlTotalBox", Location = new Point(25, 258), Size = new Size(335, 40), BackColor = Color.FromArgb(248, 250, 252) };
+            Panel pnlTotalBox = new Panel { Name = "pnlTotalBox", Location = new Point(25, currentY), Size = new Size(335, 40), BackColor = Color.FromArgb(248, 250, 252) };
             pnlTotalBox.Paint += (s, e) => { ControlPaint.DrawBorder(e.Graphics, pnlTotalBox.ClientRectangle, Color.FromArgb(226, 232, 240), ButtonBorderStyle.Solid); };
 
             Label lblTotalCap = new Label { Text = "Total", Font = new Font("Segoe UI", 9F, FontStyle.Bold), ForeColor = Color.FromArgb(15, 23, 42), Location = new Point(12, 10), AutoSize = true };
@@ -265,6 +362,7 @@ namespace SISTEMAACTUALIZADO.Modals
 
             pnlTotalBox.Controls.Add(lblTotalCap);
             pnlTotalBox.Controls.Add(lblTotalPreview);
+            currentY += 46;
 
             string txtAccion = _esPorGramos ? $"🛒 Agregar {_cantidad} g a la venta" : $"🛒 Agregar {_cantidad} a la venta";
 
@@ -272,38 +370,42 @@ namespace SISTEMAACTUALIZADO.Modals
             {
                 Name = "btnAgregarAccion",
                 Text = txtAccion,
-                Location = new Point(25, 310),
-                Size = new Size(335, 48),
+                Location = new Point(25, currentY),
+                Size = new Size(335, 44),
                 BackColor = Color.FromArgb(0, 102, 255),
                 ForeColor = Color.White,
                 FlatStyle = FlatStyle.Flat,
-                Font = new Font("Segoe UI", 10.5F, FontStyle.Bold),
+                Font = new Font("Segoe UI", 10F, FontStyle.Bold),
                 Cursor = Cursors.Hand,
                 DialogResult = DialogResult.OK
             };
             btnAgregarAccion.FlatAppearance.BorderSize = 0;
             btnAgregarAccion.Click += (s, e) => { ConfirmarYAgregar(); };
+            currentY += 48;
 
-            Label lblHintEnter = new Label { Name = "lblHintEnter", Text = "Presione [Enter] para agregar a la venta", Font = new Font("Segoe UI", 8F), ForeColor = Color.FromArgb(148, 163, 184), Location = new Point(25, 368), Width = 335, TextAlign = ContentAlignment.MiddleCenter };
+            Label lblHintEnter = new Label { Name = "lblHintEnter", Text = "Presione [Enter] para agregar a la venta", Font = new Font("Segoe UI", 8F), ForeColor = Color.FromArgb(148, 163, 184), Location = new Point(25, currentY), Width = 335, TextAlign = ContentAlignment.MiddleCenter };
 
             btnToggleKeypad.Click += (s, e) =>
             {
                 pnlKeypadContainer.Visible = !pnlKeypadContainer.Visible;
                 btnToggleKeypad.Text = pnlKeypadContainer.Visible ? "⌨️ Ocultar Teclado Numérico" : "⌨️ Mostrar Teclado Numérico Táctil";
 
+                int yBase = tieneTramos ? 284 : 242;
+
                 if (pnlKeypadContainer.Visible)
                 {
-                    pnlTotalBox.Location = new Point(25, 396);
-                    btnAgregarAccion.Location = new Point(25, 444);
-                    lblHintEnter.Location = new Point(25, 498);
-                    this.Size = new Size(390, 570);
+                    pnlKeypadContainer.Location = new Point(25, yBase);
+                    pnlTotalBox.Location = new Point(25, yBase + 136);
+                    btnAgregarAccion.Location = new Point(25, yBase + 182);
+                    lblHintEnter.Location = new Point(25, yBase + 232);
+                    this.Size = new Size(390, yBase + 300);
                 }
                 else
                 {
-                    pnlTotalBox.Location = new Point(25, 258);
-                    btnAgregarAccion.Location = new Point(25, 310);
-                    lblHintEnter.Location = new Point(25, 368);
-                    this.Size = new Size(390, 480);
+                    pnlTotalBox.Location = new Point(25, yBase);
+                    btnAgregarAccion.Location = new Point(25, yBase + 46);
+                    lblHintEnter.Location = new Point(25, yBase + 96);
+                    this.Size = new Size(390, yBase + 155);
                 }
                 btnAgregarAccion.Focus();
             };
@@ -321,6 +423,7 @@ namespace SISTEMAACTUALIZADO.Modals
             this.Controls.Add(btnPlus);
             this.Controls.Add(lblRapidasHeader);
             this.Controls.Add(flowRapidas);
+            this.Controls.Add(pnlBannerSugerencia);
             this.Controls.Add(btnToggleKeypad);
             this.Controls.Add(pnlKeypadContainer);
             this.Controls.Add(pnlTotalBox);
@@ -329,6 +432,98 @@ namespace SISTEMAACTUALIZADO.Modals
 
             this.AcceptButton = btnAgregarAccion;
             this.ResumeLayout(false);
+        }
+
+        private void RecalcularSegunCantidad()
+        {
+            if (_producto != null)
+            {
+                _precioUnitario = _productoService.ObtenerPrecioProductoConCliente(_producto, _listaCliente, _cantidad, 0);
+            }
+            else
+            {
+                _precioUnitario = _precioBaseSinTramo;
+            }
+
+            lblCantidadDisplay.Text = _esPorGramos ? $"{_cantidad} g" : _cantidad.ToString();
+            lblTotalPreview.Text = MonedaHelper.Formatear(_precioUnitario * _cantidad, conSigno: true);
+            btnAgregarAccion.Text = _esPorGramos ? $"🛒 Agregar {_cantidad} g a la venta" : $"🛒 Agregar {_cantidad} a la venta";
+
+            ActualizarBannerPromocion();
+        }
+
+        private void ActualizarBannerPromocion()
+        {
+            if (_producto == null || _reglasTramos.Count == 0 || pnlBannerSugerencia == null) return;
+
+            PrecioQ? tramoActual = null;
+            PrecioQ? siguienteTramo = null;
+
+            for (int i = 0; i < _reglasTramos.Count; i++)
+            {
+                var t = _reglasTramos[i];
+                if (_cantidad >= (int)t.Qini && _cantidad <= (int)t.Qfin)
+                {
+                    tramoActual = t;
+                    if (i + 1 < _reglasTramos.Count)
+                    {
+                        siguienteTramo = _reglasTramos[i + 1];
+                    }
+                    break;
+                }
+            }
+
+            // Desvincular cualquier click anterior
+            pnlBannerSugerencia.Click -= null;
+
+            if (siguienteTramo != null)
+            {
+                int cantDestino = (int)Math.Round(siguienteTramo.Qini);
+                int faltan = cantDestino - _cantidad;
+
+                int listaSig = ObtenerIndiceLista(siguienteTramo.IdPrecio);
+                decimal precioSig = _productoService.ObtenerPrecioPorNumeroLista(_producto, listaSig);
+
+                if (precioSig < _precioUnitario)
+                {
+                    pnlBannerSugerencia.BackColor = Color.FromArgb(239, 246, 255);
+                    lblTextoPromo.ForeColor = Color.FromArgb(2, 132, 199);
+                    lblTextoPromo.Text = $"💡 Lleva {faltan} más (total {cantDestino}) y baja a ${precioSig:N0} c/u  ➔";
+
+                    // Al dar clic en el banner se suma lo que falta
+                    EventHandler bannerClick = (s, e) =>
+                    {
+                        if (cantDestino <= _stockDisponible)
+                        {
+                            _cantidad = cantDestino;
+                            _esPrimerDigito = true;
+                            ResaltarBotonRapido(_cantidad);
+                            RecalcularSegunCantidad();
+                            btnAgregarAccion.Focus();
+                        }
+                    };
+                    pnlBannerSugerencia.Click += bannerClick;
+                    lblTextoPromo.Click += bannerClick;
+                }
+                else
+                {
+                    pnlBannerSugerencia.BackColor = Color.FromArgb(240, 253, 244);
+                    lblTextoPromo.ForeColor = Color.FromArgb(22, 101, 52);
+                    lblTextoPromo.Text = "✔ Precio con descuento por escala aplicado";
+                }
+            }
+            else if (tramoActual != null && tramoActual != _reglasTramos[0])
+            {
+                pnlBannerSugerencia.BackColor = Color.FromArgb(240, 253, 244);
+                lblTextoPromo.ForeColor = Color.FromArgb(22, 101, 52);
+                lblTextoPromo.Text = "🎉 ¡Escala máxima aplicada a este producto!";
+            }
+            else
+            {
+                pnlBannerSugerencia.BackColor = Color.FromArgb(248, 250, 252);
+                lblTextoPromo.ForeColor = Color.FromArgb(100, 116, 139);
+                lblTextoPromo.Text = "🏷️ Producto con precios preferenciales por cantidad";
+            }
         }
 
         private void ResaltarBotonRapido(int val)
@@ -396,18 +591,18 @@ namespace SISTEMAACTUALIZADO.Modals
                     if (char.IsDigit(label[0]))
                     {
                         int digitVal = int.Parse(label);
-                        btn.Click += (s, e) => { ProcesarEntradaDigito(digitVal); ActualizarValores(); btnAgregarAccion.Focus(); };
+                        btn.Click += (s, e) => { ProcesarEntradaDigito(digitVal); RecalcularSegunCantidad(); btnAgregarAccion.Focus(); };
                     }
                     else if (label == "C")
                     {
-                        btn.Click += (s, e) => { _cantidad = _esPorGramos ? 0 : 1; _esPrimerDigito = true; ActualizarValores(); btnAgregarAccion.Focus(); };
+                        btn.Click += (s, e) => { _cantidad = _esPorGramos ? 0 : 1; _esPrimerDigito = true; RecalcularSegunCantidad(); btnAgregarAccion.Focus(); };
                     }
                     else if (label == "⌫")
                     {
                         btn.Click += (s, e) =>
                         {
                             _cantidad /= 10;
-                            ActualizarValores();
+                            RecalcularSegunCantidad();
                             btnAgregarAccion.Focus();
                         };
                     }
@@ -425,20 +620,20 @@ namespace SISTEMAACTUALIZADO.Modals
             {
                 int digito = e.KeyCode - Keys.D0;
                 ProcesarEntradaDigito(digito);
-                ActualizarValores();
+                RecalcularSegunCantidad();
                 e.SuppressKeyPress = true;
             }
             else if (e.KeyCode >= Keys.NumPad0 && e.KeyCode <= Keys.NumPad9)
             {
                 int digito = e.KeyCode - Keys.NumPad0;
                 ProcesarEntradaDigito(digito);
-                ActualizarValores();
+                RecalcularSegunCantidad();
                 e.SuppressKeyPress = true;
             }
             else if (e.KeyCode == Keys.Back)
             {
                 _cantidad /= 10;
-                ActualizarValores();
+                RecalcularSegunCantidad();
                 e.SuppressKeyPress = true;
             }
             else if (e.KeyCode == Keys.Enter)
@@ -490,13 +685,6 @@ namespace SISTEMAACTUALIZADO.Modals
             }
             this.DialogResult = DialogResult.OK;
             this.Close();
-        }
-
-        private void ActualizarValores()
-        {
-            lblCantidadDisplay.Text = _esPorGramos ? $"{_cantidad} g" : _cantidad.ToString();
-            lblTotalPreview.Text = MonedaHelper.Formatear(_precioUnitario * _cantidad, conSigno: true);
-            btnAgregarAccion.Text = _esPorGramos ? $"🛒 Agregar {_cantidad} g a la venta" : $"🛒 Agregar {_cantidad} a la venta";
         }
     }
 }
