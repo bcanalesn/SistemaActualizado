@@ -8,6 +8,7 @@ using System.IO;
 using System.Linq;
 using System.Text;
 using System.Windows.Forms;
+using SISTEMAACTUALIZADO.Helpers;
 using SISTEMAACTUALIZADO.Models;
 using SISTEMAACTUALIZADO.Modals;
 using SISTEMAACTUALIZADO.Services;
@@ -542,19 +543,21 @@ namespace SISTEMAACTUALIZADO
                 var resumen = _libroService.ObtenerLibroVentas(desde, hasta);
                 _ventasCargadas = resumen.Ventas;
 
-                lblKpiTotalVentas.Text = $"$ {resumen.TotalVentas:N0}";
-                lblKpiCantDocs.Text = $"Con {resumen.CantidadDocumentos} documentos";
-                lblKpiBoletas.Text = resumen.CantidadBoletas.ToString();
+                // KPIs Superiores
+                lblKpiTotalVentas.Text = MonedaHelper.Formatear(resumen.TotalVentas, conSigno: true);
+                lblKpiCantDocs.Text = $"Con {MonedaHelper.Formatear(resumen.CantidadDocumentos)} documentos";
+                lblKpiBoletas.Text = MonedaHelper.Formatear(resumen.CantidadBoletas);
                 lblKpiPctBoletas.Text = $"{resumen.PorcentajeBoletas}% del total";
-                lblKpiFacturas.Text = resumen.CantidadFacturas.ToString();
+                lblKpiFacturas.Text = MonedaHelper.Formatear(resumen.CantidadFacturas);
                 lblKpiPctFacturas.Text = $"{resumen.PorcentajeFacturas}% del total";
-                lblKpiDevoluciones.Text = resumen.CantidadNotasCredito.ToString();
-                lblKpiMontoDev.Text = $"$ {resumen.MontoNotasCredito:N0}";
+                lblKpiDevoluciones.Text = MonedaHelper.Formatear(resumen.CantidadNotasCredito);
+                lblKpiMontoDev.Text = MonedaHelper.Formatear(resumen.MontoNotasCredito, conSigno: true);
 
-                lblResumenNeto.Text = $"$ {resumen.TotalNeto:N0}";
-                lblResumenIva.Text = $"$ {resumen.DebitoFiscalTotal:N0}";
-                lblResumenNotasCredito.Text = $"$ {resumen.MontoNotasCredito:N0}";
-                lblResumenTotalDebito.Text = $"$ {resumen.DebitoFiscalTotal:N0}";
+                // Panel Lateral Resumen F29
+                lblResumenNeto.Text = MonedaHelper.Formatear(resumen.TotalNeto, conSigno: true);
+                lblResumenIva.Text = MonedaHelper.Formatear(resumen.DebitoFiscalTotal, conSigno: true);
+                lblResumenNotasCredito.Text = MonedaHelper.Formatear(resumen.MontoNotasCredito, conSigno: true);
+                lblResumenTotalDebito.Text = MonedaHelper.Formatear(resumen.DebitoFiscalTotal, conSigno: true);
 
                 FiltrarLocalmente();
             }
@@ -610,17 +613,85 @@ namespace SISTEMAACTUALIZADO
 
             dgvLibro.DataSource = listaFinal;
 
-            if (dgvLibro.Columns["Documento"] != null) dgvLibro.Columns["Documento"].HeaderText = "TIPO DOCUMENTO";
-            if (dgvLibro.Columns["FolioDTE"] != null) { dgvLibro.Columns["FolioDTE"].HeaderText = "FOLIO DTE"; dgvLibro.Columns["FolioDTE"].DefaultCellStyle.Alignment = DataGridViewContentAlignment.MiddleCenter; }
-            if (dgvLibro.Columns["FechaEmision"] != null) { dgvLibro.Columns["FechaEmision"].HeaderText = "FECHA EMISIÓN"; dgvLibro.Columns["FechaEmision"].DefaultCellStyle.Format = "dd-MM-yyyy HH:mm"; }
-            if (dgvLibro.Columns["Neto"] != null) { dgvLibro.Columns["Neto"].HeaderText = "NETO"; dgvLibro.Columns["Neto"].DefaultCellStyle.Format = "$#,##0"; }
-            if (dgvLibro.Columns["IVA"] != null) { dgvLibro.Columns["IVA"].HeaderText = "IVA (19%)"; dgvLibro.Columns["IVA"].DefaultCellStyle.Format = "$#,##0"; }
-            if (dgvLibro.Columns["Total"] != null) { dgvLibro.Columns["Total"].HeaderText = "TOTAL"; dgvLibro.Columns["Total"].DefaultCellStyle.Format = "$#,##0"; dgvLibro.Columns["Total"].DefaultCellStyle.ForeColor = Color.FromArgb(0, 102, 255); dgvLibro.Columns["Total"].DefaultCellStyle.Font = new Font("Segoe UI", 8.5F, FontStyle.Bold); }
-            if (dgvLibro.Columns["RUT"] != null) dgvLibro.Columns["RUT"].HeaderText = "RUT CLIENTE";
+            // Estilo numérico con alineación centrada o a la derecha coordinada con el encabezado
+            var estiloMonedaCL = new DataGridViewCellStyle
+            {
+                FormatProvider = new System.Globalization.CultureInfo("es-CL"),
+                Format = "$ #,##0",
+                Alignment = DataGridViewContentAlignment.MiddleCenter // 👈 Centrado vertical y horizontal
+            };
+
+            // 1. TIPO DOCUMENTO (A la izquierda)
+            if (dgvLibro.Columns["Documento"] != null)
+            {
+                dgvLibro.Columns["Documento"].HeaderText = "TIPO DOCUMENTO";
+                dgvLibro.Columns["Documento"].FillWeight = 22;
+                dgvLibro.Columns["Documento"].HeaderCell.Style.Alignment = DataGridViewContentAlignment.MiddleLeft;
+                dgvLibro.Columns["Documento"].DefaultCellStyle.Alignment = DataGridViewContentAlignment.MiddleLeft;
+            }
+
+            // 2. FOLIO DTE (Centrado)
+            if (dgvLibro.Columns["FolioDTE"] != null)
+            {
+                dgvLibro.Columns["FolioDTE"].HeaderText = "FOLIO DTE";
+                dgvLibro.Columns["FolioDTE"].FillWeight = 11;
+                dgvLibro.Columns["FolioDTE"].HeaderCell.Style.Alignment = DataGridViewContentAlignment.MiddleCenter;
+                dgvLibro.Columns["FolioDTE"].DefaultCellStyle.Alignment = DataGridViewContentAlignment.MiddleCenter;
+            }
+
+            // 3. FECHA EMISIÓN (Centrada)
+            if (dgvLibro.Columns["FechaEmision"] != null)
+            {
+                dgvLibro.Columns["FechaEmision"].HeaderText = "FECHA EMISIÓN";
+                dgvLibro.Columns["FechaEmision"].FillWeight = 16;
+                dgvLibro.Columns["FechaEmision"].HeaderCell.Style.Alignment = DataGridViewContentAlignment.MiddleCenter;
+                dgvLibro.Columns["FechaEmision"].DefaultCellStyle.Alignment = DataGridViewContentAlignment.MiddleCenter;
+                dgvLibro.Columns["FechaEmision"].DefaultCellStyle.Format = "dd-MM-yyyy HH:mm";
+            }
+
+            // 4. NETO (Centrado)
+            if (dgvLibro.Columns["Neto"] != null)
+            {
+                dgvLibro.Columns["Neto"].HeaderText = "NETO";
+                dgvLibro.Columns["Neto"].FillWeight = 13;
+                dgvLibro.Columns["Neto"].HeaderCell.Style.Alignment = DataGridViewContentAlignment.MiddleCenter;
+                dgvLibro.Columns["Neto"].DefaultCellStyle = estiloMonedaCL;
+            }
+
+            // 5. IVA (19%) (Centrado)
+            if (dgvLibro.Columns["IVA"] != null)
+            {
+                dgvLibro.Columns["IVA"].HeaderText = "IVA (19%)";
+                dgvLibro.Columns["IVA"].FillWeight = 12;
+                dgvLibro.Columns["IVA"].HeaderCell.Style.Alignment = DataGridViewContentAlignment.MiddleCenter;
+                dgvLibro.Columns["IVA"].DefaultCellStyle = estiloMonedaCL;
+            }
+
+            // 6. TOTAL (Centrado y en negrita azul)
+            if (dgvLibro.Columns["Total"] != null)
+            {
+                dgvLibro.Columns["Total"].HeaderText = "TOTAL";
+                dgvLibro.Columns["Total"].FillWeight = 13;
+                dgvLibro.Columns["Total"].HeaderCell.Style.Alignment = DataGridViewContentAlignment.MiddleCenter;
+                dgvLibro.Columns["Total"].DefaultCellStyle = new DataGridViewCellStyle(estiloMonedaCL)
+                {
+                    ForeColor = Color.FromArgb(0, 102, 255),
+                    Font = new Font("Segoe UI", 8.5F, FontStyle.Bold)
+                };
+            }
+
+            // 7. RUT CLIENTE (Centrado)
+            if (dgvLibro.Columns["RUT"] != null)
+            {
+                dgvLibro.Columns["RUT"].HeaderText = "RUT CLIENTE";
+                dgvLibro.Columns["RUT"].FillWeight = 13;
+                dgvLibro.Columns["RUT"].HeaderCell.Style.Alignment = DataGridViewContentAlignment.MiddleCenter;
+                dgvLibro.Columns["RUT"].DefaultCellStyle.Alignment = DataGridViewContentAlignment.MiddleCenter;
+            }
 
             if (dgvLibro.Columns["ObjetoOriginal"] != null) dgvLibro.Columns["ObjetoOriginal"].Visible = false;
 
-            lblPaginadorInfo.Text = $"Mostrando {listaFinal.Count} de {_ventasCargadas.Count} documentos oficiales";
+            lblPaginadorInfo.Text = $"Mostrando {MonedaHelper.Formatear(listaFinal.Count)} de {MonedaHelper.Formatear(_ventasCargadas.Count)} documentos oficiales";
         }
 
         private void DgvLibro_SelectionChanged(object? sender, EventArgs e)
@@ -777,7 +848,8 @@ namespace SISTEMAACTUALIZADO
 
                 using Font fontKpi = new Font("Segoe UI", 8.5F, FontStyle.Bold);
                 using Brush brushKpi = new SolidBrush(Color.FromArgb(30, 41, 59));
-                string resumenTexto = $"Documentos: {cantDoc} (Boletas: {boletas}, Facturas: {facturas})   |   Neto: ${totalNeto:N0}   |   Débito Fiscal IVA: ${totalIva:N0}   |   TOTAL VENTAS: ${totalVentas:N0}";
+                // Bloque KPI en cabecera PDF
+                string resumenTexto = $"Documentos: {MonedaHelper.Formatear(cantDoc)} (Boletas: {MonedaHelper.Formatear(boletas)}, Facturas: {MonedaHelper.Formatear(facturas)})   |   Neto: {MonedaHelper.Formatear(totalNeto, conSigno: true)}   |   Débito Fiscal IVA: {MonedaHelper.Formatear(totalIva, conSigno: true)}   |   TOTAL VENTAS: {MonedaHelper.Formatear(totalVentas, conSigno: true)}";
                 g.DrawString(resumenTexto, fontKpi, brushKpi, left + 10, y + 8);
                 y += 42;
             }
@@ -841,9 +913,9 @@ namespace SISTEMAACTUALIZADO
                     v.FecDoc.ToString("dd/MM/yyyy HH:mm"),
                     razon,
                     rut,
-                    $"${v.Neto:N0}",
-                    $"${v.IvA:N0}",
-                    $"${v.Total:N0}"
+                    MonedaHelper.Formatear(v.Neto, conSigno: true),
+                    MonedaHelper.Formatear(v.IvA, conSigno: true),
+                    MonedaHelper.Formatear(v.Total, conSigno: true)
                 };
 
                 for (int i = 0; i < rowValores.Length; i++)
@@ -901,7 +973,7 @@ namespace SISTEMAACTUALIZADO
             Label lblTitle = new Label { Text = "📄 Emitir Nota de Crédito Electrónica", Location = new Point(25, 18), Font = new Font("Segoe UI", 12F, FontStyle.Bold), ForeColor = Color.FromArgb(185, 28, 28), AutoSize = true };
             Label lblInfo = new Label
             {
-                Text = $"Documentos seleccionados: {ventasParaAnular.Count} ({foliosRef})\nMonto Total a Anular: ${totalConsolidado:N0} (Neto: ${netoConsolidado:N0} | IVA: ${ivaConsolidado:N0})",
+                Text = $"Documentos seleccionados: {MonedaHelper.Formatear(ventasParaAnular.Count)} ({foliosRef})\nMonto Total a Anular: {MonedaHelper.Formatear(totalConsolidado, conSigno: true)} (Neto: {MonedaHelper.Formatear(netoConsolidado, conSigno: true)} | IVA: {MonedaHelper.Formatear(ivaConsolidado, conSigno: true)})",
                 Location = new Point(25, 48),
                 Font = new Font("Segoe UI", 8.5F, FontStyle.Bold),
                 ForeColor = Color.FromArgb(51, 65, 85),

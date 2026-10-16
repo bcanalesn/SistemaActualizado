@@ -6,6 +6,7 @@ using System.Linq;
 using System.Windows.Forms;
 using SISTEMAACTUALIZADO.Models;
 using SISTEMAACTUALIZADO.Services;
+using SISTEMAACTUALIZADO.Helpers;
 
 namespace SISTEMAACTUALIZADO.Forms
 {
@@ -59,6 +60,10 @@ namespace SISTEMAACTUALIZADO.Forms
 
         public FormConfiguracion()
         {
+            // Forzar cultura chilena para que los separadores de miles sean puntos en todos los controles
+            System.Threading.Thread.CurrentThread.CurrentCulture = new CultureInfo("es-CL");
+            System.Threading.Thread.CurrentThread.CurrentUICulture = new CultureInfo("es-CL");
+
             this.DoubleBuffered = true;
             this.SetStyle(ControlStyles.AllPaintingInWmPaint | ControlStyles.UserPaint | ControlStyles.OptimizedDoubleBuffer | ControlStyles.ResizeRedraw, true);
             this.UpdateStyles();
@@ -67,7 +72,6 @@ namespace SISTEMAACTUALIZADO.Forms
             CargarDatosEmpresa();
             CargarZonasDelivery();
         }
-
         private void InitializeComponent()
         {
             this.Text = "Configuración General del Negocio y Datos Tributarios";
@@ -487,7 +491,7 @@ namespace SISTEMAACTUALIZADO.Forms
             btnGuardarPuntosConfig.Click += BtnGuardarPuntosConfig_Click;
             pnlBody.Controls.Add(btnGuardarPuntosConfig);
 
-            // Actualización dinámica de los textos de ejemplo
+            // Actualización dinámica de los textos de ejemplo con MonedaHelper
             Action actualizarEjemplos = () =>
             {
                 int montoBase = (int)numMontoPorPunto.Value;
@@ -495,12 +499,16 @@ namespace SISTEMAACTUALIZADO.Forms
                 decimal valPunto = numValorPesoPorPunto.Value;
 
                 int ejemploCompra = Math.Max(10000, montoBase * 5);
-                int puntosGanados = (ejemploCompra / montoBase) * pts;
-                lblEjemploAcumulacion.Text = $"💡 Ejemplo: Por una compra de ${ejemploCompra:N0} el cliente acumulará {puntosGanados} puntos.";
+                int puntosGanados = montoBase > 0 ? (ejemploCompra / montoBase) * pts : 0;
+                
+                string montoCompraStr = MonedaHelper.Formatear(ejemploCompra, conSigno: true);
+                string ptsGanadosStr = MonedaHelper.Formatear(puntosGanados);
+                lblEjemploAcumulacion.Text = $"💡 Ejemplo: Por una compra de {montoCompraStr} el cliente acumulará {ptsGanadosStr} puntos.";
 
                 int ejemploPtsCanje = 50;
                 decimal dctoPesos = ejemploPtsCanje * valPunto;
-                lblEjemploCanje.Text = $"💡 Ejemplo: Si el cliente canjea {ejemploPtsCanje} puntos, obtendrá -${dctoPesos:N0} de descuento.";
+                string dctoPesosStr = MonedaHelper.Formatear(dctoPesos, conSigno: true);
+                lblEjemploCanje.Text = $"💡 Ejemplo: Si el cliente canjea {ejemploPtsCanje} puntos, obtendrá -{dctoPesosStr} de descuento.";
             };
 
             numMontoPorPunto.ValueChanged += (s, e) => actualizarEjemplos();
@@ -649,9 +657,9 @@ namespace SISTEMAACTUALIZADO.Forms
                     dgvZonas.Rows.Add(
                         z.ZonaDeliveryId, 
                         z.Nombre, 
-                        $"$ {z.CostoEnvio:N0}", 
-                        $"$ {z.PedidoMinimo:N0}", 
-                        $"$ {z.MontoEnvioGratis:N0}", 
+                        MonedaHelper.Formatear(z.CostoEnvio, conSigno: true), 
+                        MonedaHelper.Formatear(z.PedidoMinimo, conSigno: true), 
+                        MonedaHelper.Formatear(z.MontoEnvioGratis, conSigno: true), 
                         z.Activo ? "Sí" : "No"
                     );
                 }
@@ -702,8 +710,7 @@ namespace SISTEMAACTUALIZADO.Forms
         private static decimal ParsearMoneda(object? valor)
         {
             if (valor == null) return 0m;
-            string str = valor.ToString()?.Replace("$", "").Replace(".", "").Trim() ?? "0";
-            return decimal.TryParse(str, NumberStyles.Any, CultureInfo.InvariantCulture, out decimal res) ? res : 0m;
+            return MonedaHelper.Limpiar(valor.ToString());
         }
 
         private void CargarComunasDeZona(int zonaId)

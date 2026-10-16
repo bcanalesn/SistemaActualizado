@@ -162,7 +162,7 @@ namespace SISTEMAACTUALIZADO.Modals
 
             string stockTexto = _esPorGramos 
                 ? $"Stock: {(_stockDisponible / 1000.0):0.0} kg" 
-                : $"Stock: {_stockDisponible} un.";
+                : $"Stock: {MonedaHelper.Formatear(_stockDisponible)} un.";
 
             string precioTexto = _esPorGramos 
                 ? $"Precio: {MonedaHelper.Formatear(_precioBaseSinTramo, conSigno: true)}/g | {stockTexto}" 
@@ -445,9 +445,12 @@ namespace SISTEMAACTUALIZADO.Modals
                 _precioUnitario = _precioBaseSinTramo;
             }
 
-            lblCantidadDisplay.Text = _esPorGramos ? $"{_cantidad} g" : _cantidad.ToString();
+            // Formateo con separador de miles usando MonedaHelper
+            string cantFormateada = MonedaHelper.Formatear(_cantidad);
+
+            lblCantidadDisplay.Text = _esPorGramos ? $"{cantFormateada} g" : cantFormateada;
             lblTotalPreview.Text = MonedaHelper.Formatear(_precioUnitario * _cantidad, conSigno: true);
-            btnAgregarAccion.Text = _esPorGramos ? $"🛒 Agregar {_cantidad} g a la venta" : $"🛒 Agregar {_cantidad} a la venta";
+            btnAgregarAccion.Text = _esPorGramos ? $"🛒 Agregar {cantFormateada} g a la venta" : $"🛒 Agregar {cantFormateada} a la venta";
 
             ActualizarBannerPromocion();
         }
@@ -488,9 +491,13 @@ namespace SISTEMAACTUALIZADO.Modals
                 {
                     pnlBannerSugerencia.BackColor = Color.FromArgb(239, 246, 255);
                     lblTextoPromo.ForeColor = Color.FromArgb(2, 132, 199);
-                    lblTextoPromo.Text = $"💡 Lleva {faltan} más (total {cantDestino}) y baja a ${precioSig:N0} c/u  ➔";
+                    
+                    string precioSigStr = MonedaHelper.Formatear(precioSig, conSigno: true);
+                    string cantDestinoStr = MonedaHelper.Formatear(cantDestino);
+                    string faltanStr = MonedaHelper.Formatear(faltan);
 
-                    // Al dar clic en el banner se suma lo que falta
+                    lblTextoPromo.Text = $"💡 Lleva {faltanStr} más (total {cantDestinoStr}) y baja a {precioSigStr} c/u  ➔";
+
                     EventHandler bannerClick = (s, e) =>
                     {
                         if (cantDestino <= _stockDisponible)

@@ -11,6 +11,7 @@ using System.Windows.Forms;
 using SISTEMAACTUALIZADO.Models;
 using SISTEMAACTUALIZADO.Modals;
 using SISTEMAACTUALIZADO.Services;
+using SISTEMAACTUALIZADO.Helpers;
 
 namespace SISTEMAACTUALIZADO.Forms
 {
@@ -415,7 +416,14 @@ namespace SISTEMAACTUALIZADO.Forms
 
             dgvLibro.Columns.Clear();
 
-            void AgregarColumna(string name, string header, int width, DataGridViewContentAlignment align, string format = "", Color? fore = null, bool bold = false, bool fill = false)
+            var estiloMonedaCL = new DataGridViewCellStyle
+            {
+                FormatProvider = new System.Globalization.CultureInfo("es-CL"),
+                Format = "$ #,##0",
+                Alignment = DataGridViewContentAlignment.MiddleCenter
+            };
+
+            void AgregarColumna(string name, string header, int width, DataGridViewContentAlignment align, string format = "", Color? fore = null, bool bold = false, bool fill = false, DataGridViewCellStyle? estiloPersonalizado = null)
             {
                 var col = new DataGridViewTextBoxColumn
                 {
@@ -424,10 +432,19 @@ namespace SISTEMAACTUALIZADO.Forms
                     Width = width
                 };
                 col.HeaderCell.Style.Alignment = align;
-                col.DefaultCellStyle.Alignment = align;
-                if (!string.IsNullOrEmpty(format)) col.DefaultCellStyle.Format = format;
-                if (fore.HasValue) col.DefaultCellStyle.ForeColor = fore.Value;
-                if (bold) col.DefaultCellStyle.Font = new Font("Segoe UI", 8.5F, FontStyle.Bold);
+
+                if (estiloPersonalizado != null)
+                {
+                    col.DefaultCellStyle = estiloPersonalizado;
+                }
+                else
+                {
+                    col.DefaultCellStyle.Alignment = align;
+                    if (!string.IsNullOrEmpty(format)) col.DefaultCellStyle.Format = format;
+                    if (fore.HasValue) col.DefaultCellStyle.ForeColor = fore.Value;
+                    if (bold) col.DefaultCellStyle.Font = new Font("Segoe UI", 8.5F, FontStyle.Bold);
+                }
+
                 if (fill) col.AutoSizeMode = DataGridViewAutoSizeColumnMode.Fill;
 
                 dgvLibro.Columns.Add(col);
@@ -438,9 +455,18 @@ namespace SISTEMAACTUALIZADO.Forms
             AgregarColumna("Fecha", "FECHA EMISIÓN", 115, DataGridViewContentAlignment.MiddleCenter);
             AgregarColumna("Proveedor", "PROVEEDOR / RAZÓN SOCIAL", 240, DataGridViewContentAlignment.MiddleLeft, "", null, false, true);
             AgregarColumna("Rut", "RUT", 120, DataGridViewContentAlignment.MiddleCenter);
-            AgregarColumna("Neto", "NETO", 120, DataGridViewContentAlignment.MiddleCenter, "$#,##0");
-            AgregarColumna("Iva", "IVA (19%)", 110, DataGridViewContentAlignment.MiddleCenter, "$#,##0");
-            AgregarColumna("Total", "TOTAL", 130, DataGridViewContentAlignment.MiddleCenter, "$#,##0", Color.FromArgb(22, 163, 74), true);
+
+            // Columnas monetarias centradas con formato $ #,##0
+            AgregarColumna("Neto", "NETO", 120, DataGridViewContentAlignment.MiddleCenter, estiloPersonalizado: estiloMonedaCL);
+            AgregarColumna("Iva", "IVA (19%)", 110, DataGridViewContentAlignment.MiddleCenter, estiloPersonalizado: estiloMonedaCL);
+            
+            var estiloTotal = new DataGridViewCellStyle(estiloMonedaCL)
+            {
+                ForeColor = Color.FromArgb(22, 163, 74),
+                Font = new Font("Segoe UI", 8.5F, FontStyle.Bold)
+            };
+            AgregarColumna("Total", "TOTAL", 130, DataGridViewContentAlignment.MiddleCenter, estiloPersonalizado: estiloTotal);
+
             AgregarColumna("Estado", "ESTADO", 100, DataGridViewContentAlignment.MiddleCenter);
         }
 
@@ -464,7 +490,7 @@ namespace SISTEMAACTUALIZADO.Forms
                     string codigoSii = ObtenerCodigoDte(c.TipoDocumento);
                     dgvLibro.Rows.Add(
                         codigoSii,
-                        c.NroFacturaProveedor,
+                        c.NroFacturaProveedor.ToString(),
                         c.FechaEmision.ToString("dd-MM-yyyy"),
                         c.RazonSocialProveedor,
                         c.RutProveedor,
@@ -475,13 +501,14 @@ namespace SISTEMAACTUALIZADO.Forms
                     );
                 }
 
-                lblKpiTotalBrutoMonto.Text = $"$ {resumen.TotalBruto:N0}";
-                lblKpiComprasNetoMonto.Text = $"$ {resumen.TotalNeto:N0}";
-                lblKpiFacturasCant.Text = resumen.TotalFacturas.ToString("N0");
-                lblKpiIvaMonto.Text = $"$ {resumen.TotalIva:N0}";
-                lblKpiProveedoresCant.Text = resumen.TotalProveedores.ToString("N0");
+                // KPIs Superiores con MonedaHelper
+                lblKpiTotalBrutoMonto.Text = MonedaHelper.Formatear(resumen.TotalBruto, conSigno: true);
+                lblKpiComprasNetoMonto.Text = MonedaHelper.Formatear(resumen.TotalNeto, conSigno: true);
+                lblKpiFacturasCant.Text = MonedaHelper.Formatear(resumen.TotalFacturas);
+                lblKpiIvaMonto.Text = MonedaHelper.Formatear(resumen.TotalIva, conSigno: true);
+                lblKpiProveedoresCant.Text = MonedaHelper.Formatear(resumen.TotalProveedores);
 
-                lblContadorFooter.Text = $"Mostrando {_comprasCargadas.Count} documento(s) en el período seleccionado.";
+                lblContadorFooter.Text = $"Mostrando {MonedaHelper.Formatear(_comprasCargadas.Count)} documento(s) en el período seleccionado.";
             }
             catch (Exception ex)
             {
@@ -639,7 +666,8 @@ namespace SISTEMAACTUALIZADO.Forms
 
                 using Font fontKpi = new Font("Segoe UI", 8.5F, FontStyle.Bold);
                 using Brush brushKpi = new SolidBrush(Color.FromArgb(30, 41, 59));
-                string resumenTexto = $"Documentos: {cantDoc}   |   Proveedores: {provs}   |   Neto: ${netoTot:N0}   |   IVA (19%): ${ivaTot:N0}   |   TOTAL COMPRAS: ${totalBruto:N0}";
+                // Resumen KPI en cabecera del PDF
+                string resumenTexto = $"Documentos: {MonedaHelper.Formatear(cantDoc)}   |   Proveedores: {MonedaHelper.Formatear(provs)}   |   Neto: {MonedaHelper.Formatear(netoTot, conSigno: true)}   |   IVA (19%): {MonedaHelper.Formatear(ivaTot, conSigno: true)}   |   TOTAL COMPRAS: {MonedaHelper.Formatear(totalBruto, conSigno: true)}";
                 g.DrawString(resumenTexto, fontKpi, brushKpi, left + 10, y + 8);
                 y += 42;
             }
@@ -698,9 +726,9 @@ namespace SISTEMAACTUALIZADO.Forms
                     c.FechaEmision.ToString("dd/MM/yyyy"),
                     c.RazonSocialProveedor,
                     c.RutProveedor,
-                    $"${c.MontoNeto:N0}",
-                    $"${c.MontoIva:N0}",
-                    $"${c.MontoTotal:N0}"
+                    MonedaHelper.Formatear(c.MontoNeto, conSigno: true),
+                    MonedaHelper.Formatear(c.MontoIva, conSigno: true),
+                    MonedaHelper.Formatear(c.MontoTotal, conSigno: true)
                 };
 
                 for (int i = 0; i < cValores.Length; i++)

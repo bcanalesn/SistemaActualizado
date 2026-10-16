@@ -7,6 +7,7 @@ using System.Windows.Forms;
 using SISTEMAACTUALIZADO.Models;
 using SISTEMAACTUALIZADO.Modals;
 using SISTEMAACTUALIZADO.Services;
+using SISTEMAACTUALIZADO.Helpers;
 
 namespace SISTEMAACTUALIZADO
 {
@@ -289,13 +290,13 @@ namespace SISTEMAACTUALIZADO
             Agregar("NFamilia", "Familia", 110, DataGridViewContentAlignment.MiddleLeft);
 
             // Stock y Precios CENTRADOS para quedar debajo de su título
-            Agregar("Stock", "Stock", 85, DataGridViewContentAlignment.MiddleCenter, "#,##0", null, true);
-            Agregar("PrecioCosto", "Costo Neto", 100, DataGridViewContentAlignment.MiddleCenter, "$#,##0");
-            Agregar("PrecioUnitario", "Precio Venta (L1)", 125, DataGridViewContentAlignment.MiddleCenter, "$#,##0", Color.FromArgb(16, 185, 129), true);
+            Agregar("Stock", "Stock", 85, DataGridViewContentAlignment.MiddleCenter, "", null, true);
+            Agregar("PrecioCosto", "Costo Neto", 100, DataGridViewContentAlignment.MiddleCenter);
+            Agregar("PrecioUnitario", "Precio Venta (L1)", 125, DataGridViewContentAlignment.MiddleCenter, "", Color.FromArgb(16, 185, 129), true);
 
             for (int i = 2; i <= 10; i++)
             {
-                Agregar($"Precio{i}", $"Lista {i}", 100, DataGridViewContentAlignment.MiddleCenter, "$#,##0", Color.FromArgb(2, 132, 199), false);
+                Agregar($"Precio{i}", $"Lista {i}", 100, DataGridViewContentAlignment.MiddleCenter, "", Color.FromArgb(2, 132, 199), false);
             }
 
             Agregar("ListaDefectoPOS", "Lista Activa POS", 110, DataGridViewContentAlignment.MiddleCenter, "Lista #0", Color.FromArgb(124, 58, 237), true);
@@ -328,27 +329,41 @@ namespace SISTEMAACTUALIZADO
         {
             if (e.RowIndex < 0 || e.RowIndex >= dgvProductos.Rows.Count) return;
 
-            if (dgvProductos.Rows[e.RowIndex].DataBoundItem is Producto prod && prod.EsPesable)
+            if (dgvProductos.Rows[e.RowIndex].DataBoundItem is Producto prod)
             {
                 string colName = dgvProductos.Columns[e.ColumnIndex].Name;
 
-                // 1. Formateo de Costo y Listas de Precios por Kilo
+                // 1. FORMATEO DE PRECIOS (Costo, L1 y Listas 2 a 10)
                 if (colName == "PrecioCosto" || colName == "PrecioUnitario" || colName.StartsWith("Precio"))
                 {
                     if (e.Value is decimal valDecimal)
                     {
-                        e.Value = $"${(valDecimal * 1000m):#,##0}/Kg";
+                        if (prod.EsPesable)
+                        {
+                            e.Value = $"{MonedaHelper.Formatear(valDecimal * 1000m, conSigno: true)}/Kg";
+                        }
+                        else
+                        {
+                            e.Value = MonedaHelper.Formatear(valDecimal, conSigno: true);
+                        }
                         e.FormattingApplied = true;
                     }
                 }
-                // 2. Formateo de Stock en Kg o Gramos
+                // 2. FORMATEO DE STOCK
                 else if (colName == "Stock")
                 {
-                    if (e.Value is int stockGramos)
+                    if (e.Value is int stockInt)
                     {
-                        e.Value = stockGramos >= 1000 
-                            ? $"{(stockGramos / 1000.0):0.0} Kg" 
-                            : $"{stockGramos} g";
+                        if (prod.EsPesable)
+                        {
+                            e.Value = stockInt >= 1000 
+                                ? $"{(stockInt / 1000.0):0.0} Kg" 
+                                : $"{MonedaHelper.Formatear(stockInt)} g";
+                        }
+                        else
+                        {
+                            e.Value = MonedaHelper.Formatear(stockInt);
+                        }
                         e.FormattingApplied = true;
                     }
                 }
@@ -384,7 +399,7 @@ namespace SISTEMAACTUALIZADO
             dgvProductos.DataSource = null;
             dgvProductos.DataSource = lista;
 
-            lblContadorFooter.Text = $"Mostrando {lista.Count:N0} de {_listaProductos.Count:N0} productos registrados";
+            lblContadorFooter.Text = $"Mostrando {MonedaHelper.Formatear(lista.Count)} de {MonedaHelper.Formatear(_listaProductos.Count)} productos registrados";
 
             if (dgvProductos.Rows.Count > 0)
             {
