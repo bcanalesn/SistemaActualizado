@@ -561,6 +561,20 @@ namespace SISTEMAACTUALIZADO
 
             pnlCuerpo.Controls.Add(pnlIzquierda);
             pnlCuerpo.Controls.Add(pnlDerecha);
+            // Candado A: Si el cursor entra a la barra de atajos, ocultar cualquier preview
+            pnlAtajosFooter.MouseEnter += (s, e) => VentanaPreviewProducto.Ocultar();
+            lblAtajosInfo.MouseEnter += (s, e) => VentanaPreviewProducto.Ocultar();
+
+            // Candado B: Si el usuario mueve la rueda del mouse o hace scroll en los productos
+            pnlProductosGrid.MouseEnter += (s, e) =>
+            {
+                // Si el mouse está en el fondo del grid y no sobre una tarjeta específica
+                if (s == pnlProductosGrid) VentanaPreviewProducto.Ocultar();
+            };
+
+            // Candado C: Al cambiar de módulo o minimizar el formulario
+            this.Deactivate += (s, e) => VentanaPreviewProducto.Ocultar();
+            this.VisibleChanged += (s, e) => { if (!this.Visible) VentanaPreviewProducto.Ocultar(); };
 
             this.Controls.Add(pnlCuerpo);
             this.Controls.Add(pnlAtajosFooter);
@@ -1812,6 +1826,7 @@ namespace SISTEMAACTUALIZADO
     {
         private static VentanaPreviewProducto? _instanciaActual;
         private static Control? _controlOrigenActual;
+        private static System.Windows.Forms.Timer? _timerAutoCierre;
 
         private readonly PictureBox pbFoto;
         private readonly Label lblNombre;
@@ -1886,6 +1901,29 @@ namespace SISTEMAACTUALIZADO
             pnlBorde.Controls.Add(lblNombre);
             pnlBorde.Controls.Add(pbFoto);
             this.Controls.Add(pnlBorde);
+
+            // Timer de seguridad: evalúa cada 70ms si el puntero sigue sobre la tarjeta
+            _timerAutoCierre?.Stop();
+            _timerAutoCierre?.Dispose();
+            _timerAutoCierre = new System.Windows.Forms.Timer { Interval = 70 };
+            _timerAutoCierre.Tick += (s, e) =>
+            {
+                if (_controlOrigenActual == null || _controlOrigenActual.IsDisposed || !_controlOrigenActual.Visible)
+                {
+                    Ocultar();
+                    return;
+                }
+
+                // Obtiene la posición actual global del mouse
+                Point cursorGlobal = Cursor.Position;
+                Rectangle rectGlobal = _controlOrigenActual.RectangleToScreen(_controlOrigenActual.ClientRectangle);
+
+                // Si el mouse ya no está dentro de los límites de la tarjeta origen, se cierra
+                if (!rectGlobal.Contains(cursorGlobal))
+                {
+                    Ocultar();
+                }
+            };
         }
 
         protected override bool ShowWithoutActivation => true;
@@ -1918,16 +1956,18 @@ namespace SISTEMAACTUALIZADO
 
             _instanciaActual.Location = puntoPantalla;
             _instanciaActual.Show();
+            _timerAutoCierre?.Start();
         }
 
         public static void Ocultar()
         {
+            _timerAutoCierre?.Stop();
             if (_instanciaActual != null)
             {
+                _controlOrigenActual = null;
                 _instanciaActual.Close();
                 _instanciaActual.Dispose();
                 _instanciaActual = null;
-                _controlOrigenActual = null;
             }
         }
     }
