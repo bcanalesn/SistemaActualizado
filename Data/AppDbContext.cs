@@ -39,6 +39,8 @@ namespace SISTEMAACTUALIZADO.Data
         public DbSet<ComunaDelivery> ComunasDelivery { get; set; } = null!;
         public DbSet<Delivery> Deliveries { get; set; } = null!;
         public DbSet<PosPreferencia> PosPreferencias { get; set; } = null!;
+        public DbSet<PosCategoria> PosCategorias { get; set; } = null!;
+        public DbSet<PosFamilia> PosFamilias { get; set; } = null!;
 
         protected override void OnConfiguring(DbContextOptionsBuilder optionsBuilder)
         {

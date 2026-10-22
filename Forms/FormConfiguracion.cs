@@ -48,6 +48,7 @@ namespace SISTEMAACTUALIZADO.Forms
 
         private int _zonaSeleccionadaId = 0;
         private int _comunaSeleccionadaId = 0;
+
         // --- Controles Pestaña Fidelización ---
         private CheckBox chkProgramaPuntosActivo = null!;
         private NumericUpDown numMontoPorPunto = null!;
@@ -57,23 +58,29 @@ namespace SISTEMAACTUALIZADO.Forms
         private Label lblEjemploAcumulacion = null!;
         private Label lblEjemploCanje = null!;
         private Button btnGuardarPuntosConfig = null!;
-        // --- Controles Pestaña Catálogo POS ---
+
+        // --- Controles Pestaña Espejo Catálogo POS ---
         private RadioButton rbOrdenCategoria = null!;
         private RadioButton rbOrdenPersonalizado = null!;
         private RadioButton rbOrdenMasVendidos = null!;
-        private Panel pnlContenedorPersonalizado = null!;
-        private TextBox txtBuscarProductoOrden = null!;
-        private DataGridView dgvOrdenProductos = null!;
-        private Button btnSubirOrden = null!;
-        private Button btnBajarOrden = null!;
+        private Panel pnlSeccionCategorias = null!;
+        private FlowLayoutPanel flowConfigCategorias = null!;
+        private FlowLayoutPanel flowConfigFamilias = null!;
+        private FlowLayoutPanel flowLienzoProductos = null!;
+        private FlowLayoutPanel flowAlmacenProductos = null!;
+        private TextBox txtBuscarAlmacen = null!;
+        private RadioButton rbFiltroSinAsignar = null!;
+        private RadioButton rbFiltroTodos = null!;
         private Button btnGuardarCatalogoConfig = null!;
-        private Label lblTotalItemsOrden = null!;
+        private Point _dragStartPoint = Point.Empty;
+        private bool _isDragging = false;
 
-        private List<Producto> _productosOrdenMemoria = new List<Producto>();
+        private string _catEdicionActiva = "";
+        private string _famEdicionActiva = "";
+        private List<PosCategoria> _categoriasCache = new List<PosCategoria>();
 
         public FormConfiguracion()
         {
-            // Forzar cultura chilena para que los separadores de miles sean puntos en todos los controles
             System.Threading.Thread.CurrentThread.CurrentCulture = new CultureInfo("es-CL");
             System.Threading.Thread.CurrentThread.CurrentUICulture = new CultureInfo("es-CL");
 
@@ -82,14 +89,15 @@ namespace SISTEMAACTUALIZADO.Forms
             this.UpdateStyles();
 
             InitializeComponent();
+
             CargarDatosEmpresa();
             CargarZonasDelivery();
-            CargarConfiguracionCatalogoUI();
         }
+
         private void InitializeComponent()
         {
             this.Text = "Configuración General del Negocio y Datos Tributarios";
-            this.Size = new Size(1100, 720);
+            this.Size = new Size(1160, 750);
             this.StartPosition = FormStartPosition.CenterParent;
             this.FormBorderStyle = FormBorderStyle.FixedDialog;
             this.MaximizeBox = true;
@@ -97,7 +105,6 @@ namespace SISTEMAACTUALIZADO.Forms
             this.BackColor = Color.FromArgb(248, 250, 252);
             this.Font = new Font("Segoe UI", 9F);
 
-            // Header Principal
             Panel pnlHeader = new Panel
             {
                 Dock = DockStyle.Top,
@@ -116,7 +123,6 @@ namespace SISTEMAACTUALIZADO.Forms
             };
             pnlHeader.Controls.Add(lblTitulo);
 
-            // TabControl Principal
             TabControl tabPrincipal = new TabControl
             {
                 Dock = DockStyle.Fill,
@@ -143,48 +149,10 @@ namespace SISTEMAACTUALIZADO.Forms
             tabPrincipal.TabPages.Add(tabEmpresa);
             tabPrincipal.TabPages.Add(tabDelivery);
             tabPrincipal.TabPages.Add(tabFidelizacion);
-            tabPrincipal.TabPages.Add(tabCatalogo); // 👈 Cuarta pestaña
+            tabPrincipal.TabPages.Add(tabCatalogo);
 
             this.Controls.Add(tabPrincipal);
             this.Controls.Add(pnlHeader);
-        }
-        // ==========================================
-        // MÉTODOS AUXILIARES DE DISEÑO GRÁFICO
-        // ==========================================
-        private Panel CrearTarjetaRedondeada(int x, int y, int ancho, int alto, Color colorFondo, Color colorBorde)
-        {
-            Panel pnl = new Panel 
-            { 
-                Location = new Point(x, y), 
-                Size = new Size(ancho, alto), 
-                BackColor = colorFondo 
-            };
-
-            pnl.Resize += (s, e) => pnl.Invalidate();
-
-            pnl.Paint += (s, e) =>
-            {
-                e.Graphics.SmoothingMode = System.Drawing.Drawing2D.SmoothingMode.AntiAlias;
-                e.Graphics.Clear(pnl.BackColor);
-
-                Rectangle r = new Rectangle(0, 0, pnl.Width - 1, pnl.Height - 1);
-                using var p = CrearRutaRedondeada(r, 8);
-                using var pen = new Pen(colorBorde, 1.2f);
-                e.Graphics.DrawPath(pen, p);
-            };
-            return pnl;
-        }
-
-        private System.Drawing.Drawing2D.GraphicsPath CrearRutaRedondeada(Rectangle rect, int radio)
-        {
-            var path = new System.Drawing.Drawing2D.GraphicsPath();
-            int d = radio * 2;
-            path.AddArc(rect.X, rect.Y, d, d, 180, 90);
-            path.AddArc(rect.Right - d, rect.Y, d, d, 270, 90);
-            path.AddArc(rect.Right - d, rect.Bottom - d, d, d, 0, 90);
-            path.AddArc(rect.X, rect.Bottom - d, d, d, 90, 90);
-            path.CloseFigure();
-            return path;
         }
 
         // ==========================================
@@ -259,7 +227,6 @@ namespace SISTEMAACTUALIZADO.Forms
         // ==========================================
         private void ConstruirPestañaDelivery(TabPage tab)
         {
-            // TableLayoutPanel responsivo: 54% Zonas, 46% Comunas (evita cualquier excepción de splitter)
             TableLayoutPanel tlpLayout = new TableLayoutPanel
             {
                 Dock = DockStyle.Fill,
@@ -271,7 +238,6 @@ namespace SISTEMAACTUALIZADO.Forms
             tlpLayout.ColumnStyles.Add(new ColumnStyle(SizeType.Percent, 54F));
             tlpLayout.ColumnStyles.Add(new ColumnStyle(SizeType.Percent, 46F));
 
-            // PANEL IZQUIERDO: ZONAS
             GroupBox gbZonas = new GroupBox
             {
                 Text = "📍 Macro Zonas de Reparto",
@@ -362,7 +328,6 @@ namespace SISTEMAACTUALIZADO.Forms
             gbZonas.Controls.Add(dgvZonas);
             tlpLayout.Controls.Add(gbZonas, 0, 0);
 
-            // PANEL DERECHO: COMUNAS
             GroupBox gbComunas = new GroupBox
             {
                 Text = "🏘️ Comunas Asignadas a la Zona",
@@ -441,6 +406,7 @@ namespace SISTEMAACTUALIZADO.Forms
 
             tab.Controls.Add(tlpLayout);
         }
+
         // ==========================================
         // 3. PESTAÑA: PUNTOS Y FIDELIZACIÓN
         // ==========================================
@@ -453,7 +419,6 @@ namespace SISTEMAACTUALIZADO.Forms
                 AutoScroll = true
             };
 
-            // Switch General
             Panel pnlSwitch = new Panel
             {
                 Location = new Point(20, 15),
@@ -474,7 +439,6 @@ namespace SISTEMAACTUALIZADO.Forms
             pnlSwitch.Controls.Add(chkProgramaPuntosActivo);
             pnlBody.Controls.Add(pnlSwitch);
 
-            // GroupBox Acumulación
             GroupBox gbAcumulacion = new GroupBox
             {
                 Text = "📈 Reglas de Acumulación (Ganar Puntos)",
@@ -506,7 +470,6 @@ namespace SISTEMAACTUALIZADO.Forms
             gbAcumulacion.Controls.AddRange(new Control[] { lblMontoBase, numMontoPorPunto, lblPuntosBase, numPuntosEntregados, lblMinimo, numMontoMinimoAcumular, lblEjemploAcumulacion });
             pnlBody.Controls.Add(gbAcumulacion);
 
-            // GroupBox Canje
             GroupBox gbCanje = new GroupBox
             {
                 Text = "🎁 Reglas de Canje (Descuentos en Pesos)",
@@ -532,7 +495,6 @@ namespace SISTEMAACTUALIZADO.Forms
             gbCanje.Controls.AddRange(new Control[] { lblValorPunto, numValorPesoPorPunto, lblEjemploCanje });
             pnlBody.Controls.Add(gbCanje);
 
-            // Botón Guardar
             btnGuardarPuntosConfig = new Button
             {
                 Text = "💾 Guardar Parámetros de Fidelización",
@@ -548,7 +510,6 @@ namespace SISTEMAACTUALIZADO.Forms
             btnGuardarPuntosConfig.Click += BtnGuardarPuntosConfig_Click;
             pnlBody.Controls.Add(btnGuardarPuntosConfig);
 
-            // Actualización dinámica de los textos de ejemplo con MonedaHelper
             Action actualizarEjemplos = () =>
             {
                 int montoBase = (int)numMontoPorPunto.Value;
@@ -575,441 +536,1093 @@ namespace SISTEMAACTUALIZADO.Forms
             tab.Controls.Add(pnlBody);
             CargarDatosFidelizacionUI();
         }
+
         // ==========================================
-        // 4. PESTAÑA: ORDEN DEL CATÁLOGO POS
+        // 4. PESTAÑA: PERSONALIZADOR ESPEJO DEL CATÁLOGO POS
         // ==========================================
         private void ConstruirPestañaCatalogoPOS(TabPage tab)
         {
-            Panel pnlMain = new Panel
+            TableLayoutPanel tlpLayout = new TableLayoutPanel
             {
                 Dock = DockStyle.Fill,
-                Padding = new Padding(20, 15, 20, 15),
-                BackColor = Color.FromArgb(248, 250, 252)
+                ColumnCount = 2,
+                RowCount = 1,
+                Padding = new Padding(8),
+                BackColor = Color.FromArgb(244, 246, 249)
             };
+            tlpLayout.ColumnStyles.Add(new ColumnStyle(SizeType.Percent, 70F)); // Lienzo Espejo
+            tlpLayout.ColumnStyles.Add(new ColumnStyle(SizeType.Percent, 30F)); // Almacén
 
-            // 1. TARJETA SELECTOR DE MODALIDAD
-            Panel pnlOpcionesCard = CrearTarjetaRedondeada(0, 0, 0, 105, Color.White, Color.FromArgb(226, 232, 240));
-            pnlOpcionesCard.Dock = DockStyle.Top;
-            pnlOpcionesCard.Padding = new Padding(16, 12, 16, 10);
-
-            Label lblTitModo = new Label
-            {
-                Text = "CRITERIO DE VISUALIZACIÓN DE PRODUCTOS EN EL PUNTO DE VENTA",
-                Font = new Font("Segoe UI", 8.5F, FontStyle.Bold),
-                ForeColor = Color.FromArgb(30, 41, 59),
-                Dock = DockStyle.Top,
-                Height = 20
-            };
-
-            FlowLayoutPanel flowRadios = new FlowLayoutPanel
+            // ----------------------------------------------------
+            // 1. PANEL IZQUIERDO: LIENZO ESPEJO DEL PUNTO DE VENTA
+            // ----------------------------------------------------
+            TableLayoutPanel tlpLienzoWrapper = new TableLayoutPanel
             {
                 Dock = DockStyle.Fill,
-                WrapContents = false,
-                Padding = new Padding(0, 8, 0, 0),
-                BackColor = Color.Transparent
+                ColumnCount = 1,
+                RowCount = 5,
+                BackColor = Color.Transparent,
+                Margin = new Padding(0),
+                Padding = new Padding(0)
+            };
+            tlpLienzoWrapper.ColumnStyles.Add(new ColumnStyle(SizeType.Percent, 100F));
+
+            // Fila 0: Selector Superior de Radios (Fijo 42px)
+            tlpLienzoWrapper.RowStyles.Add(new RowStyle(SizeType.Absolute, 42F));
+            // Fila 1: Categorías (Auto-ajustable a las filas que necesite)
+            tlpLienzoWrapper.RowStyles.Add(new RowStyle(SizeType.AutoSize));
+            // Fila 2: Subfamilias (Auto-ajustable a las filas que necesite)
+            tlpLienzoWrapper.RowStyles.Add(new RowStyle(SizeType.AutoSize));
+            // Fila 3: Lienzo Blanco de Productos (Ocupa el resto)
+            tlpLienzoWrapper.RowStyles.Add(new RowStyle(SizeType.Percent, 100F));
+            // Fila 4: Footer Guardar (Fijo 48px)
+            tlpLienzoWrapper.RowStyles.Add(new RowStyle(SizeType.Absolute, 48F));
+
+            // Fila 0: Selector de Criterio Superior
+            Panel pnlTopRadios = new Panel { Dock = DockStyle.Fill, BackColor = Color.White, Padding = new Padding(10, 8, 10, 6), Margin = new Padding(0) };
+            
+            string modoActual = _configService.ObtenerModoOrdenCatalogo();
+
+            rbOrdenCategoria = new RadioButton { Text = "📂 Alfabético", Location = new Point(10, 8), AutoSize = true, Font = new Font("Segoe UI", 8.5F, FontStyle.Bold), Checked = (modoActual == "CATEGORIA") };
+            rbOrdenPersonalizado = new RadioButton { Text = "⭐ Personalizado (Arrastrar)", Location = new Point(140, 8), AutoSize = true, Font = new Font("Segoe UI", 8.5F, FontStyle.Bold), Checked = (modoActual == "PERSONALIZADO") };
+            rbOrdenMasVendidos = new RadioButton { Text = "🔥 Los Más Vendidos", Location = new Point(340, 8), AutoSize = true, Font = new Font("Segoe UI", 8.5F, FontStyle.Bold), Checked = (modoActual == "MAS_VENDIDOS") };
+
+            Action alternarModo = () =>
+            {
+                string m = "CATEGORIA";
+                if (rbOrdenPersonalizado.Checked) m = "PERSONALIZADO";
+                else if (rbOrdenMasVendidos.Checked) m = "MAS_VENDIDOS";
+                _configService.GuardarModoOrdenCatalogo(m);
+
+                RenderizarCategoriasConfig();
+                RenderizarFamiliasConfig(); 
+                RefrescarLienzoYAlmacen();
             };
 
-            rbOrdenCategoria = new RadioButton
-            {
-                Text = "📂 Por Categorías (Alfabético tradicional)",
+            rbOrdenCategoria.Click += (s, e) => alternarModo();
+            rbOrdenPersonalizado.Click += (s, e) => alternarModo();
+            rbOrdenMasVendidos.Click += (s, e) => alternarModo();
+
+            pnlTopRadios.Controls.AddRange(new Control[] { rbOrdenCategoria, rbOrdenPersonalizado, rbOrdenMasVendidos });
+            tlpLienzoWrapper.Controls.Add(pnlTopRadios, 0, 0);
+
+            // Fila 1: Categorías (FlowLayoutPanel sin scroll, crece solo)
+            flowConfigCategorias = new FlowLayoutPanel 
+            { 
+                Dock = DockStyle.Fill, 
                 AutoSize = true,
-                Font = new Font("Segoe UI", 9F, FontStyle.Bold),
-                ForeColor = Color.FromArgb(51, 65, 85),
-                Margin = new Padding(0, 0, 24, 0),
-                Cursor = Cursors.Hand
+                AutoSizeMode = AutoSizeMode.GrowAndShrink,
+                AutoScroll = false, 
+                WrapContents = true,
+                Margin = new Padding(0, 4, 0, 4),
+                Padding = new Padding(0)
             };
+            tlpLienzoWrapper.Controls.Add(flowConfigCategorias, 0, 1);
 
-            rbOrdenPersonalizado = new RadioButton
-            {
-                Text = "⭐ Personalizado por el Local (Tu propio orden)",
+            // Fila 2: Familias (FlowLayoutPanel sin scroll, crece solo)
+            flowConfigFamilias = new FlowLayoutPanel 
+            { 
+                Dock = DockStyle.Fill, 
                 AutoSize = true,
-                Font = new Font("Segoe UI", 9F, FontStyle.Bold),
-                ForeColor = Color.FromArgb(37, 99, 235),
-                Margin = new Padding(0, 0, 24, 0),
-                Cursor = Cursors.Hand
+                AutoSizeMode = AutoSizeMode.GrowAndShrink,
+                AutoScroll = false, 
+                WrapContents = true,
+                Margin = new Padding(0, 2, 0, 4),
+                Padding = new Padding(0)
             };
+            tlpLienzoWrapper.Controls.Add(flowConfigFamilias, 0, 2);
 
-            rbOrdenMasVendidos = new RadioButton
-            {
-                Text = "🔥 Los Más Vendidos (Top Ventas primero)",
-                AutoSize = true,
-                Font = new Font("Segoe UI", 9F, FontStyle.Bold),
-                ForeColor = Color.FromArgb(22, 163, 74),
-                Cursor = Cursors.Hand
-            };
-
-            rbOrdenCategoria.CheckedChanged += (s, e) => ToggleModoCatalogo();
-            rbOrdenPersonalizado.CheckedChanged += (s, e) => ToggleModoCatalogo();
-            rbOrdenMasVendidos.CheckedChanged += (s, e) => ToggleModoCatalogo();
-
-            flowRadios.Controls.AddRange(new Control[] { rbOrdenCategoria, rbOrdenPersonalizado, rbOrdenMasVendidos });
-            pnlOpcionesCard.Controls.Add(flowRadios);
-            pnlOpcionesCard.Controls.Add(lblTitModo);
-
-            // 2. PANEL CONTENEDOR DE EDICIÓN PERSONALIZADA
-            pnlContenedorPersonalizado = new Panel
+            // Fila 3: Lienzo de Productos
+            flowLienzoProductos = new FlowLayoutPanel
             {
                 Dock = DockStyle.Fill,
-                Padding = new Padding(0, 12, 0, 0),
-                BackColor = Color.Transparent
+                AutoScroll = true,
+                BackColor = Color.White,
+                Padding = new Padding(8),
+                Margin = new Padding(0),
+                AllowDrop = true
             };
+            flowLienzoProductos.DragEnter += (s, e) => { if (e.Data!.GetDataPresent(typeof(Producto))) e.Effect = DragDropEffects.Move; };
+            flowLienzoProductos.DragDrop += FlowLienzoProductos_DragDrop;
+            tlpLienzoWrapper.Controls.Add(flowLienzoProductos, 0, 3);
 
-            Panel pnlCardGrilla = CrearTarjetaRedondeada(0, 0, 0, 0, Color.White, Color.FromArgb(226, 232, 240));
-            pnlCardGrilla.Dock = DockStyle.Fill;
-            pnlCardGrilla.Padding = new Padding(12);
-
-            // Header con buscador y contador
-            Panel pnlGridHeader = new Panel { Dock = DockStyle.Top, Height = 42, BackColor = Color.Transparent };
-
-            txtBuscarProductoOrden = new TextBox
-            {
-                Location = new Point(0, 6),
-                Size = new Size(320, 26),
-                Font = new Font("Segoe UI", 9.5F),
-                PlaceholderText = "🔍 Filtrar lista para ubicar producto..."
-            };
-            txtBuscarProductoOrden.TextChanged += (s, e) => FiltrarGrillaOrden();
-
-            lblTotalItemsOrden = new Label
-            {
-                Dock = DockStyle.Right,
-                AutoSize = false,
-                Width = 350,
-                Font = new Font("Segoe UI", 8.5F, FontStyle.Bold),
-                ForeColor = Color.FromArgb(100, 116, 139),
-                TextAlign = ContentAlignment.MiddleRight
-            };
-
-            pnlGridHeader.Controls.Add(txtBuscarProductoOrden);
-            pnlGridHeader.Controls.Add(lblTotalItemsOrden);
-
-            // Grilla de Orden
-            dgvOrdenProductos = new DataGridView
-            {
-                Dock = DockStyle.Fill,
-                BackgroundColor = Color.White,
-                BorderStyle = BorderStyle.None,
-                CellBorderStyle = DataGridViewCellBorderStyle.SingleHorizontal,
-                ColumnHeadersBorderStyle = DataGridViewHeaderBorderStyle.None,
-                SelectionMode = DataGridViewSelectionMode.FullRowSelect,
-                MultiSelect = false,
-                AllowUserToAddRows = false,
-                AllowUserToDeleteRows = false,
-                RowHeadersVisible = false,
-                AutoSizeColumnsMode = DataGridViewAutoSizeColumnsMode.Fill,
-                RowTemplate = { Height = 36 },
-                Font = new Font("Segoe UI", 9F)
-            };
-            ConfigurarEstiloTablaCatalogo(dgvOrdenProductos);
-
-            // Evento para cuando el usuario edita la celda "Posición" directamente con el teclado
-            dgvOrdenProductos.CellEndEdit += DgvOrdenProductos_CellEndEdit;
-
-            // Panel de Botones Laterales / Acciones (Subir, Bajar)
-            Panel pnlBotonesLaterales = new Panel { Dock = DockStyle.Right, Width = 90, Padding = new Padding(8, 0, 0, 0) };
-
-            btnSubirOrden = new Button
-            {
-                Text = "▲\nSubir",
-                Dock = DockStyle.Top,
-                Height = 65,
-                BackColor = Color.FromArgb(239, 246, 255),
-                ForeColor = Color.FromArgb(37, 99, 235),
-                FlatStyle = FlatStyle.Flat,
-                Font = new Font("Segoe UI", 9F, FontStyle.Bold),
-                Cursor = Cursors.Hand
-            };
-            btnSubirOrden.FlatAppearance.BorderColor = Color.FromArgb(191, 219, 254);
-            btnSubirOrden.Click += (s, e) => MoverFilaSeleccionada(-1);
-
-            Panel pnlSpacer = new Panel { Dock = DockStyle.Top, Height = 10 };
-
-            btnBajarOrden = new Button
-            {
-                Text = "▼\nBajar",
-                Dock = DockStyle.Top,
-                Height = 65,
-                BackColor = Color.FromArgb(239, 246, 255),
-                ForeColor = Color.FromArgb(37, 99, 235),
-                FlatStyle = FlatStyle.Flat,
-                Font = new Font("Segoe UI", 9F, FontStyle.Bold),
-                Cursor = Cursors.Hand
-            };
-            btnBajarOrden.FlatAppearance.BorderColor = Color.FromArgb(191, 219, 254);
-            btnBajarOrden.Click += (s, e) => MoverFilaSeleccionada(1);
-
-            pnlBotonesLaterales.Controls.Add(btnBajarOrden);
-            pnlBotonesLaterales.Controls.Add(pnlSpacer);
-            pnlBotonesLaterales.Controls.Add(btnSubirOrden);
-
-            pnlCardGrilla.Controls.Add(dgvOrdenProductos);
-            pnlCardGrilla.Controls.Add(pnlBotonesLaterales);
-            pnlCardGrilla.Controls.Add(pnlGridHeader);
-            pnlContenedorPersonalizado.Controls.Add(pnlCardGrilla);
-
-            // 3. FOOTER CON BOTÓN GUARDAR
-            Panel pnlFooter = new Panel { Dock = DockStyle.Bottom, Height = 52, Padding = new Padding(0, 10, 0, 0) };
-
+            // Fila 4: Footer Guardar
+            Panel pnlFooterLienzo = new Panel { Dock = DockStyle.Fill, BackColor = Color.Transparent, Padding = new Padding(0, 6, 0, 0), Margin = new Padding(0) };
             btnGuardarCatalogoConfig = new Button
             {
                 Text = "💾 Guardar Configuración de Catálogo",
                 Dock = DockStyle.Left,
-                Width = 320,
+                Width = 280,
                 BackColor = Color.FromArgb(16, 185, 129),
                 ForeColor = Color.White,
                 FlatStyle = FlatStyle.Flat,
-                Font = new Font("Segoe UI", 9.5F, FontStyle.Bold),
+                Font = new Font("Segoe UI", 9F, FontStyle.Bold),
                 Cursor = Cursors.Hand
             };
             btnGuardarCatalogoConfig.FlatAppearance.BorderSize = 0;
             btnGuardarCatalogoConfig.Click += BtnGuardarCatalogoConfig_Click;
+            pnlFooterLienzo.Controls.Add(btnGuardarCatalogoConfig);
+            tlpLienzoWrapper.Controls.Add(pnlFooterLienzo, 0, 4);
 
-            pnlFooter.Controls.Add(btnGuardarCatalogoConfig);
+            // ----------------------------------------------------
+            // 2. PANEL DERECHO: ALMACÉN DE PRODUCTOS (DEPÓSITO)
+            // ----------------------------------------------------
+            GroupBox gbAlmacen = new GroupBox
+            {
+                Text = "📦 Almacén de Productos (Arrastrar al Lienzo)",
+                Dock = DockStyle.Fill,
+                Font = new Font("Segoe UI", 9F, FontStyle.Bold),
+                Padding = new Padding(8)
+            };
 
-            pnlMain.Controls.Add(pnlContenedorPersonalizado);
-            pnlMain.Controls.Add(pnlOpcionesCard);
-            pnlMain.Controls.Add(pnlFooter);
-            tab.Controls.Add(pnlMain);
+            txtBuscarAlmacen = new TextBox { Dock = DockStyle.Top, Font = new Font("Segoe UI", 9F), PlaceholderText = "🔍 Buscar producto en almacén..." };
+            txtBuscarAlmacen.TextChanged += (s, e) => FiltrarAlmacen();
 
-            CargarConfiguracionCatalogoUI();
+            Panel pnlFiltrosAlmacen = new Panel { Dock = DockStyle.Top, Height = 28, Padding = new Padding(0, 4, 0, 0) };
+            rbFiltroSinAsignar = new RadioButton { Text = "Sin Asignar", Location = new Point(4, 4), AutoSize = true, Checked = true, Font = new Font("Segoe UI", 8F) };
+            rbFiltroTodos = new RadioButton { Text = "Todo el Catálogo", Location = new Point(120, 4), AutoSize = true, Font = new Font("Segoe UI", 8F) };
+            rbFiltroSinAsignar.CheckedChanged += (s, e) => FiltrarAlmacen();
+            rbFiltroTodos.CheckedChanged += (s, e) => FiltrarAlmacen();
+            pnlFiltrosAlmacen.Controls.AddRange(new Control[] { rbFiltroSinAsignar, rbFiltroTodos });
+
+            flowAlmacenProductos = new FlowLayoutPanel { Dock = DockStyle.Fill, AutoScroll = true, WrapContents = false, FlowDirection = FlowDirection.TopDown, BackColor = Color.FromArgb(248, 250, 252) };
+
+            gbAlmacen.Controls.Add(flowAlmacenProductos);
+            gbAlmacen.Controls.Add(pnlFiltrosAlmacen);
+            gbAlmacen.Controls.Add(txtBuscarAlmacen);
+
+            // ----------------------------------------------------
+            // 3. AGREGAR A LA VENTANA (EN EL ORDEN CORRECTO)
+            // ----------------------------------------------------
+            tlpLayout.Controls.Add(tlpLienzoWrapper, 0, 0);
+            tlpLayout.Controls.Add(gbAlmacen, 1, 0);
+            tab.Controls.Add(tlpLayout);
+
+            CargarDatosEspejoConfig();
         }
 
-        private void ConfigurarEstiloTablaCatalogo(DataGridView dgv)
+        private void AjustarResponsiveCategorias()
         {
-            dgv.EnableHeadersVisualStyles = false;
             
-            // Color normal de los encabezados
-            dgv.ColumnHeadersDefaultCellStyle.BackColor = Color.FromArgb(15, 23, 42);
-            dgv.ColumnHeadersDefaultCellStyle.ForeColor = Color.White;
-            dgv.ColumnHeadersDefaultCellStyle.Font = new Font("Segoe UI", 8.5F, FontStyle.Bold);
-            dgv.ColumnHeadersHeight = 34;
-
-            // ✔ Candados: Evitar que se pinte de azul al hacer clic en el título
-            dgv.ColumnHeadersDefaultCellStyle.SelectionBackColor = Color.FromArgb(15, 23, 42); // Mismo fondo oscuro
-            dgv.ColumnHeadersDefaultCellStyle.SelectionForeColor = Color.White;                // Mismo texto blanco
-
-            // Desactivar el ordenamiento nativo por clic para que no seleccione la columna en azul
-            // (y respete siempre el criterio del radio button seleccionado arriba)
-            dgv.AllowUserToOrderColumns = false;
-
-            dgv.DefaultCellStyle.SelectionBackColor = Color.FromArgb(224, 242, 254);
-            dgv.DefaultCellStyle.SelectionForeColor = Color.FromArgb(15, 23, 42);
-            dgv.RowTemplate.Height = 34;
-
-            dgv.Columns.Clear();
-
-            // Columna 1: Posición (Editable directamente)
-            var colPos = new DataGridViewTextBoxColumn
-            {
-                Name = "OrdenPOS",
-                HeaderText = "POSICIÓN (1 - N)",
-                FillWeight = 16,
-                ReadOnly = false
-            };
-            colPos.HeaderCell.Style.Alignment = DataGridViewContentAlignment.MiddleCenter;
-            colPos.DefaultCellStyle.Alignment = DataGridViewContentAlignment.MiddleCenter;
-            colPos.DefaultCellStyle.Font = new Font("Segoe UI", 9.5F, FontStyle.Bold);
-            colPos.DefaultCellStyle.ForeColor = Color.FromArgb(37, 99, 235);
-            dgv.Columns.Add(colPos);
-
-            // Columna 2: Nombre Producto
-            var colNom = new DataGridViewTextBoxColumn
-            {
-                Name = "Nombre",
-                HeaderText = "PRODUCTO",
-                FillWeight = 44,
-                ReadOnly = true
-            };
-            colNom.HeaderCell.Style.Alignment = DataGridViewContentAlignment.MiddleLeft;
-            colNom.DefaultCellStyle.Alignment = DataGridViewContentAlignment.MiddleLeft;
-            dgv.Columns.Add(colNom);
-
-            // Columna 3: Categoría
-            var colCat = new DataGridViewTextBoxColumn
-            {
-                Name = "Categoria",
-                HeaderText = "CATEGORÍA",
-                FillWeight = 22,
-                ReadOnly = true
-            };
-            colCat.HeaderCell.Style.Alignment = DataGridViewContentAlignment.MiddleCenter;
-            colCat.DefaultCellStyle.Alignment = DataGridViewContentAlignment.MiddleCenter;
-            dgv.Columns.Add(colCat);
-
-            // Columna 4: Precio Venta
-            var colPrecio = new DataGridViewTextBoxColumn
-            {
-                Name = "Precio",
-                HeaderText = "PRECIO",
-                FillWeight = 18,
-                ReadOnly = true
-            };
-            colPrecio.HeaderCell.Style.Alignment = DataGridViewContentAlignment.MiddleCenter;
-            colPrecio.DefaultCellStyle.Alignment = DataGridViewContentAlignment.MiddleCenter;
-            colPrecio.DefaultCellStyle.Font = new Font("Segoe UI", 9F, FontStyle.Bold);
-            dgv.Columns.Add(colPrecio);
-
-            // Columna oculta con ID
-            var colId = new DataGridViewTextBoxColumn { Name = "ProductoID", Visible = false };
-            dgv.Columns.Add(colId);
         }
 
-        private void CargarConfiguracionCatalogoUI()
+        private void CargarDatosEspejoConfig()
         {
-            string modo = _configService.ObtenerModoOrdenCatalogo();
-            rbOrdenCategoria.Checked = (modo == "CATEGORIA");
-            rbOrdenPersonalizado.Checked = (modo == "PERSONALIZADO");
-            rbOrdenMasVendidos.Checked = (modo == "MAS_VENDIDOS");
-
-            _productosOrdenMemoria = _configService.ObtenerProductosParaConfigurarOrden();
-            RenderizarGrillaOrden();
-            ToggleModoCatalogo();
-        }
-
-        private void ToggleModoCatalogo()
-        {
-            bool esPersonalizado = rbOrdenPersonalizado.Checked;
-            pnlContenedorPersonalizado.Enabled = esPersonalizado;
-            btnSubirOrden.Enabled = esPersonalizado;
-            btnBajarOrden.Enabled = esPersonalizado;
-            dgvOrdenProductos.ReadOnly = !esPersonalizado;
-
-            pnlContenedorPersonalizado.BackColor = esPersonalizado ? Color.White : Color.FromArgb(241, 245, 249);
-            
-            if (!esPersonalizado)
+            _categoriasCache = _configService.ObtenerCategoriasPOS();
+            if (_categoriasCache.Count > 0 && string.IsNullOrEmpty(_catEdicionActiva))
             {
-                lblTotalItemsOrden.Text = rbOrdenMasVendidos.Checked 
-                    ? "🔥 Modo Automático: El orden se calcula según las boletas emitidas."
-                    : "📂 Modo Automático: Los productos se ordenan alfabéticamente de la A a la Z.";
+                _catEdicionActiva = _categoriasCache[0].Nombre;
             }
-            else
-            {
-                lblTotalItemsOrden.Text = $"⭐ Modo Manual: Arrastre o digite la posición (1 al {_productosOrdenMemoria.Count})";
-            }
-
-            // Refrescar la grilla para que refleje el orden según el radio button seleccionado
-            RenderizarGrillaOrden(txtBuscarProductoOrden?.Text?.Trim() ?? "");
+            RenderizarCategoriasConfig();
+            RenderizarFamiliasConfig();
+            RefrescarLienzoYAlmacen();
         }
 
-        private void RenderizarGrillaOrden(string filtro = "")
+        // =========================================================================
+        // 1. CATEGORÍAS: Mismo tamaño compacto de siempre (118 x 38)
+        // =========================================================================
+        private void RenderizarCategoriasConfig()
         {
-            dgvOrdenProductos.Rows.Clear();
-            int total = _productosOrdenMemoria.Count;
+            flowConfigCategorias.SuspendLayout();
+            flowConfigCategorias.Controls.Clear();
+            bool esPersonalizado = rbOrdenPersonalizado != null && rbOrdenPersonalizado.Checked;
 
-            // Determinar qué modo está seleccionado actualmente en la vista
+            for (int i = 0; i < _categoriasCache.Count; i++)
+            {
+                var cat = _categoriasCache[i];
+                bool estaSeleccionada = cat.Nombre.Equals(_catEdicionActiva, StringComparison.OrdinalIgnoreCase);
+
+                Color back = ColorTranslator.FromHtml(cat.FondoHex);
+                Color fore = ColorTranslator.FromHtml(cat.TextoHex);
+                Color bordeFuerte = ColorTranslator.FromHtml(cat.BordeHex);
+
+                if (esPersonalizado)
+                {
+                    Panel pnlCat = new Panel
+                    {
+                        Size = new Size(118, 38),
+                        Margin = new Padding(0, 0, 6, 6),
+                        BackColor = back,
+                        AllowDrop = true,
+                        Tag = cat
+                    };
+
+                    pnlCat.Paint += (s, e) =>
+                    {
+                        Rectangle r = new Rectangle(0, 0, pnlCat.Width - 1, pnlCat.Height - 1);
+                        using Pen pen = new Pen(estaSeleccionada ? bordeFuerte : Color.FromArgb(226, 232, 240), estaSeleccionada ? 2.5f : 1f);
+                        e.Graphics.DrawRectangle(pen, r);
+                    };
+
+                    Button btnSelect = new Button
+                    {
+                        Text = cat.Nombre,
+                        Location = new Point(0, 0),
+                        Size = new Size(92, 38),
+                        FlatStyle = FlatStyle.Flat,
+                        BackColor = Color.Transparent,
+                        ForeColor = fore,
+                        Font = new Font("Segoe UI", estaSeleccionada ? 8.5F : 8F, estaSeleccionada ? FontStyle.Bold : FontStyle.Regular),
+                        TextAlign = ContentAlignment.MiddleCenter,
+                        Cursor = Cursors.Hand,
+                        Margin = new Padding(0)
+                    };
+                    btnSelect.FlatAppearance.BorderSize = 0;
+                    btnSelect.Click += (s, e) =>
+                    {
+                        _catEdicionActiva = cat.Nombre;
+                        _famEdicionActiva = "";
+                        RenderizarCategoriasConfig();
+                        RenderizarFamiliasConfig();
+                        RefrescarLienzoYAlmacen();
+                    };
+
+                    Point dragStart = Point.Empty;
+                    btnSelect.MouseDown += (s, e) => { if (e.Button == MouseButtons.Left) dragStart = e.Location; };
+                    btnSelect.MouseMove += (s, e) =>
+                    {
+                        if (e.Button == MouseButtons.Left && dragStart != Point.Empty)
+                        {
+                            if (Math.Abs(e.X - dragStart.X) > 4 || Math.Abs(e.Y - dragStart.Y) > 4)
+                            {
+                                dragStart = Point.Empty;
+                                pnlCat.DoDragDrop(cat, DragDropEffects.Move);
+                            }
+                        }
+                    };
+
+                    Button btnEdit = new Button
+                    {
+                        Text = "✏️",
+                        Location = new Point(92, 0),
+                        Size = new Size(26, 38),
+                        FlatStyle = FlatStyle.Flat,
+                        BackColor = Color.Transparent,
+                        ForeColor = fore,
+                        Cursor = Cursors.Hand,
+                        Margin = new Padding(0)
+                    };
+                    btnEdit.FlatAppearance.BorderSize = 0;
+                    btnEdit.Click += (s, e) => PromptEditarCategoria(cat);
+
+                    pnlCat.Controls.Add(btnSelect);
+                    pnlCat.Controls.Add(btnEdit);
+
+                    void ConfigurarDrop(Control c)
+                    {
+                        c.AllowDrop = true;
+                        c.DragEnter += (s, e) => { if (e.Data!.GetDataPresent(typeof(PosCategoria))) e.Effect = DragDropEffects.Move; };
+                        c.DragDrop += (s, e) =>
+                        {
+                            if (e.Data!.GetDataPresent(typeof(PosCategoria)))
+                            {
+                                var fuente = (PosCategoria)e.Data.GetData(typeof(PosCategoria))!;
+                                if (fuente.Id != cat.Id)
+                                {
+                                    int idxOrigen = _categoriasCache.FindIndex(x => x.Id == fuente.Id);
+                                    int idxDestino = _categoriasCache.FindIndex(x => x.Id == cat.Id);
+                                    if (idxOrigen >= 0 && idxDestino >= 0)
+                                    {
+                                        _categoriasCache.RemoveAt(idxOrigen);
+                                        _categoriasCache.Insert(idxDestino, fuente);
+                                        _configService.GuardarOrdenCategorias(_categoriasCache.Select(x => x.Id).ToList());
+                                        RenderizarCategoriasConfig();
+                                    }
+                                }
+                            }
+                        };
+                    }
+
+                    ConfigurarDrop(pnlCat);
+                    ConfigurarDrop(btnSelect);
+
+                    flowConfigCategorias.Controls.Add(pnlCat);
+                }
+                else
+                {
+                    Button btnCat = new Button
+                    {
+                        Text = cat.Nombre,
+                        Size = new Size(118, 38),
+                        Margin = new Padding(0, 0, 6, 6),
+                        BackColor = back,
+                        ForeColor = fore,
+                        FlatStyle = FlatStyle.Flat,
+                        Font = new Font("Segoe UI", estaSeleccionada ? 8.5F : 8F, estaSeleccionada ? FontStyle.Bold : FontStyle.Regular),
+                        Cursor = Cursors.Hand
+                    };
+                    btnCat.FlatAppearance.BorderSize = estaSeleccionada ? 2 : 1;
+                    btnCat.FlatAppearance.BorderColor = estaSeleccionada ? bordeFuerte : Color.FromArgb(226, 232, 240);
+                    btnCat.Click += (s, e) =>
+                    {
+                        _catEdicionActiva = cat.Nombre;
+                        _famEdicionActiva = "";
+                        RenderizarCategoriasConfig();
+                        RenderizarFamiliasConfig();
+                        RefrescarLienzoYAlmacen();
+                    };
+                    flowConfigCategorias.Controls.Add(btnCat);
+                }
+            }
+
+            // Botón ➕ Nueva Cat SIEMPRE al final
+            if (esPersonalizado)
+            {
+                Button btnNueva = new Button 
+                { 
+                    Text = "➕ Nueva Cat", 
+                    Size = new Size(110, 38), 
+                    Margin = new Padding(0, 0, 6, 6),
+                    BackColor = Color.FromArgb(16, 185, 129), 
+                    ForeColor = Color.White, 
+                    FlatStyle = FlatStyle.Flat, 
+                    Font = new Font("Segoe UI", 8F, FontStyle.Bold), 
+                    Cursor = Cursors.Hand 
+                };
+                btnNueva.FlatAppearance.BorderSize = 0;
+                btnNueva.Click += (s, e) => PromptNuevaCategoria();
+                flowConfigCategorias.Controls.Add(btnNueva);
+            }
+
+            flowConfigCategorias.ResumeLayout();
+        }
+
+        private void IntercambiarPosicionCategoria(int actual, int destino)
+        {
+            var item = _categoriasCache[actual];
+            _categoriasCache.RemoveAt(actual);
+            _categoriasCache.Insert(destino, item);
+
+            _configService.GuardarOrdenCategorias(_categoriasCache.Select(c => c.Id).ToList());
+            RenderizarCategoriasConfig();
+        }
+
+        // Mini diálogo nativo para renombrar sin librerías externas
+        private void PromptRenombrarCategoria(PosCategoria cat)
+        {
+            using Form prompt = new Form
+            {
+                Width = 350,
+                Height = 160,
+                FormBorderStyle = FormBorderStyle.FixedDialog,
+                Text = "Renombrar Categoría",
+                StartPosition = FormStartPosition.CenterParent,
+                MaximizeBox = false,
+                MinimizeBox = false
+            };
+            Label textLabel = new Label() { Left = 20, Top = 15, Text = "Nuevo nombre:", AutoSize = true, Font = new Font("Segoe UI", 9F, FontStyle.Bold) };
+            TextBox textBox = new TextBox() { Left = 20, Top = 40, Width = 295, Text = cat.Nombre, Font = new Font("Segoe UI", 10F) };
+            Button confirmation = new Button() { Text = "Aceptar", Left = 215, Width = 100, Top = 75, DialogResult = DialogResult.OK, BackColor = Color.FromArgb(0, 102, 255), ForeColor = Color.White, FlatStyle = FlatStyle.Flat };
+            confirmation.FlatAppearance.BorderSize = 0;
+
+            prompt.Controls.Add(textBox);
+            prompt.Controls.Add(confirmation);
+            prompt.Controls.Add(textLabel);
+            prompt.AcceptButton = confirmation;
+
+            if (prompt.ShowDialog(this) == DialogResult.OK)
+            {
+                string nuevo = textBox.Text.Trim();
+                if (!string.IsNullOrWhiteSpace(nuevo) && nuevo != cat.Nombre)
+                {
+                    _configService.RenombrarCategoria(cat.Id, nuevo);
+                    CargarDatosEspejoConfig();
+                }
+            }
+        }
+
+        // Mini diálogo nativo para crear categoría sin librerías externas
+        private void PromptNuevaCategoria()
+        {
+            using Form prompt = new Form
+            {
+                Width = 380,
+                Height = 230,
+                FormBorderStyle = FormBorderStyle.FixedDialog,
+                Text = "Nueva Categoría",
+                StartPosition = FormStartPosition.CenterParent,
+                MaximizeBox = false,
+                MinimizeBox = false,
+                BackColor = Color.White
+            };
+
+            Label lblNom = new Label { Left = 20, Top = 15, Text = "Nombre de la categoría:", AutoSize = true, Font = new Font("Segoe UI", 9F, FontStyle.Bold) };
+            TextBox txtNom = new TextBox { Left = 20, Top = 38, Width = 320, Font = new Font("Segoe UI", 9.5F) };
+
+            Label lblColor = new Label { Left = 20, Top = 72, Text = "Color de la categoría:", AutoSize = true, Font = new Font("Segoe UI", 9F, FontStyle.Bold) };
+            Button btnMuestra = new Button { Left = 20, Top = 95, Size = new Size(24, 24), FlatStyle = FlatStyle.Flat, Enabled = false };
+            btnMuestra.FlatAppearance.BorderSize = 1;
+
+            ComboBox cbColor = new ComboBox { Left = 50, Top = 95, Width = 290, DropDownStyle = ComboBoxStyle.DropDownList, Font = new Font("Segoe UI", 9F, FontStyle.Bold) };
+foreach (var opc in CategoriaColorHelper.OpcionesPaleta) cbColor.Items.Add(opc.Nombre);
+
+            // 1. Conectar el evento PRIMERO
+            cbColor.SelectedIndexChanged += (s, e) =>
+            {
+                if (cbColor.SelectedIndex >= 0)
+                {
+                    var pal = CategoriaColorHelper.OpcionesPaleta[cbColor.SelectedIndex];
+                    btnMuestra.BackColor = pal.Texto;
+                    btnMuestra.FlatAppearance.BorderColor = pal.Borde;
+                }
+            };
+
+            // 2. Asignar el índice DESPUÉS (esto dispara automáticamente el evento y pinta btnMuestra)
+            cbColor.SelectedIndex = 0;
+
+            Button btnCrear = new Button { Text = "Crear Categoría", Left = 190, Width = 150, Top = 140, DialogResult = DialogResult.OK, BackColor = Color.FromArgb(16, 185, 129), ForeColor = Color.White, FlatStyle = FlatStyle.Flat, Font = new Font("Segoe UI", 9F, FontStyle.Bold) };
+            btnCrear.FlatAppearance.BorderSize = 0;
+
+            prompt.Controls.AddRange(new Control[] { lblNom, txtNom, lblColor, btnMuestra, cbColor, btnCrear });
+            prompt.AcceptButton = btnCrear;
+
+            if (prompt.ShowDialog(this) == DialogResult.OK)
+            {
+                string nombre = txtNom.Text.Trim();
+                if (string.IsNullOrWhiteSpace(nombre)) return;
+
+                var pal = CategoriaColorHelper.OpcionesPaleta[Math.Max(0, cbColor.SelectedIndex)];
+
+                using var db = new SISTEMAACTUALIZADO.Data.AppDbContext();
+                var nueva = new PosCategoria 
+                { 
+                    Nombre = nombre, 
+                    Orden = _categoriasCache.Count + 1,
+                    FondoHex = ColorTranslator.ToHtml(pal.Fondo),
+                    TextoHex = ColorTranslator.ToHtml(pal.Texto),
+                    BordeHex = ColorTranslator.ToHtml(pal.Borde)
+                };
+                db.PosCategorias.Add(nueva);
+                db.SaveChanges();
+
+                CargarDatosEspejoConfig();
+            }
+        }
+
+        private void PromptEditarCategoria(PosCategoria cat)
+        {
+            using Form prompt = new Form
+            {
+                Width = 380,
+                Height = 230,
+                FormBorderStyle = FormBorderStyle.FixedDialog,
+                Text = "Editar Categoría",
+                StartPosition = FormStartPosition.CenterParent,
+                MaximizeBox = false,
+                MinimizeBox = false,
+                BackColor = Color.White
+            };
+
+            Label lblNom = new Label { Left = 20, Top = 15, Text = "Nombre de la categoría:", AutoSize = true, Font = new Font("Segoe UI", 9F, FontStyle.Bold) };
+            TextBox txtNom = new TextBox { Left = 20, Top = 38, Width = 320, Text = cat.Nombre, Font = new Font("Segoe UI", 9.5F) };
+
+            Label lblColor = new Label { Left = 20, Top = 72, Text = "Color de la categoría:", AutoSize = true, Font = new Font("Segoe UI", 9F, FontStyle.Bold) };
+            Button btnMuestra = new Button { Left = 20, Top = 95, Size = new Size(24, 24), FlatStyle = FlatStyle.Flat, Enabled = false };
+            btnMuestra.FlatAppearance.BorderSize = 1;
+
+            ComboBox cbColor = new ComboBox { Left = 50, Top = 95, Width = 290, DropDownStyle = ComboBoxStyle.DropDownList, Font = new Font("Segoe UI", 9F, FontStyle.Bold) };
+            int selectedIdx = 0;
+
+            for (int i = 0; i < CategoriaColorHelper.OpcionesPaleta.Count; i++)
+            {
+                var opc = CategoriaColorHelper.OpcionesPaleta[i];
+                cbColor.Items.Add(opc.Nombre);
+                if (ColorTranslator.ToHtml(opc.Texto).Equals(cat.TextoHex, StringComparison.OrdinalIgnoreCase))
+                {
+                    selectedIdx = i;
+                }
+            }
+
+            // 1. Conectar el evento PRIMERO
+            cbColor.SelectedIndexChanged += (s, e) =>
+            {
+                if (cbColor.SelectedIndex >= 0)
+                {
+                    var pal = CategoriaColorHelper.OpcionesPaleta[cbColor.SelectedIndex];
+                    btnMuestra.BackColor = pal.Texto;
+                    btnMuestra.FlatAppearance.BorderColor = pal.Borde;
+                }
+            };
+
+            // 2. Asignar el índice DESPUÉS (dispara el evento y colorea btnMuestra al instante)
+            cbColor.SelectedIndex = selectedIdx;
+
+            Button btnGuardar = new Button { Text = "Guardar Cambios", Left = 190, Width = 150, Top = 140, DialogResult = DialogResult.OK, BackColor = Color.FromArgb(0, 102, 255), ForeColor = Color.White, FlatStyle = FlatStyle.Flat, Font = new Font("Segoe UI", 9F, FontStyle.Bold) };
+            btnGuardar.FlatAppearance.BorderSize = 0;
+
+            prompt.Controls.AddRange(new Control[] { lblNom, txtNom, lblColor, btnMuestra, cbColor, btnGuardar });
+            prompt.AcceptButton = btnGuardar;
+
+            if (prompt.ShowDialog(this) == DialogResult.OK)
+            {
+                string nuevoNombre = txtNom.Text.Trim();
+                var pal = CategoriaColorHelper.OpcionesPaleta[Math.Max(0, cbColor.SelectedIndex)];
+
+                // Actualizar nombre si cambió
+                if (!string.IsNullOrWhiteSpace(nuevoNombre) && nuevoNombre != cat.Nombre)
+                {
+                    _configService.RenombrarCategoria(cat.Id, nuevoNombre);
+                    _catEdicionActiva = nuevoNombre;
+                }
+
+                // Actualizar color en base de datos
+                _configService.ActualizarColorCategoria(cat.Id, 
+                    ColorTranslator.ToHtml(pal.Fondo), 
+                    ColorTranslator.ToHtml(pal.Texto), 
+                    ColorTranslator.ToHtml(pal.Borde));
+
+                CargarDatosEspejoConfig();
+            }
+        }
+
+        // =========================================================================
+        // 2. FAMILIAS: Botones ajustados a la palabra con lápiz pegado (sin espacios)
+        // =========================================================================
+        private void RenderizarFamiliasConfig()
+        {
+            flowConfigFamilias.SuspendLayout();
+            flowConfigFamilias.Controls.Clear();
+            var cat = _categoriasCache.FirstOrDefault(c => c.Nombre.Equals(_catEdicionActiva, StringComparison.OrdinalIgnoreCase));
+            if (cat == null) 
+            {
+                flowConfigFamilias.ResumeLayout();
+                return;
+            }
+
+            bool esPersonalizado = rbOrdenPersonalizado != null && rbOrdenPersonalizado.Checked;
+            var familias = cat.Familias.Where(f => f.Activo).OrderBy(f => f.Orden).ToList();
+
+            // 1. Botón "Todas"
+            bool todasSeleccionada = string.IsNullOrEmpty(_famEdicionActiva);
+            Button btnTodas = new Button
+            {
+                Text = "Todas",
+                Height = 28,
+                AutoSize = true,
+                BackColor = todasSeleccionada ? Color.FromArgb(30, 41, 59) : Color.FromArgb(241, 245, 249),
+                ForeColor = todasSeleccionada ? Color.White : Color.FromArgb(51, 65, 85),
+                FlatStyle = FlatStyle.Flat,
+                Font = new Font("Segoe UI", 8F, FontStyle.Bold),
+                Cursor = Cursors.Hand,
+                Margin = new Padding(0, 0, 6, 4),
+                Padding = new Padding(6, 0, 6, 0)
+            };
+            btnTodas.FlatAppearance.BorderSize = 0;
+            btnTodas.Click += (s, e) =>
+            {
+                _famEdicionActiva = "";
+                RenderizarFamiliasConfig();
+                RefrescarLienzoYAlmacen();
+            };
+            flowConfigFamilias.Controls.Add(btnTodas);
+
+            // 2. Subfamilias agrupadas con su lápiz
+            for (int i = 0; i < familias.Count; i++)
+            {
+                var fam = familias[i];
+                bool estaSeleccionada = fam.Nombre.Equals(_famEdicionActiva, StringComparison.OrdinalIgnoreCase);
+
+                Color backColor = estaSeleccionada ? Color.FromArgb(30, 41, 59) : Color.FromArgb(241, 245, 249);
+                Color foreColor = estaSeleccionada ? Color.White : Color.FromArgb(51, 65, 85);
+                Color hoverColor = estaSeleccionada ? Color.FromArgb(51, 65, 85) : Color.FromArgb(226, 232, 240);
+
+                Button btnFam = new Button
+                {
+                    Text = fam.Nombre,
+                    Height = 28,
+                    AutoSize = true,
+                    BackColor = backColor,
+                    ForeColor = foreColor,
+                    FlatStyle = FlatStyle.Flat,
+                    Font = new Font("Segoe UI", 8F, FontStyle.Bold),
+                    Cursor = Cursors.Hand,
+                    Margin = new Padding(0),
+                    Padding = new Padding(6, 0, 6, 0),
+                    Tag = fam
+                };
+                btnFam.FlatAppearance.BorderSize = 0;
+                btnFam.FlatAppearance.MouseOverBackColor = hoverColor;
+                btnFam.Click += (s, e) =>
+                {
+                    _famEdicionActiva = fam.Nombre;
+                    RenderizarFamiliasConfig();
+                    RefrescarLienzoYAlmacen();
+                };
+
+                if (esPersonalizado)
+                {
+                    // Mini grupo: botón de texto + lápiz siempre unidos en la misma fila
+                    FlowLayoutPanel grupo = new FlowLayoutPanel
+                    {
+                        AutoSize = true,
+                        Height = 28,
+                        WrapContents = false,
+                        FlowDirection = FlowDirection.LeftToRight,
+                        Margin = new Padding(0, 0, 6, 4),
+                        Padding = new Padding(0),
+                        BackColor = Color.Transparent
+                    };
+
+                    Point famDragStart = Point.Empty;
+                    btnFam.MouseDown += (s, e) => { if (e.Button == MouseButtons.Left) famDragStart = e.Location; };
+                    btnFam.MouseMove += (s, e) =>
+                    {
+                        if (e.Button == MouseButtons.Left && famDragStart != Point.Empty)
+                        {
+                            if (Math.Abs(e.X - famDragStart.X) > 4 || Math.Abs(e.Y - famDragStart.Y) > 4)
+                            {
+                                famDragStart = Point.Empty;
+                                grupo.DoDragDrop(fam, DragDropEffects.Move);
+                            }
+                        }
+                    };
+
+                    Button btnEditFam = new Button
+                    {
+                        Text = "✏️",
+                        Height = 28,
+                        Width = 22,
+                        BackColor = backColor,
+                        ForeColor = foreColor,
+                        FlatStyle = FlatStyle.Flat,
+                        Cursor = Cursors.Hand,
+                        Margin = new Padding(0),
+                        Padding = new Padding(0)
+                    };
+                    btnEditFam.FlatAppearance.BorderSize = 0;
+                    btnEditFam.FlatAppearance.MouseOverBackColor = hoverColor;
+                    btnEditFam.Click += (s, e) => PromptRenombrarFamilia(fam);
+
+                    void ConfigurarDropFam(Control c)
+                    {
+                        c.AllowDrop = true;
+                        c.DragEnter += (s, e) => { if (e.Data!.GetDataPresent(typeof(PosFamilia))) e.Effect = DragDropEffects.Move; };
+                        c.DragDrop += (s, e) =>
+                        {
+                            if (e.Data!.GetDataPresent(typeof(PosFamilia)))
+                            {
+                                var fuente = (PosFamilia)e.Data.GetData(typeof(PosFamilia))!;
+                                if (fuente.Id != fam.Id)
+                                {
+                                    int idxO = familias.FindIndex(x => x.Id == fuente.Id);
+                                    int idxD = familias.FindIndex(x => x.Id == fam.Id);
+                                    if (idxO >= 0 && idxD >= 0)
+                                    {
+                                        familias.RemoveAt(idxO);
+                                        familias.Insert(idxD, fuente);
+                                        _configService.GuardarOrdenFamilias(familias.Select(x => x.Id).ToList());
+                                        cat.Familias = familias;
+                                        RenderizarFamiliasConfig();
+                                    }
+                                }
+                            }
+                        };
+                    }
+
+                    ConfigurarDropFam(grupo);
+                    ConfigurarDropFam(btnFam);
+
+                    grupo.Controls.Add(btnFam);
+                    grupo.Controls.Add(btnEditFam);
+                    flowConfigFamilias.Controls.Add(grupo);
+                }
+                else
+                {
+                    btnFam.Margin = new Padding(0, 0, 6, 4);
+                    flowConfigFamilias.Controls.Add(btnFam);
+                }
+            }
+
+            // 3. Botón ➕ Familia SIEMPRE visible al final
+            if (esPersonalizado)
+            {
+                Button btnNuevaFam = new Button
+                {
+                    Text = "➕ Familia",
+                    Height = 28,
+                    AutoSize = true,
+                    BackColor = Color.FromArgb(16, 185, 129),
+                    ForeColor = Color.White,
+                    FlatStyle = FlatStyle.Flat,
+                    Font = new Font("Segoe UI", 8F, FontStyle.Bold),
+                    Cursor = Cursors.Hand,
+                    Margin = new Padding(0, 0, 6, 4),
+                    Padding = new Padding(6, 0, 6, 0)
+                };
+                btnNuevaFam.FlatAppearance.BorderSize = 0;
+                btnNuevaFam.Click += (s, e) => PromptNuevaFamilia(cat);
+                flowConfigFamilias.Controls.Add(btnNuevaFam);
+            }
+
+            flowConfigFamilias.ResumeLayout();
+        }
+
+        private void PromptRenombrarFamilia(PosFamilia fam)
+        {
+            using Form prompt = new Form
+            {
+                Width = 350,
+                Height = 160,
+                FormBorderStyle = FormBorderStyle.FixedDialog,
+                Text = "Renombrar Subfamilia",
+                StartPosition = FormStartPosition.CenterParent,
+                MaximizeBox = false,
+                MinimizeBox = false,
+                BackColor = Color.White
+            };
+            Label textLabel = new Label() { Left = 20, Top = 15, Text = "Nuevo nombre para la familia:", AutoSize = true, Font = new Font("Segoe UI", 9F, FontStyle.Bold) };
+            TextBox textBox = new TextBox() { Left = 20, Top = 40, Width = 295, Text = fam.Nombre, Font = new Font("Segoe UI", 10F) };
+            Button confirmation = new Button() { Text = "Aceptar", Left = 215, Width = 100, Top = 75, DialogResult = DialogResult.OK, BackColor = Color.FromArgb(0, 102, 255), ForeColor = Color.White, FlatStyle = FlatStyle.Flat, Font = new Font("Segoe UI", 9F, FontStyle.Bold) };
+            confirmation.FlatAppearance.BorderSize = 0;
+
+            prompt.Controls.AddRange(new Control[] { textLabel, textBox, confirmation });
+            prompt.AcceptButton = confirmation;
+
+            if (prompt.ShowDialog(this) == DialogResult.OK)
+            {
+                string nuevo = textBox.Text.Trim();
+                if (!string.IsNullOrWhiteSpace(nuevo) && nuevo != fam.Nombre)
+                {
+                    _configService.RenombrarFamilia(fam.Id, nuevo);
+                    CargarDatosEspejoConfig();
+                }
+            }
+        }
+        private void PromptNuevaFamilia(PosCategoria cat)
+        {
+            using Form prompt = new Form
+            {
+                Width = 350,
+                Height = 160,
+                FormBorderStyle = FormBorderStyle.FixedDialog,
+                Text = $"Nueva Familia en {cat.Nombre}",
+                StartPosition = FormStartPosition.CenterParent,
+                MaximizeBox = false,
+                MinimizeBox = false,
+                BackColor = Color.White
+            };
+            Label textLabel = new Label() { Left = 20, Top = 15, Text = "Nombre de la subfamilia:", AutoSize = true, Font = new Font("Segoe UI", 9F, FontStyle.Bold) };
+            TextBox textBox = new TextBox() { Left = 20, Top = 40, Width = 295, Font = new Font("Segoe UI", 10F) };
+            Button confirmation = new Button() { Text = "Crear", Left = 215, Width = 100, Top = 75, DialogResult = DialogResult.OK, BackColor = Color.FromArgb(16, 185, 129), ForeColor = Color.White, FlatStyle = FlatStyle.Flat };
+            confirmation.FlatAppearance.BorderSize = 0;
+
+            prompt.Controls.AddRange(new Control[] { textLabel, textBox, confirmation });
+            prompt.AcceptButton = confirmation;
+
+            if (prompt.ShowDialog(this) == DialogResult.OK)
+            {
+                string nombre = textBox.Text.Trim();
+                if (string.IsNullOrWhiteSpace(nombre)) return;
+
+                _configService.CrearFamilia(cat.Id, nombre);
+
+                // Recargar categorías y familias desde la BD para reflejar la nueva
+                _categoriasCache = _configService.ObtenerCategoriasPOS();
+                _famEdicionActiva = nombre; // Deja seleccionada la nueva familia creada
+                RenderizarFamiliasConfig();
+                RefrescarLienzoYAlmacen();
+            }
+        }
+
+        private void RefrescarLienzoYAlmacen()
+        {
+            if (flowLienzoProductos == null) return;
+
+            bool esPersonalizado = rbOrdenPersonalizado != null && rbOrdenPersonalizado.Checked;
+
+            flowLienzoProductos.AllowDrop = esPersonalizado;
+            if (flowAlmacenProductos != null) flowAlmacenProductos.Enabled = esPersonalizado;
+            if (txtBuscarAlmacen != null) txtBuscarAlmacen.Enabled = esPersonalizado;
+            if (rbFiltroSinAsignar != null) rbFiltroSinAsignar.Enabled = esPersonalizado;
+            if (rbFiltroTodos != null) rbFiltroTodos.Enabled = esPersonalizado;
+
+            using var db = new SISTEMAACTUALIZADO.Data.AppDbContext();
+            var todosProductos = db.Productos.Where(p => p.Estado).ToList();
+
+            var productosFiltrados = todosProductos
+                .Where(p => p.Categoria.Equals(_catEdicionActiva, StringComparison.OrdinalIgnoreCase) && 
+                           (string.IsNullOrEmpty(_famEdicionActiva) || p.NFamilia == _famEdicionActiva))
+                .ToList();
+
             string modoActual = "CATEGORIA";
-            if (rbOrdenPersonalizado != null && rbOrdenPersonalizado.Checked)
+            if (rbOrdenPersonalizado != null && rbOrdenPersonalizado.Checked) modoActual = "PERSONALIZADO";
+            else if (rbOrdenMasVendidos != null && rbOrdenMasVendidos.Checked) modoActual = "MAS_VENDIDOS";
+
+            var productosEnLienzo = _configService.AplicarCriterioOrdenPOS(productosFiltrados, modoActual).ToList();
+
+            flowLienzoProductos.SuspendLayout();
+            flowLienzoProductos.Controls.Clear();
+
+            for (int i = 0; i < productosEnLienzo.Count; i++)
             {
-                modoActual = "PERSONALIZADO";
-            }
-            else if (rbOrdenMasVendidos != null && rbOrdenMasVendidos.Checked)
-            {
-                modoActual = "MAS_VENDIDOS";
+                var prod = productosEnLienzo[i];
+                int posicionVisible = i + 1;
+
+                Panel card = new Panel 
+                { 
+                    Size = new Size(130, 168), 
+                    BackColor = Color.White, 
+                    Margin = new Padding(6),
+                    Tag = prod,
+                    AllowDrop = esPersonalizado,
+                    Cursor = esPersonalizado ? Cursors.SizeAll : Cursors.Default
+                };
+                card.Paint += (s, e) => ControlPaint.DrawBorder(e.Graphics, card.ClientRectangle, Color.FromArgb(226, 232, 240), ButtonBorderStyle.Solid);
+
+                Label lblPos = new Label 
+                { 
+                    Text = $"#{posicionVisible}", 
+                    Location = new Point(4, 4), 
+                    AutoSize = true, 
+                    Font = new Font("Segoe UI", 7.5F, FontStyle.Bold), 
+                    ForeColor = Color.FromArgb(37, 99, 235),
+                    BackColor = Color.FromArgb(239, 246, 255)
+                };
+                card.Controls.Add(lblPos);
+
+                if (esPersonalizado)
+                {
+                    Button btnQuitar = new Button 
+                    { 
+                        Text = "✕", 
+                        Size = new Size(20, 20), 
+                        Location = new Point(106, 2), 
+                        FlatStyle = FlatStyle.Flat, 
+                        ForeColor = Color.FromArgb(239, 68, 68), 
+                        Cursor = Cursors.Hand,
+                        Font = new Font("Segoe UI", 8F, FontStyle.Bold)
+                    };
+                    btnQuitar.FlatAppearance.BorderSize = 0;
+                    btnQuitar.Click += (s, e) =>
+                    {
+                        _configService.AsignarProductoACategoriaYFamilia(prod.ProductoID, "Sin Asignar", "General", 0);
+                        RefrescarLienzoYAlmacen();
+                    };
+                    card.Controls.Add(btnQuitar);
+                }
+
+                Control ctrlImagen;
+                Image? imgProd = ImagenHelper.CargarImagenSegura(prod.ImagenPath);
+
+                if (imgProd != null)
+                {
+                    ctrlImagen = new PictureBoxCalidadAlta
+                    {
+                        Location = new Point(10, 22),
+                        Size = new Size(110, 60),
+                        SizeMode = PictureBoxSizeMode.Zoom,
+                        BackColor = Color.Transparent,
+                        Image = imgProd
+                    };
+                }
+                else
+                {
+                    ctrlImagen = new Label
+                    {
+                        Text = prod.EsPesable ? "⚖️" : "📦",
+                        Font = new Font("Segoe UI", 18F),
+                        Location = new Point(10, 22),
+                        Size = new Size(110, 60),
+                        TextAlign = ContentAlignment.MiddleCenter
+                    };
+                }
+                card.Controls.Add(ctrlImagen);
+
+                Label lblNom = new Label 
+                { 
+                    Text = prod.Nombre, 
+                    Location = new Point(4, 84), 
+                    Size = new Size(122, 28), 
+                    Font = new Font("Segoe UI", 8F, FontStyle.Bold),
+                    TextAlign = ContentAlignment.TopCenter,
+                    ForeColor = Color.FromArgb(15, 23, 42)
+                };
+                card.Controls.Add(lblNom);
+
+                string precioStr = prod.EsPesable
+                    ? $"{MonedaHelper.Formatear(prod.PrecioUnitario * 1000m, conSigno: true)}/Kg"
+                    : MonedaHelper.Formatear(prod.PrecioUnitario, conSigno: true);
+
+                Label lblPrecio = new Label 
+                { 
+                    Text = precioStr, 
+                    Location = new Point(4, 114), 
+                    Size = new Size(122, 18), 
+                    ForeColor = Color.FromArgb(0, 102, 255), 
+                    Font = new Font("Segoe UI", 8.5F, FontStyle.Bold),
+                    TextAlign = ContentAlignment.MiddleCenter
+                };
+                card.Controls.Add(lblPrecio);
+
+                string stockTexto = prod.EsPesable
+                    ? (prod.Stock >= 1000 ? $"Stock: {(prod.Stock / 1000.0):0.0} kg" : $"Stock: {prod.Stock} g")
+                    : $"Stock: {prod.Stock} un.";
+
+                Label lblStock = new Label
+                {
+                    Text = stockTexto,
+                    Location = new Point(4, 134),
+                    Size = new Size(122, 16),
+                    ForeColor = Color.FromArgb(100, 116, 139),
+                    Font = new Font("Segoe UI", 7.5F),
+                    TextAlign = ContentAlignment.MiddleCenter
+                };
+                card.Controls.Add(lblStock);
+
+                // --- CONFIGURAR DRAG & DROP EN LA TARJETA Y TODOS SUS HIJOS ---
+                if (esPersonalizado)
+                {
+                    Point cardDragStart = Point.Empty;
+                    void AsignarEventosArrastre(Control c)
+                    {
+                        if (c is Button) return; // El botón [X] no arrastra
+
+                        c.Cursor = Cursors.SizeAll;
+                        c.MouseDown += (s, e) => { if (e.Button == MouseButtons.Left) cardDragStart = e.Location; };
+                        c.MouseMove += (s, e) =>
+                        {
+                            if (e.Button == MouseButtons.Left && cardDragStart != Point.Empty)
+                            {
+                                if (Math.Abs(e.X - cardDragStart.X) > 4 || Math.Abs(e.Y - cardDragStart.Y) > 4)
+                                {
+                                    cardDragStart = Point.Empty;
+                                    card.DoDragDrop(prod, DragDropEffects.Move);
+                                }
+                            }
+                        };
+
+                        c.AllowDrop = true;
+                        c.DragEnter += (s, e) => { if (e.Data!.GetDataPresent(typeof(Producto))) e.Effect = DragDropEffects.Move; };
+                        c.DragDrop += (s, e) =>
+                        {
+                            if (e.Data!.GetDataPresent(typeof(Producto)))
+                            {
+                                var prodSoltado = (Producto)e.Data.GetData(typeof(Producto))!;
+                                _configService.ReordenarEInsertarProducto(prodSoltado.ProductoID, _catEdicionActiva, _famEdicionActiva, posicionVisible);
+                                RefrescarLienzoYAlmacen();
+                            }
+                        };
+                    }
+
+                    AsignarEventosArrastre(card);
+                    foreach (Control child in card.Controls)
+                    {
+                        AsignarEventosArrastre(child);
+                    }
+                }
+
+                flowLienzoProductos.Controls.Add(card);
             }
 
-            // Aplicar exactamente el mismo criterio de ordenamiento del servicio
-            var listaOrdenada = _configService.AplicarCriterioOrdenPOS(_productosOrdenMemoria, modoActual);
+            flowLienzoProductos.ResumeLayout();
 
-            if (!string.IsNullOrWhiteSpace(filtro))
+            FiltrarAlmacen();
+        }
+
+        private void FiltrarAlmacen()
+        {
+            if (txtBuscarAlmacen == null || flowAlmacenProductos == null) return;
+
+            if (rbOrdenPersonalizado != null && !rbOrdenPersonalizado.Checked)
             {
-                string f = filtro.ToLower();
-                listaOrdenada = listaOrdenada.Where(p => p.Nombre.ToLower().Contains(f) || p.Categoria.ToLower().Contains(f));
+                flowAlmacenProductos.Controls.Clear();
+                return;
             }
 
-            foreach (var p in listaOrdenada)
+            string filtro = txtBuscarAlmacen.Text.Trim().ToLower();
+            bool soloSinAsignar = rbFiltroSinAsignar != null && rbFiltroSinAsignar.Checked;
+
+            using var db = new SISTEMAACTUALIZADO.Data.AppDbContext();
+            var query = db.Productos.Where(p => p.Estado);
+
+            if (soloSinAsignar)
             {
+                // Un producto está "Sin Asignar" si no tiene categoría válida,
+                // o si su categoría es "Sin Asignar" / "General", o si su OrdenPOS es 0
+                query = query.Where(p => 
+                    string.IsNullOrEmpty(p.Categoria) || 
+                    p.Categoria == "Sin Asignar" || 
+                    p.OrdenPOS == 0
+                );
+            }
+
+            if (!string.IsNullOrEmpty(filtro))
+            {
+                query = query.Where(p => p.Nombre.ToLower().Contains(filtro) || p.CodigoBarra.Contains(filtro));
+            }
+
+            var lista = query.Take(50).ToList();
+
+            flowAlmacenProductos.SuspendLayout();
+            flowAlmacenProductos.Controls.Clear();
+
+            foreach (var p in lista)
+            {
+                Panel item = new Panel 
+                { 
+                    Size = new Size(275, 42), 
+                    BackColor = Color.White, 
+                    Margin = new Padding(0, 0, 0, 4), 
+                    Cursor = Cursors.Hand 
+                };
+                item.Paint += (s, e) => ControlPaint.DrawBorder(e.Graphics, item.ClientRectangle, Color.FromArgb(226, 232, 240), ButtonBorderStyle.Solid);
+
+                Label lbl = new Label 
+                { 
+                    Text = p.Nombre, 
+                    Location = new Point(6, 4), 
+                    Size = new Size(180, 18), 
+                    AutoSize = false, 
+                    Font = new Font("Segoe UI", 8F, FontStyle.Bold) 
+                };
+
                 string precioStr = p.EsPesable
                     ? $"{MonedaHelper.Formatear(p.PrecioUnitario * 1000m, conSigno: true)}/Kg"
                     : MonedaHelper.Formatear(p.PrecioUnitario, conSigno: true);
 
-                dgvOrdenProductos.Rows.Add(p.OrdenPOS, p.Nombre, p.Categoria, precioStr, p.ProductoID);
-            }
-        }
+                Label lblSub = new Label 
+                { 
+                    Text = $"{p.Categoria} • {precioStr}", 
+                    Location = new Point(6, 22), 
+                    Size = new Size(200, 16), 
+                    ForeColor = Color.FromArgb(100, 116, 139), 
+                    Font = new Font("Segoe UI", 7F) 
+                };
 
-        private void FiltrarGrillaOrden()
-        {
-            RenderizarGrillaOrden(txtBuscarProductoOrden.Text.Trim());
-        }
+                Label lblDrag = new Label 
+                { 
+                    Text = "⋮⋮", 
+                    Location = new Point(250, 10), 
+                    Size = new Size(20, 20), 
+                    ForeColor = Color.FromArgb(148, 163, 184), 
+                    Font = new Font("Segoe UI", 11F, FontStyle.Bold) 
+                };
 
-        private void MoverFilaSeleccionada(int direccion)
-        {
-            if (dgvOrdenProductos.CurrentRow == null) return;
+                Action dragAction = () => item.DoDragDrop(p, DragDropEffects.Move);
+                item.MouseDown += (s, e) => dragAction();
+                lbl.MouseDown += (s, e) => dragAction();
+                lblSub.MouseDown += (s, e) => dragAction();
+                lblDrag.MouseDown += (s, e) => dragAction();
 
-            int prodId = Convert.ToInt32(dgvOrdenProductos.CurrentRow.Cells["ProductoID"].Value);
-            int indexMemoria = _productosOrdenMemoria.FindIndex(p => p.ProductoID == prodId);
-
-            if (indexMemoria < 0) return;
-
-            int nuevoIndex = indexMemoria + direccion;
-            if (nuevoIndex < 0 || nuevoIndex >= _productosOrdenMemoria.Count) return;
-
-            // Intercambiar en la lista de memoria
-            var item = _productosOrdenMemoria[indexMemoria];
-            _productosOrdenMemoria.RemoveAt(indexMemoria);
-            _productosOrdenMemoria.Insert(nuevoIndex, item);
-
-            // Reasignar posiciones correlativas 1..N
-            for (int i = 0; i < _productosOrdenMemoria.Count; i++)
-            {
-                _productosOrdenMemoria[i].OrdenPOS = i + 1;
+                item.Controls.AddRange(new Control[] { lbl, lblSub, lblDrag });
+                flowAlmacenProductos.Controls.Add(item);
             }
 
-            RenderizarGrillaOrden(txtBuscarProductoOrden.Text.Trim());
-
-            // Reseleccionar el ítem movido
-            SeleccionarFilaPorProductoId(prodId);
+            flowAlmacenProductos.ResumeLayout();
         }
 
-        private void DgvOrdenProductos_CellEndEdit(object? sender, DataGridViewCellEventArgs e)
+        private void FlowLienzoProductos_DragDrop(object? sender, DragEventArgs e)
         {
-            if (e.RowIndex < 0 || dgvOrdenProductos.Columns[e.ColumnIndex].Name != "OrdenPOS") return;
+            if (rbOrdenPersonalizado == null || !rbOrdenPersonalizado.Checked) return;
 
-            var fila = dgvOrdenProductos.Rows[e.RowIndex];
-            int prodId = Convert.ToInt32(fila.Cells["ProductoID"].Value);
-            string nuevoValorStr = fila.Cells["OrdenPOS"].Value?.ToString() ?? "";
-
-            int totalProductos = _productosOrdenMemoria.Count;
-
-            if (!int.TryParse(nuevoValorStr, out int nuevaPosicion))
+            // Si se suelta en el fondo libre del lienzo, se añade al final de la fila
+            if (e.Data!.GetDataPresent(typeof(Producto)))
             {
-                RenderizarGrillaOrden(txtBuscarProductoOrden.Text.Trim());
-                return;
-            }
+                var prod = (Producto)e.Data.GetData(typeof(Producto))!;
+                int nuevoOrden = flowLienzoProductos.Controls.Count + 1;
+                _configService.ReordenarEInsertarProducto(prod.ProductoID, _catEdicionActiva, _famEdicionActiva, nuevoOrden);
 
-            // Ajustar al rango dinámico 1 a N
-            nuevaPosicion = Math.Max(1, Math.Min(totalProductos, nuevaPosicion));
-
-            int indexActual = _productosOrdenMemoria.FindIndex(p => p.ProductoID == prodId);
-            if (indexActual >= 0)
-            {
-                var prod = _productosOrdenMemoria[indexActual];
-                _productosOrdenMemoria.RemoveAt(indexActual);
-
-                // Insertar en la posición deseada (índice 0-based)
-                _productosOrdenMemoria.Insert(nuevaPosicion - 1, prod);
-
-                // Reindexar toda la lista para que sea 100% limpia y sin huecos
-                for (int i = 0; i < _productosOrdenMemoria.Count; i++)
-                {
-                    _productosOrdenMemoria[i].OrdenPOS = i + 1;
-                }
-
-                RenderizarGrillaOrden(txtBuscarProductoOrden.Text.Trim());
-                SeleccionarFilaPorProductoId(prodId);
-            }
-        }
-
-        private void SeleccionarFilaPorProductoId(int prodId)
-        {
-            foreach (DataGridViewRow row in dgvOrdenProductos.Rows)
-            {
-                if (row.Cells["ProductoID"].Value != null && Convert.ToInt32(row.Cells["ProductoID"].Value) == prodId)
-                {
-                    dgvOrdenProductos.ClearSelection();
-                    row.Selected = true;
-                    dgvOrdenProductos.CurrentCell = row.Cells["OrdenPOS"];
-                    break;
-                }
+                RefrescarLienzoYAlmacen();
             }
         }
 
@@ -1022,18 +1635,9 @@ namespace SISTEMAACTUALIZADO.Forms
                 else if (rbOrdenMasVendidos.Checked) modo = "MAS_VENDIDOS";
 
                 _configService.GuardarModoOrdenCatalogo(modo);
+                _configService.GuardarOrdenCategorias(_categoriasCache.Select(c => c.Id).ToList());
 
-                // Si está en modo personalizado, persistir las posiciones 1..N
-                if (modo == "PERSONALIZADO")
-                {
-                    var ordenes = _productosOrdenMemoria
-                        .Select(p => (p.ProductoID, p.OrdenPOS))
-                        .ToList();
-
-                    _configService.GuardarOrdenPersonalizadoProductos(ordenes);
-                }
-
-                MessageBox.Show("Configuración del catálogo guardada exitosamente.\nLos cambios se reflejarán de inmediato en el Punto de Venta.", "Catálogo POS", MessageBoxButtons.OK, MessageBoxIcon.Information);
+                MessageBox.Show("Configuración del catálogo guardada exitosamente.\nLos cambios ya están activos en el Punto de Venta.", "Catálogo POS", MessageBoxButtons.OK, MessageBoxIcon.Information);
             }
             catch (Exception ex)
             {
@@ -1111,7 +1715,7 @@ namespace SISTEMAACTUALIZADO.Forms
         }
 
         // ==========================================
-        // 3. LÓGICA DE NEGOCIO Y PERSISTENCIA
+        // 5. LÓGICA DE NEGOCIO Y PERSISTENCIA (EMPRESA Y DELIVERY)
         // ==========================================
         private void CargarDatosEmpresa()
         {
@@ -1220,7 +1824,6 @@ namespace SISTEMAACTUALIZADO.Forms
             _zonaSeleccionadaId = Convert.ToInt32(fila.Cells["Id"].Value);
             txtZonaNombre.Text = fila.Cells["Nombre"].Value?.ToString() ?? "";
 
-            // Parseo seguro de moneda
             numCostoEnvio.Value = ParsearMoneda(fila.Cells["Costo"].Value);
             numPedidoMinimo.Value = ParsearMoneda(fila.Cells["Minimo"].Value);
             numEnvioGratis.Value = ParsearMoneda(fila.Cells["Gratis"].Value);

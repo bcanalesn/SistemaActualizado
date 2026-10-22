@@ -600,27 +600,28 @@ namespace SISTEMAACTUALIZADO
         {
             flowCategorias.Controls.Clear();
 
-            flowCategorias.Controls.Add(CrearBotonCategoria(
-                "Todas",
-                Color.FromArgb(239, 246, 255),
-                Color.FromArgb(37, 99, 235),
-                Color.FromArgb(29, 78, 216),
-                _categoriaActivaNombre == "Todas"
-            ));
+            var configService = new ConfiguracionService();
+            var categoriasBD = configService.ObtenerCategoriasPOS();
 
-            var categoriasBD = _productoService.ObtenerCategoriasRegistradas();
+            if (categoriasBD.Count == 0) return;
+
+            // Si la categoría activa ya no existe o es "Todas", se selecciona por defecto la primera por Orden
+            if (_categoriaActivaNombre == "Todas" || !categoriasBD.Any(c => c.Nombre.Equals(_categoriaActivaNombre, StringComparison.OrdinalIgnoreCase)))
+            {
+                _categoriaActivaNombre = categoriasBD[0].Nombre;
+            }
 
             foreach (var cat in categoriasBD)
             {
-                if (cat.Equals("Todas", StringComparison.OrdinalIgnoreCase)) continue;
+                Color back = ColorTranslator.FromHtml(cat.FondoHex);
+                Color fore = ColorTranslator.FromHtml(cat.TextoHex);
+                Color border = ColorTranslator.FromHtml(cat.BordeHex);
 
-                // 👈 Obtiene el color personalizado y guardado para esta categoría
-                var estilo = CategoriaColorHelper.ObtenerColor(cat);
-                bool seleccionada = _categoriaActivaNombre.Equals(cat, StringComparison.OrdinalIgnoreCase);
+                bool seleccionada = _categoriaActivaNombre.Equals(cat.Nombre, StringComparison.OrdinalIgnoreCase);
 
                 flowCategorias.Controls.Add(CrearBotonCategoria(
-                    cat,
-                    estilo.Fondo, estilo.Texto, estilo.Borde,
+                    cat.Nombre,
+                    back, fore, border,
                     seleccionada
                 ));
             }
@@ -633,16 +634,13 @@ namespace SISTEMAACTUALIZADO
         {
             flowSubFamilias.Controls.Clear();
 
-            if (_categoriaActivaNombre == "Todas")
-            {
-                flowSubFamilias.Visible = false;
-                AjustarAnchoYAlturaCategorias();
-                return;
-            }
+            var configService = new ConfiguracionService();
+            var categorias = configService.ObtenerCategoriasPOS();
+            var catActual = categorias.FirstOrDefault(c => c.Nombre.Equals(_categoriaActivaNombre, StringComparison.OrdinalIgnoreCase));
 
-            var familiasDeCategoria = _productoService.ObtenerFamiliasPorCategoria(_categoriaActivaNombre);
+            var familias = catActual?.Familias.OrderBy(f => f.Orden).Select(f => f.Nombre).ToList() ?? new List<string>();
 
-            if (familiasDeCategoria.Count == 0)
+            if (familias.Count == 0)
             {
                 flowSubFamilias.Visible = false;
                 AjustarAnchoYAlturaCategorias();
@@ -651,10 +649,13 @@ namespace SISTEMAACTUALIZADO
 
             flowSubFamilias.Visible = true;
 
-            Button btnTodasFam = CrearBotonSubFamilia("Todas", _familiaActivaNombre == "Todas");
-            flowSubFamilias.Controls.Add(btnTodasFam);
+            // La primera subfamilia se activa por defecto si la actual no coincide
+            if (_familiaActivaNombre == "Todas" || !familias.Contains(_familiaActivaNombre))
+            {
+                _familiaActivaNombre = familias[0];
+            }
 
-            foreach (var fam in familiasDeCategoria)
+            foreach (var fam in familias)
             {
                 Button btnFam = CrearBotonSubFamilia(fam, _familiaActivaNombre == fam);
                 flowSubFamilias.Controls.Add(btnFam);
