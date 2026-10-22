@@ -649,12 +649,37 @@ namespace SISTEMAACTUALIZADO
 
             flowSubFamilias.Visible = true;
 
-            // La primera subfamilia se activa por defecto si la actual no coincide
-            if (_familiaActivaNombre == "Todas" || !familias.Contains(_familiaActivaNombre))
+            // Si la familia activa ya no existe y no es "Todas", restablecer a "Todas"
+            if (_familiaActivaNombre != "Todas" && !familias.Contains(_familiaActivaNombre))
             {
-                _familiaActivaNombre = familias[0];
+                _familiaActivaNombre = "Todas";
             }
 
+            // 1. Botón "Todas" al inicio (idéntico al configurador)
+            bool todasSeleccionada = (_familiaActivaNombre == "Todas" || string.IsNullOrEmpty(_familiaActivaNombre));
+            Button btnTodas = new Button
+            {
+                Text = "Todas",
+                Height = 26,
+                AutoSize = true,
+                BackColor = todasSeleccionada ? Color.FromArgb(30, 41, 59) : Color.FromArgb(241, 245, 249),
+                ForeColor = todasSeleccionada ? Color.White : Color.FromArgb(51, 65, 85),
+                FlatStyle = FlatStyle.Flat,
+                Font = new Font("Segoe UI", 8F, FontStyle.Bold),
+                Cursor = Cursors.Hand,
+                Margin = new Padding(0, 0, 6, 4),
+                Padding = new Padding(8, 0, 8, 0)
+            };
+            btnTodas.FlatAppearance.BorderSize = 0;
+            btnTodas.Click += (s, e) =>
+            {
+                _familiaActivaNombre = "Todas";
+                ActualizarSubFamiliasUI();
+                FiltrarProductosPorJerarquia();
+            };
+            flowSubFamilias.Controls.Add(btnTodas);
+
+            // 2. Botones de cada Subfamilia
             foreach (var fam in familias)
             {
                 Button btnFam = CrearBotonSubFamilia(fam, _familiaActivaNombre == fam);

@@ -954,9 +954,8 @@ namespace SISTEMAACTUALIZADO.Forms
             btnMuestra.FlatAppearance.BorderSize = 1;
 
             ComboBox cbColor = new ComboBox { Left = 50, Top = 95, Width = 290, DropDownStyle = ComboBoxStyle.DropDownList, Font = new Font("Segoe UI", 9F, FontStyle.Bold) };
-foreach (var opc in CategoriaColorHelper.OpcionesPaleta) cbColor.Items.Add(opc.Nombre);
+            foreach (var opc in CategoriaColorHelper.OpcionesPaleta) cbColor.Items.Add(opc.Nombre);
 
-            // 1. Conectar el evento PRIMERO
             cbColor.SelectedIndexChanged += (s, e) =>
             {
                 if (cbColor.SelectedIndex >= 0)
@@ -966,8 +965,6 @@ foreach (var opc in CategoriaColorHelper.OpcionesPaleta) cbColor.Items.Add(opc.N
                     btnMuestra.FlatAppearance.BorderColor = pal.Borde;
                 }
             };
-
-            // 2. Asignar el índice DESPUÉS (esto dispara automáticamente el evento y pinta btnMuestra)
             cbColor.SelectedIndex = 0;
 
             Button btnCrear = new Button { Text = "Crear Categoría", Left = 190, Width = 150, Top = 140, DialogResult = DialogResult.OK, BackColor = Color.FromArgb(16, 185, 129), ForeColor = Color.White, FlatStyle = FlatStyle.Flat, Font = new Font("Segoe UI", 9F, FontStyle.Bold) };
@@ -981,21 +978,32 @@ foreach (var opc in CategoriaColorHelper.OpcionesPaleta) cbColor.Items.Add(opc.N
                 string nombre = txtNom.Text.Trim();
                 if (string.IsNullOrWhiteSpace(nombre)) return;
 
+                // Si ya está actualmente activa y visible en la barra, avisar
+                if (_categoriasCache.Any(c => c.Nombre.Equals(nombre, StringComparison.OrdinalIgnoreCase)))
+                {
+                    MessageBox.Show($"Ya existe una categoría activa con el nombre '{nombre}'.", "Categoría Existente", MessageBoxButtons.OK, MessageBoxIcon.Warning);
+                    return;
+                }
+
                 var pal = CategoriaColorHelper.OpcionesPaleta[Math.Max(0, cbColor.SelectedIndex)];
 
-                using var db = new SISTEMAACTUALIZADO.Data.AppDbContext();
-                var nueva = new PosCategoria 
-                { 
-                    Nombre = nombre, 
-                    Orden = _categoriasCache.Count + 1,
-                    FondoHex = ColorTranslator.ToHtml(pal.Fondo),
-                    TextoHex = ColorTranslator.ToHtml(pal.Texto),
-                    BordeHex = ColorTranslator.ToHtml(pal.Borde)
-                };
-                db.PosCategorias.Add(nueva);
-                db.SaveChanges();
+                try
+                {
+                    // ✔ LLAMA AL SERVICIO: Reactiva, renombra al nuevo formato (Chao / CHAO) y aplica color
+                    _configService.CrearOCargarCategoria(
+                        nombre,
+                        ColorTranslator.ToHtml(pal.Fondo),
+                        ColorTranslator.ToHtml(pal.Texto),
+                        ColorTranslator.ToHtml(pal.Borde)
+                    );
 
-                CargarDatosEspejoConfig();
+                    _catEdicionActiva = nombre;
+                    CargarDatosEspejoConfig();
+                }
+                catch (Exception ex)
+                {
+                    MessageBox.Show($"Error al procesar la categoría: {ex.Message}", "Error", MessageBoxButtons.OK, MessageBoxIcon.Error);
+                }
             }
         }
 
@@ -1003,7 +1011,7 @@ foreach (var opc in CategoriaColorHelper.OpcionesPaleta) cbColor.Items.Add(opc.N
         {
             using Form prompt = new Form
             {
-                Width = 380,
+                Width = 400,
                 Height = 230,
                 FormBorderStyle = FormBorderStyle.FixedDialog,
                 Text = "Editar Categoría",
@@ -1014,13 +1022,13 @@ foreach (var opc in CategoriaColorHelper.OpcionesPaleta) cbColor.Items.Add(opc.N
             };
 
             Label lblNom = new Label { Left = 20, Top = 15, Text = "Nombre de la categoría:", AutoSize = true, Font = new Font("Segoe UI", 9F, FontStyle.Bold) };
-            TextBox txtNom = new TextBox { Left = 20, Top = 38, Width = 320, Text = cat.Nombre, Font = new Font("Segoe UI", 9.5F) };
+            TextBox txtNom = new TextBox { Left = 20, Top = 38, Width = 345, Text = cat.Nombre, Font = new Font("Segoe UI", 9.5F) };
 
             Label lblColor = new Label { Left = 20, Top = 72, Text = "Color de la categoría:", AutoSize = true, Font = new Font("Segoe UI", 9F, FontStyle.Bold) };
             Button btnMuestra = new Button { Left = 20, Top = 95, Size = new Size(24, 24), FlatStyle = FlatStyle.Flat, Enabled = false };
             btnMuestra.FlatAppearance.BorderSize = 1;
 
-            ComboBox cbColor = new ComboBox { Left = 50, Top = 95, Width = 290, DropDownStyle = ComboBoxStyle.DropDownList, Font = new Font("Segoe UI", 9F, FontStyle.Bold) };
+            ComboBox cbColor = new ComboBox { Left = 50, Top = 95, Width = 315, DropDownStyle = ComboBoxStyle.DropDownList, Font = new Font("Segoe UI", 9F, FontStyle.Bold) };
             int selectedIdx = 0;
 
             for (int i = 0; i < CategoriaColorHelper.OpcionesPaleta.Count; i++)
@@ -1033,7 +1041,6 @@ foreach (var opc in CategoriaColorHelper.OpcionesPaleta) cbColor.Items.Add(opc.N
                 }
             }
 
-            // 1. Conectar el evento PRIMERO
             cbColor.SelectedIndexChanged += (s, e) =>
             {
                 if (cbColor.SelectedIndex >= 0)
@@ -1043,14 +1050,65 @@ foreach (var opc in CategoriaColorHelper.OpcionesPaleta) cbColor.Items.Add(opc.N
                     btnMuestra.FlatAppearance.BorderColor = pal.Borde;
                 }
             };
-
-            // 2. Asignar el índice DESPUÉS (dispara el evento y colorea btnMuestra al instante)
             cbColor.SelectedIndex = selectedIdx;
 
-            Button btnGuardar = new Button { Text = "Guardar Cambios", Left = 190, Width = 150, Top = 140, DialogResult = DialogResult.OK, BackColor = Color.FromArgb(0, 102, 255), ForeColor = Color.White, FlatStyle = FlatStyle.Flat, Font = new Font("Segoe UI", 9F, FontStyle.Bold) };
+            // BOTÓN ELIMINAR (Rojo)
+            Button btnEliminar = new Button 
+            { 
+                Text = "🗑️ Eliminar", 
+                Left = 20, 
+                Width = 110, 
+                Top = 140, 
+                BackColor = Color.FromArgb(239, 68, 68), 
+                ForeColor = Color.White, 
+                FlatStyle = FlatStyle.Flat, 
+                Font = new Font("Segoe UI", 9F, FontStyle.Bold),
+                Cursor = Cursors.Hand
+            };
+            btnEliminar.FlatAppearance.BorderSize = 0;
+            btnEliminar.Click += (s, e) =>
+            {
+                var confirm = MessageBox.Show(
+                    $"¿Seguro que deseas eliminar la categoría \"{cat.Nombre}\"?\n\nLos productos asociados quedarán \"Sin Asignar\" en el almacén.",
+                    "Confirmar Eliminación",
+                    MessageBoxButtons.YesNo,
+                    MessageBoxIcon.Warning);
+
+                if (confirm == DialogResult.Yes)
+                {
+                    _configService.EliminarCategoria(cat.Id);
+                    _categoriasCache = _configService.ObtenerCategoriasPOS();
+                    
+                    // Si eliminamos la categoría activa, seleccionar la primera disponible
+                    _catEdicionActiva = _categoriasCache.FirstOrDefault()?.Nombre ?? "";
+                    _famEdicionActiva = "";
+
+                    prompt.DialogResult = DialogResult.Abort;
+                    prompt.Close();
+
+                    RenderizarCategoriasConfig();
+                    RenderizarFamiliasConfig();
+                    RefrescarLienzoYAlmacen();
+                }
+            };
+
+            // BOTÓN GUARDAR (Azul)
+            Button btnGuardar = new Button 
+            { 
+                Text = "Guardar Cambios", 
+                Left = 215, 
+                Width = 150, 
+                Top = 140, 
+                DialogResult = DialogResult.OK, 
+                BackColor = Color.FromArgb(0, 102, 255), 
+                ForeColor = Color.White, 
+                FlatStyle = FlatStyle.Flat, 
+                Font = new Font("Segoe UI", 9F, FontStyle.Bold),
+                Cursor = Cursors.Hand
+            };
             btnGuardar.FlatAppearance.BorderSize = 0;
 
-            prompt.Controls.AddRange(new Control[] { lblNom, txtNom, lblColor, btnMuestra, cbColor, btnGuardar });
+            prompt.Controls.AddRange(new Control[] { lblNom, txtNom, lblColor, btnMuestra, cbColor, btnEliminar, btnGuardar });
             prompt.AcceptButton = btnGuardar;
 
             if (prompt.ShowDialog(this) == DialogResult.OK)
@@ -1058,14 +1116,12 @@ foreach (var opc in CategoriaColorHelper.OpcionesPaleta) cbColor.Items.Add(opc.N
                 string nuevoNombre = txtNom.Text.Trim();
                 var pal = CategoriaColorHelper.OpcionesPaleta[Math.Max(0, cbColor.SelectedIndex)];
 
-                // Actualizar nombre si cambió
                 if (!string.IsNullOrWhiteSpace(nuevoNombre) && nuevoNombre != cat.Nombre)
                 {
                     _configService.RenombrarCategoria(cat.Id, nuevoNombre);
                     _catEdicionActiva = nuevoNombre;
                 }
 
-                // Actualizar color en base de datos
                 _configService.ActualizarColorCategoria(cat.Id, 
                     ColorTranslator.ToHtml(pal.Fondo), 
                     ColorTranslator.ToHtml(pal.Texto), 
@@ -1261,21 +1317,72 @@ foreach (var opc in CategoriaColorHelper.OpcionesPaleta) cbColor.Items.Add(opc.N
         {
             using Form prompt = new Form
             {
-                Width = 350,
-                Height = 160,
+                Width = 380,
+                Height = 170,
                 FormBorderStyle = FormBorderStyle.FixedDialog,
-                Text = "Renombrar Subfamilia",
+                Text = "Editar Subfamilia",
                 StartPosition = FormStartPosition.CenterParent,
                 MaximizeBox = false,
                 MinimizeBox = false,
                 BackColor = Color.White
             };
-            Label textLabel = new Label() { Left = 20, Top = 15, Text = "Nuevo nombre para la familia:", AutoSize = true, Font = new Font("Segoe UI", 9F, FontStyle.Bold) };
-            TextBox textBox = new TextBox() { Left = 20, Top = 40, Width = 295, Text = fam.Nombre, Font = new Font("Segoe UI", 10F) };
-            Button confirmation = new Button() { Text = "Aceptar", Left = 215, Width = 100, Top = 75, DialogResult = DialogResult.OK, BackColor = Color.FromArgb(0, 102, 255), ForeColor = Color.White, FlatStyle = FlatStyle.Flat, Font = new Font("Segoe UI", 9F, FontStyle.Bold) };
+
+            Label textLabel = new Label { Left = 20, Top = 15, Text = "Nombre de la subfamilia:", AutoSize = true, Font = new Font("Segoe UI", 9F, FontStyle.Bold) };
+            TextBox textBox = new TextBox { Left = 20, Top = 40, Width = 325, Text = fam.Nombre, Font = new Font("Segoe UI", 10F) };
+
+            // BOTÓN ELIMINAR (Rojo)
+            Button btnEliminar = new Button 
+            { 
+                Text = "🗑️ Eliminar", 
+                Left = 20, 
+                Width = 100, 
+                Top = 80, 
+                BackColor = Color.FromArgb(239, 68, 68), 
+                ForeColor = Color.White, 
+                FlatStyle = FlatStyle.Flat, 
+                Font = new Font("Segoe UI", 9F, FontStyle.Bold),
+                Cursor = Cursors.Hand
+            };
+            btnEliminar.FlatAppearance.BorderSize = 0;
+            btnEliminar.Click += (s, e) =>
+            {
+                var confirm = MessageBox.Show(
+                    $"¿Seguro que deseas eliminar la subfamilia \"{fam.Nombre}\"?\n\nLos productos se mantendrán en esta categoría y se mostrarán en \"Todas\".",
+                    "Confirmar Eliminación",
+                    MessageBoxButtons.YesNo,
+                    MessageBoxIcon.Warning);
+
+                if (confirm == DialogResult.Yes)
+                {
+                    _configService.EliminarFamilia(fam.Id);
+                    _categoriasCache = _configService.ObtenerCategoriasPOS();
+                    _famEdicionActiva = ""; // Vuelve a "Todas"
+
+                    prompt.DialogResult = DialogResult.Abort;
+                    prompt.Close();
+
+                    RenderizarFamiliasConfig();
+                    RefrescarLienzoYAlmacen();
+                }
+            };
+
+            // BOTÓN ACEPTAR (Azul)
+            Button confirmation = new Button 
+            { 
+                Text = "Guardar", 
+                Left = 225, 
+                Width = 120, 
+                Top = 80, 
+                DialogResult = DialogResult.OK, 
+                BackColor = Color.FromArgb(0, 102, 255), 
+                ForeColor = Color.White, 
+                FlatStyle = FlatStyle.Flat, 
+                Font = new Font("Segoe UI", 9F, FontStyle.Bold),
+                Cursor = Cursors.Hand
+            };
             confirmation.FlatAppearance.BorderSize = 0;
 
-            prompt.Controls.AddRange(new Control[] { textLabel, textBox, confirmation });
+            prompt.Controls.AddRange(new Control[] { textLabel, textBox, btnEliminar, confirmation });
             prompt.AcceptButton = confirmation;
 
             if (prompt.ShowDialog(this) == DialogResult.OK)
@@ -1284,6 +1391,7 @@ foreach (var opc in CategoriaColorHelper.OpcionesPaleta) cbColor.Items.Add(opc.N
                 if (!string.IsNullOrWhiteSpace(nuevo) && nuevo != fam.Nombre)
                 {
                     _configService.RenombrarFamilia(fam.Id, nuevo);
+                    if (_famEdicionActiva == fam.Nombre) _famEdicionActiva = nuevo;
                     CargarDatosEspejoConfig();
                 }
             }

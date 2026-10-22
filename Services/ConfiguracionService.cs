@@ -178,7 +178,7 @@ namespace SISTEMAACTUALIZADO.Services
             }
         }
 
-        public void EliminarCategoria(int idCategoria, string? categoriaReemplazo = "General")
+        public void EliminarCategoria(int idCategoria)
         {
             using var db = new AppDbContext();
             var cat = db.PosCategorias.Find(idCategoria);
@@ -186,35 +186,67 @@ namespace SISTEMAACTUALIZADO.Services
 
             cat.Activo = false;
 
-            // Reasignar productos huérfanos a la categoría de reemplazo
+            // Los productos pasan a "Sin Asignar" con OrdenPOS = 0 (almacén de productos)
             var prods = db.Productos.Where(p => p.Categoria == cat.Nombre).ToList();
             foreach (var p in prods)
             {
-                p.Categoria = categoriaReemplazo ?? "General";
+                p.Categoria = "Sin Asignar";
+                p.NFamilia = "General";
+                p.OrdenPOS = 0;
                 p.FchUpd = DateTime.Now;
             }
 
             db.SaveChanges();
         }
 
-        // =========================================================================
-        // 4. GESTIÓN DE SUBFAMILIAS (EN BASE DE DATOS)
-        // =========================================================================
+        
 
+        // =========================================================================
+        // CREAR O REACTIVAR FAMILIA (ACTUALIZA NOMBRE Y ORDEN)
+        // =========================================================================
         public void CrearFamilia(int categoriaId, string nombreFamilia)
         {
             using var db = new AppDbContext();
-            int maxOrden = db.PosFamilias
-                .Where(f => f.CategoriaId == categoriaId && f.Activo)
-                .Max(f => (int?)f.Orden) ?? 0;
+            string nombreLimpio = nombreFamilia.Trim();
 
-            db.PosFamilias.Add(new PosFamilia
+            var famExistente = db.PosFamilias.FirstOrDefault(f => f.CategoriaId == categoriaId && f.Nombre.ToLower() == nombreLimpio.ToLower());
+
+            if (famExistente != null)
             {
-                CategoriaId = categoriaId,
-                Nombre = nombreFamilia.Trim(),
-                Orden = maxOrden + 1,
-                Activo = true
-            });
+                // 1. Reactivar y actualizar el nombre por si cambió de mayúsculas/minúsculas
+                famExistente.Activo = true;
+                string viejoNombre = famExistente.Nombre;
+                famExistente.Nombre = nombreLimpio;
+
+                // Sincronizar en productos
+                var cat = db.PosCategorias.Find(categoriaId);
+                if (cat != null && viejoNombre != nombreLimpio)
+                {
+                    var prods = db.Productos
+                        .Where(p => p.Categoria == cat.Nombre && p.NFamilia == viejoNombre)
+                        .ToList();
+                    foreach (var p in prods)
+                    {
+                        p.NFamilia = nombreLimpio;
+                        p.FchUpd = DateTime.Now;
+                    }
+                }
+
+                int maxOrden = db.PosFamilias.Where(f => f.CategoriaId == categoriaId && f.Activo && f.Id != famExistente.Id).Max(f => (int?)f.Orden) ?? 0;
+                famExistente.Orden = maxOrden + 1;
+            }
+            else
+            {
+                int maxOrden = db.PosFamilias.Where(f => f.CategoriaId == categoriaId && f.Activo).Max(f => (int?)f.Orden) ?? 0;
+                db.PosFamilias.Add(new PosFamilia
+                {
+                    CategoriaId = categoriaId,
+                    Nombre = nombreLimpio,
+                    Orden = maxOrden + 1,
+                    Activo = true
+                });
+            }
+
             db.SaveChanges();
         }
 
@@ -255,7 +287,7 @@ namespace SISTEMAACTUALIZADO.Services
             db.SaveChanges();
         }
 
-        public void EliminarFamilia(int familiaId, string? familiaReemplazo = "General")
+        public void EliminarFamilia(int familiaId)
         {
             using var db = new AppDbContext();
             var fam = db.PosFamilias.Find(familiaId);
@@ -266,12 +298,13 @@ namespace SISTEMAACTUALIZADO.Services
             var cat = db.PosCategorias.Find(fam.CategoriaId);
             if (cat != null)
             {
+                // Solo se limpia la familia: el producto se mantiene en la categoría y se verá en "Todas"
                 var prods = db.Productos
                     .Where(p => p.Categoria == cat.Nombre && p.NFamilia == fam.Nombre)
                     .ToList();
                 foreach (var p in prods)
                 {
-                    p.NFamilia = familiaReemplazo ?? "General";
+                    p.NFamilia = "General";
                     p.FchUpd = DateTime.Now;
                 }
             }
@@ -335,5 +368,63 @@ namespace SISTEMAACTUALIZADO.Services
 
             db.SaveChanges();
         }
+        // =========================================================================
+        // CREAR O REACTIVAR CATEGORÍA (ACTUALIZA NOMBRE, COLORES Y ORDEN)
+        // =========================================================================
+        public void CrearOCargarCategoria(string nombre, string fondoHex, string textoHex, string bordeHex)
+        {
+            using var db = new AppDbContext();
+            string nombreLimpio = nombre.Trim();
+
+            // Buscar si ya existió alguna vez por nombre (sin importar mayúsculas o minúsculas)
+            var catExistente = db.PosCategorias.FirstOrDefault(c => c.Nombre.ToLower() == nombreLimpio.ToLower());
+
+            if (catExistente != null)
+            {
+                // 1. Reactivar
+                catExistente.Activo = true;
+
+                // 2. Actualizar el nombre exacto por si cambió de "chao" a "Chao" o "CHAO"
+                string nombreAnterior = catExistente.Nombre;
+                catExistente.Nombre = nombreLimpio;
+
+                // Si cambió el casing o caracteres, sincronizar productos huérfanos que pudieran tener el texto antiguo
+                if (nombreAnterior != nombreLimpio)
+                {
+                    var prods = db.Productos.Where(p => p.Categoria == nombreAnterior).ToList();
+                    foreach (var p in prods)
+                    {
+                        p.Categoria = nombreLimpio;
+                        p.FchUpd = DateTime.Now;
+                    }
+                }
+
+                // 3. Actualizar colores y orden
+                catExistente.FondoHex = fondoHex;
+                catExistente.TextoHex = textoHex;
+                catExistente.BordeHex = bordeHex;
+
+                int maxOrden = db.PosCategorias.Where(c => c.Activo && c.Id != catExistente.Id).Max(c => (int?)c.Orden) ?? 0;
+                catExistente.Orden = maxOrden + 1;
+            }
+            else
+            {
+                int maxOrden = db.PosCategorias.Where(c => c.Activo).Max(c => (int?)c.Orden) ?? 0;
+                db.PosCategorias.Add(new PosCategoria
+                {
+                    Nombre = nombreLimpio,
+                    Orden = maxOrden + 1,
+                    FondoHex = fondoHex,
+                    TextoHex = textoHex,
+                    BordeHex = bordeHex,
+                    Activo = true
+                });
+            }
+
+            db.SaveChanges();
+        }
+
+        
+        
     }
 }
