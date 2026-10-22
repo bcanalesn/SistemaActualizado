@@ -57,6 +57,19 @@ namespace SISTEMAACTUALIZADO.Forms
         private Label lblEjemploAcumulacion = null!;
         private Label lblEjemploCanje = null!;
         private Button btnGuardarPuntosConfig = null!;
+        // --- Controles Pestaña Catálogo POS ---
+        private RadioButton rbOrdenCategoria = null!;
+        private RadioButton rbOrdenPersonalizado = null!;
+        private RadioButton rbOrdenMasVendidos = null!;
+        private Panel pnlContenedorPersonalizado = null!;
+        private TextBox txtBuscarProductoOrden = null!;
+        private DataGridView dgvOrdenProductos = null!;
+        private Button btnSubirOrden = null!;
+        private Button btnBajarOrden = null!;
+        private Button btnGuardarCatalogoConfig = null!;
+        private Label lblTotalItemsOrden = null!;
+
+        private List<Producto> _productosOrdenMemoria = new List<Producto>();
 
         public FormConfiguracion()
         {
@@ -71,6 +84,7 @@ namespace SISTEMAACTUALIZADO.Forms
             InitializeComponent();
             CargarDatosEmpresa();
             CargarZonasDelivery();
+            CargarConfiguracionCatalogoUI();
         }
         private void InitializeComponent()
         {
@@ -122,12 +136,55 @@ namespace SISTEMAACTUALIZADO.Forms
             tabFidelizacion.BackColor = Color.FromArgb(248, 250, 252);
             ConstruirPestañaFidelizacion(tabFidelizacion);
 
+            TabPage tabCatalogo = new TabPage("🎨 Orden Catálogo POS");
+            tabCatalogo.BackColor = Color.FromArgb(248, 250, 252);
+            ConstruirPestañaCatalogoPOS(tabCatalogo);
+
             tabPrincipal.TabPages.Add(tabEmpresa);
             tabPrincipal.TabPages.Add(tabDelivery);
-            tabPrincipal.TabPages.Add(tabFidelizacion); // 👈 Pestaña añadida
+            tabPrincipal.TabPages.Add(tabFidelizacion);
+            tabPrincipal.TabPages.Add(tabCatalogo); // 👈 Cuarta pestaña
 
             this.Controls.Add(tabPrincipal);
             this.Controls.Add(pnlHeader);
+        }
+        // ==========================================
+        // MÉTODOS AUXILIARES DE DISEÑO GRÁFICO
+        // ==========================================
+        private Panel CrearTarjetaRedondeada(int x, int y, int ancho, int alto, Color colorFondo, Color colorBorde)
+        {
+            Panel pnl = new Panel 
+            { 
+                Location = new Point(x, y), 
+                Size = new Size(ancho, alto), 
+                BackColor = colorFondo 
+            };
+
+            pnl.Resize += (s, e) => pnl.Invalidate();
+
+            pnl.Paint += (s, e) =>
+            {
+                e.Graphics.SmoothingMode = System.Drawing.Drawing2D.SmoothingMode.AntiAlias;
+                e.Graphics.Clear(pnl.BackColor);
+
+                Rectangle r = new Rectangle(0, 0, pnl.Width - 1, pnl.Height - 1);
+                using var p = CrearRutaRedondeada(r, 8);
+                using var pen = new Pen(colorBorde, 1.2f);
+                e.Graphics.DrawPath(pen, p);
+            };
+            return pnl;
+        }
+
+        private System.Drawing.Drawing2D.GraphicsPath CrearRutaRedondeada(Rectangle rect, int radio)
+        {
+            var path = new System.Drawing.Drawing2D.GraphicsPath();
+            int d = radio * 2;
+            path.AddArc(rect.X, rect.Y, d, d, 180, 90);
+            path.AddArc(rect.Right - d, rect.Y, d, d, 270, 90);
+            path.AddArc(rect.Right - d, rect.Bottom - d, d, d, 0, 90);
+            path.AddArc(rect.X, rect.Bottom - d, d, d, 90, 90);
+            path.CloseFigure();
+            return path;
         }
 
         // ==========================================
@@ -517,6 +574,471 @@ namespace SISTEMAACTUALIZADO.Forms
 
             tab.Controls.Add(pnlBody);
             CargarDatosFidelizacionUI();
+        }
+        // ==========================================
+        // 4. PESTAÑA: ORDEN DEL CATÁLOGO POS
+        // ==========================================
+        private void ConstruirPestañaCatalogoPOS(TabPage tab)
+        {
+            Panel pnlMain = new Panel
+            {
+                Dock = DockStyle.Fill,
+                Padding = new Padding(20, 15, 20, 15),
+                BackColor = Color.FromArgb(248, 250, 252)
+            };
+
+            // 1. TARJETA SELECTOR DE MODALIDAD
+            Panel pnlOpcionesCard = CrearTarjetaRedondeada(0, 0, 0, 105, Color.White, Color.FromArgb(226, 232, 240));
+            pnlOpcionesCard.Dock = DockStyle.Top;
+            pnlOpcionesCard.Padding = new Padding(16, 12, 16, 10);
+
+            Label lblTitModo = new Label
+            {
+                Text = "CRITERIO DE VISUALIZACIÓN DE PRODUCTOS EN EL PUNTO DE VENTA",
+                Font = new Font("Segoe UI", 8.5F, FontStyle.Bold),
+                ForeColor = Color.FromArgb(30, 41, 59),
+                Dock = DockStyle.Top,
+                Height = 20
+            };
+
+            FlowLayoutPanel flowRadios = new FlowLayoutPanel
+            {
+                Dock = DockStyle.Fill,
+                WrapContents = false,
+                Padding = new Padding(0, 8, 0, 0),
+                BackColor = Color.Transparent
+            };
+
+            rbOrdenCategoria = new RadioButton
+            {
+                Text = "📂 Por Categorías (Alfabético tradicional)",
+                AutoSize = true,
+                Font = new Font("Segoe UI", 9F, FontStyle.Bold),
+                ForeColor = Color.FromArgb(51, 65, 85),
+                Margin = new Padding(0, 0, 24, 0),
+                Cursor = Cursors.Hand
+            };
+
+            rbOrdenPersonalizado = new RadioButton
+            {
+                Text = "⭐ Personalizado por el Local (Tu propio orden)",
+                AutoSize = true,
+                Font = new Font("Segoe UI", 9F, FontStyle.Bold),
+                ForeColor = Color.FromArgb(37, 99, 235),
+                Margin = new Padding(0, 0, 24, 0),
+                Cursor = Cursors.Hand
+            };
+
+            rbOrdenMasVendidos = new RadioButton
+            {
+                Text = "🔥 Los Más Vendidos (Top Ventas primero)",
+                AutoSize = true,
+                Font = new Font("Segoe UI", 9F, FontStyle.Bold),
+                ForeColor = Color.FromArgb(22, 163, 74),
+                Cursor = Cursors.Hand
+            };
+
+            rbOrdenCategoria.CheckedChanged += (s, e) => ToggleModoCatalogo();
+            rbOrdenPersonalizado.CheckedChanged += (s, e) => ToggleModoCatalogo();
+            rbOrdenMasVendidos.CheckedChanged += (s, e) => ToggleModoCatalogo();
+
+            flowRadios.Controls.AddRange(new Control[] { rbOrdenCategoria, rbOrdenPersonalizado, rbOrdenMasVendidos });
+            pnlOpcionesCard.Controls.Add(flowRadios);
+            pnlOpcionesCard.Controls.Add(lblTitModo);
+
+            // 2. PANEL CONTENEDOR DE EDICIÓN PERSONALIZADA
+            pnlContenedorPersonalizado = new Panel
+            {
+                Dock = DockStyle.Fill,
+                Padding = new Padding(0, 12, 0, 0),
+                BackColor = Color.Transparent
+            };
+
+            Panel pnlCardGrilla = CrearTarjetaRedondeada(0, 0, 0, 0, Color.White, Color.FromArgb(226, 232, 240));
+            pnlCardGrilla.Dock = DockStyle.Fill;
+            pnlCardGrilla.Padding = new Padding(12);
+
+            // Header con buscador y contador
+            Panel pnlGridHeader = new Panel { Dock = DockStyle.Top, Height = 42, BackColor = Color.Transparent };
+
+            txtBuscarProductoOrden = new TextBox
+            {
+                Location = new Point(0, 6),
+                Size = new Size(320, 26),
+                Font = new Font("Segoe UI", 9.5F),
+                PlaceholderText = "🔍 Filtrar lista para ubicar producto..."
+            };
+            txtBuscarProductoOrden.TextChanged += (s, e) => FiltrarGrillaOrden();
+
+            lblTotalItemsOrden = new Label
+            {
+                Dock = DockStyle.Right,
+                AutoSize = false,
+                Width = 350,
+                Font = new Font("Segoe UI", 8.5F, FontStyle.Bold),
+                ForeColor = Color.FromArgb(100, 116, 139),
+                TextAlign = ContentAlignment.MiddleRight
+            };
+
+            pnlGridHeader.Controls.Add(txtBuscarProductoOrden);
+            pnlGridHeader.Controls.Add(lblTotalItemsOrden);
+
+            // Grilla de Orden
+            dgvOrdenProductos = new DataGridView
+            {
+                Dock = DockStyle.Fill,
+                BackgroundColor = Color.White,
+                BorderStyle = BorderStyle.None,
+                CellBorderStyle = DataGridViewCellBorderStyle.SingleHorizontal,
+                ColumnHeadersBorderStyle = DataGridViewHeaderBorderStyle.None,
+                SelectionMode = DataGridViewSelectionMode.FullRowSelect,
+                MultiSelect = false,
+                AllowUserToAddRows = false,
+                AllowUserToDeleteRows = false,
+                RowHeadersVisible = false,
+                AutoSizeColumnsMode = DataGridViewAutoSizeColumnsMode.Fill,
+                RowTemplate = { Height = 36 },
+                Font = new Font("Segoe UI", 9F)
+            };
+            ConfigurarEstiloTablaCatalogo(dgvOrdenProductos);
+
+            // Evento para cuando el usuario edita la celda "Posición" directamente con el teclado
+            dgvOrdenProductos.CellEndEdit += DgvOrdenProductos_CellEndEdit;
+
+            // Panel de Botones Laterales / Acciones (Subir, Bajar)
+            Panel pnlBotonesLaterales = new Panel { Dock = DockStyle.Right, Width = 90, Padding = new Padding(8, 0, 0, 0) };
+
+            btnSubirOrden = new Button
+            {
+                Text = "▲\nSubir",
+                Dock = DockStyle.Top,
+                Height = 65,
+                BackColor = Color.FromArgb(239, 246, 255),
+                ForeColor = Color.FromArgb(37, 99, 235),
+                FlatStyle = FlatStyle.Flat,
+                Font = new Font("Segoe UI", 9F, FontStyle.Bold),
+                Cursor = Cursors.Hand
+            };
+            btnSubirOrden.FlatAppearance.BorderColor = Color.FromArgb(191, 219, 254);
+            btnSubirOrden.Click += (s, e) => MoverFilaSeleccionada(-1);
+
+            Panel pnlSpacer = new Panel { Dock = DockStyle.Top, Height = 10 };
+
+            btnBajarOrden = new Button
+            {
+                Text = "▼\nBajar",
+                Dock = DockStyle.Top,
+                Height = 65,
+                BackColor = Color.FromArgb(239, 246, 255),
+                ForeColor = Color.FromArgb(37, 99, 235),
+                FlatStyle = FlatStyle.Flat,
+                Font = new Font("Segoe UI", 9F, FontStyle.Bold),
+                Cursor = Cursors.Hand
+            };
+            btnBajarOrden.FlatAppearance.BorderColor = Color.FromArgb(191, 219, 254);
+            btnBajarOrden.Click += (s, e) => MoverFilaSeleccionada(1);
+
+            pnlBotonesLaterales.Controls.Add(btnBajarOrden);
+            pnlBotonesLaterales.Controls.Add(pnlSpacer);
+            pnlBotonesLaterales.Controls.Add(btnSubirOrden);
+
+            pnlCardGrilla.Controls.Add(dgvOrdenProductos);
+            pnlCardGrilla.Controls.Add(pnlBotonesLaterales);
+            pnlCardGrilla.Controls.Add(pnlGridHeader);
+            pnlContenedorPersonalizado.Controls.Add(pnlCardGrilla);
+
+            // 3. FOOTER CON BOTÓN GUARDAR
+            Panel pnlFooter = new Panel { Dock = DockStyle.Bottom, Height = 52, Padding = new Padding(0, 10, 0, 0) };
+
+            btnGuardarCatalogoConfig = new Button
+            {
+                Text = "💾 Guardar Configuración de Catálogo",
+                Dock = DockStyle.Left,
+                Width = 320,
+                BackColor = Color.FromArgb(16, 185, 129),
+                ForeColor = Color.White,
+                FlatStyle = FlatStyle.Flat,
+                Font = new Font("Segoe UI", 9.5F, FontStyle.Bold),
+                Cursor = Cursors.Hand
+            };
+            btnGuardarCatalogoConfig.FlatAppearance.BorderSize = 0;
+            btnGuardarCatalogoConfig.Click += BtnGuardarCatalogoConfig_Click;
+
+            pnlFooter.Controls.Add(btnGuardarCatalogoConfig);
+
+            pnlMain.Controls.Add(pnlContenedorPersonalizado);
+            pnlMain.Controls.Add(pnlOpcionesCard);
+            pnlMain.Controls.Add(pnlFooter);
+            tab.Controls.Add(pnlMain);
+
+            CargarConfiguracionCatalogoUI();
+        }
+
+        private void ConfigurarEstiloTablaCatalogo(DataGridView dgv)
+        {
+            dgv.EnableHeadersVisualStyles = false;
+            
+            // Color normal de los encabezados
+            dgv.ColumnHeadersDefaultCellStyle.BackColor = Color.FromArgb(15, 23, 42);
+            dgv.ColumnHeadersDefaultCellStyle.ForeColor = Color.White;
+            dgv.ColumnHeadersDefaultCellStyle.Font = new Font("Segoe UI", 8.5F, FontStyle.Bold);
+            dgv.ColumnHeadersHeight = 34;
+
+            // ✔ Candados: Evitar que se pinte de azul al hacer clic en el título
+            dgv.ColumnHeadersDefaultCellStyle.SelectionBackColor = Color.FromArgb(15, 23, 42); // Mismo fondo oscuro
+            dgv.ColumnHeadersDefaultCellStyle.SelectionForeColor = Color.White;                // Mismo texto blanco
+
+            // Desactivar el ordenamiento nativo por clic para que no seleccione la columna en azul
+            // (y respete siempre el criterio del radio button seleccionado arriba)
+            dgv.AllowUserToOrderColumns = false;
+
+            dgv.DefaultCellStyle.SelectionBackColor = Color.FromArgb(224, 242, 254);
+            dgv.DefaultCellStyle.SelectionForeColor = Color.FromArgb(15, 23, 42);
+            dgv.RowTemplate.Height = 34;
+
+            dgv.Columns.Clear();
+
+            // Columna 1: Posición (Editable directamente)
+            var colPos = new DataGridViewTextBoxColumn
+            {
+                Name = "OrdenPOS",
+                HeaderText = "POSICIÓN (1 - N)",
+                FillWeight = 16,
+                ReadOnly = false
+            };
+            colPos.HeaderCell.Style.Alignment = DataGridViewContentAlignment.MiddleCenter;
+            colPos.DefaultCellStyle.Alignment = DataGridViewContentAlignment.MiddleCenter;
+            colPos.DefaultCellStyle.Font = new Font("Segoe UI", 9.5F, FontStyle.Bold);
+            colPos.DefaultCellStyle.ForeColor = Color.FromArgb(37, 99, 235);
+            dgv.Columns.Add(colPos);
+
+            // Columna 2: Nombre Producto
+            var colNom = new DataGridViewTextBoxColumn
+            {
+                Name = "Nombre",
+                HeaderText = "PRODUCTO",
+                FillWeight = 44,
+                ReadOnly = true
+            };
+            colNom.HeaderCell.Style.Alignment = DataGridViewContentAlignment.MiddleLeft;
+            colNom.DefaultCellStyle.Alignment = DataGridViewContentAlignment.MiddleLeft;
+            dgv.Columns.Add(colNom);
+
+            // Columna 3: Categoría
+            var colCat = new DataGridViewTextBoxColumn
+            {
+                Name = "Categoria",
+                HeaderText = "CATEGORÍA",
+                FillWeight = 22,
+                ReadOnly = true
+            };
+            colCat.HeaderCell.Style.Alignment = DataGridViewContentAlignment.MiddleCenter;
+            colCat.DefaultCellStyle.Alignment = DataGridViewContentAlignment.MiddleCenter;
+            dgv.Columns.Add(colCat);
+
+            // Columna 4: Precio Venta
+            var colPrecio = new DataGridViewTextBoxColumn
+            {
+                Name = "Precio",
+                HeaderText = "PRECIO",
+                FillWeight = 18,
+                ReadOnly = true
+            };
+            colPrecio.HeaderCell.Style.Alignment = DataGridViewContentAlignment.MiddleCenter;
+            colPrecio.DefaultCellStyle.Alignment = DataGridViewContentAlignment.MiddleCenter;
+            colPrecio.DefaultCellStyle.Font = new Font("Segoe UI", 9F, FontStyle.Bold);
+            dgv.Columns.Add(colPrecio);
+
+            // Columna oculta con ID
+            var colId = new DataGridViewTextBoxColumn { Name = "ProductoID", Visible = false };
+            dgv.Columns.Add(colId);
+        }
+
+        private void CargarConfiguracionCatalogoUI()
+        {
+            string modo = _configService.ObtenerModoOrdenCatalogo();
+            rbOrdenCategoria.Checked = (modo == "CATEGORIA");
+            rbOrdenPersonalizado.Checked = (modo == "PERSONALIZADO");
+            rbOrdenMasVendidos.Checked = (modo == "MAS_VENDIDOS");
+
+            _productosOrdenMemoria = _configService.ObtenerProductosParaConfigurarOrden();
+            RenderizarGrillaOrden();
+            ToggleModoCatalogo();
+        }
+
+        private void ToggleModoCatalogo()
+        {
+            bool esPersonalizado = rbOrdenPersonalizado.Checked;
+            pnlContenedorPersonalizado.Enabled = esPersonalizado;
+            btnSubirOrden.Enabled = esPersonalizado;
+            btnBajarOrden.Enabled = esPersonalizado;
+            dgvOrdenProductos.ReadOnly = !esPersonalizado;
+
+            pnlContenedorPersonalizado.BackColor = esPersonalizado ? Color.White : Color.FromArgb(241, 245, 249);
+            
+            if (!esPersonalizado)
+            {
+                lblTotalItemsOrden.Text = rbOrdenMasVendidos.Checked 
+                    ? "🔥 Modo Automático: El orden se calcula según las boletas emitidas."
+                    : "📂 Modo Automático: Los productos se ordenan alfabéticamente de la A a la Z.";
+            }
+            else
+            {
+                lblTotalItemsOrden.Text = $"⭐ Modo Manual: Arrastre o digite la posición (1 al {_productosOrdenMemoria.Count})";
+            }
+
+            // Refrescar la grilla para que refleje el orden según el radio button seleccionado
+            RenderizarGrillaOrden(txtBuscarProductoOrden?.Text?.Trim() ?? "");
+        }
+
+        private void RenderizarGrillaOrden(string filtro = "")
+        {
+            dgvOrdenProductos.Rows.Clear();
+            int total = _productosOrdenMemoria.Count;
+
+            // Determinar qué modo está seleccionado actualmente en la vista
+            string modoActual = "CATEGORIA";
+            if (rbOrdenPersonalizado != null && rbOrdenPersonalizado.Checked)
+            {
+                modoActual = "PERSONALIZADO";
+            }
+            else if (rbOrdenMasVendidos != null && rbOrdenMasVendidos.Checked)
+            {
+                modoActual = "MAS_VENDIDOS";
+            }
+
+            // Aplicar exactamente el mismo criterio de ordenamiento del servicio
+            var listaOrdenada = _configService.AplicarCriterioOrdenPOS(_productosOrdenMemoria, modoActual);
+
+            if (!string.IsNullOrWhiteSpace(filtro))
+            {
+                string f = filtro.ToLower();
+                listaOrdenada = listaOrdenada.Where(p => p.Nombre.ToLower().Contains(f) || p.Categoria.ToLower().Contains(f));
+            }
+
+            foreach (var p in listaOrdenada)
+            {
+                string precioStr = p.EsPesable
+                    ? $"{MonedaHelper.Formatear(p.PrecioUnitario * 1000m, conSigno: true)}/Kg"
+                    : MonedaHelper.Formatear(p.PrecioUnitario, conSigno: true);
+
+                dgvOrdenProductos.Rows.Add(p.OrdenPOS, p.Nombre, p.Categoria, precioStr, p.ProductoID);
+            }
+        }
+
+        private void FiltrarGrillaOrden()
+        {
+            RenderizarGrillaOrden(txtBuscarProductoOrden.Text.Trim());
+        }
+
+        private void MoverFilaSeleccionada(int direccion)
+        {
+            if (dgvOrdenProductos.CurrentRow == null) return;
+
+            int prodId = Convert.ToInt32(dgvOrdenProductos.CurrentRow.Cells["ProductoID"].Value);
+            int indexMemoria = _productosOrdenMemoria.FindIndex(p => p.ProductoID == prodId);
+
+            if (indexMemoria < 0) return;
+
+            int nuevoIndex = indexMemoria + direccion;
+            if (nuevoIndex < 0 || nuevoIndex >= _productosOrdenMemoria.Count) return;
+
+            // Intercambiar en la lista de memoria
+            var item = _productosOrdenMemoria[indexMemoria];
+            _productosOrdenMemoria.RemoveAt(indexMemoria);
+            _productosOrdenMemoria.Insert(nuevoIndex, item);
+
+            // Reasignar posiciones correlativas 1..N
+            for (int i = 0; i < _productosOrdenMemoria.Count; i++)
+            {
+                _productosOrdenMemoria[i].OrdenPOS = i + 1;
+            }
+
+            RenderizarGrillaOrden(txtBuscarProductoOrden.Text.Trim());
+
+            // Reseleccionar el ítem movido
+            SeleccionarFilaPorProductoId(prodId);
+        }
+
+        private void DgvOrdenProductos_CellEndEdit(object? sender, DataGridViewCellEventArgs e)
+        {
+            if (e.RowIndex < 0 || dgvOrdenProductos.Columns[e.ColumnIndex].Name != "OrdenPOS") return;
+
+            var fila = dgvOrdenProductos.Rows[e.RowIndex];
+            int prodId = Convert.ToInt32(fila.Cells["ProductoID"].Value);
+            string nuevoValorStr = fila.Cells["OrdenPOS"].Value?.ToString() ?? "";
+
+            int totalProductos = _productosOrdenMemoria.Count;
+
+            if (!int.TryParse(nuevoValorStr, out int nuevaPosicion))
+            {
+                RenderizarGrillaOrden(txtBuscarProductoOrden.Text.Trim());
+                return;
+            }
+
+            // Ajustar al rango dinámico 1 a N
+            nuevaPosicion = Math.Max(1, Math.Min(totalProductos, nuevaPosicion));
+
+            int indexActual = _productosOrdenMemoria.FindIndex(p => p.ProductoID == prodId);
+            if (indexActual >= 0)
+            {
+                var prod = _productosOrdenMemoria[indexActual];
+                _productosOrdenMemoria.RemoveAt(indexActual);
+
+                // Insertar en la posición deseada (índice 0-based)
+                _productosOrdenMemoria.Insert(nuevaPosicion - 1, prod);
+
+                // Reindexar toda la lista para que sea 100% limpia y sin huecos
+                for (int i = 0; i < _productosOrdenMemoria.Count; i++)
+                {
+                    _productosOrdenMemoria[i].OrdenPOS = i + 1;
+                }
+
+                RenderizarGrillaOrden(txtBuscarProductoOrden.Text.Trim());
+                SeleccionarFilaPorProductoId(prodId);
+            }
+        }
+
+        private void SeleccionarFilaPorProductoId(int prodId)
+        {
+            foreach (DataGridViewRow row in dgvOrdenProductos.Rows)
+            {
+                if (row.Cells["ProductoID"].Value != null && Convert.ToInt32(row.Cells["ProductoID"].Value) == prodId)
+                {
+                    dgvOrdenProductos.ClearSelection();
+                    row.Selected = true;
+                    dgvOrdenProductos.CurrentCell = row.Cells["OrdenPOS"];
+                    break;
+                }
+            }
+        }
+
+        private void BtnGuardarCatalogoConfig_Click(object? sender, EventArgs e)
+        {
+            try
+            {
+                string modo = "CATEGORIA";
+                if (rbOrdenPersonalizado.Checked) modo = "PERSONALIZADO";
+                else if (rbOrdenMasVendidos.Checked) modo = "MAS_VENDIDOS";
+
+                _configService.GuardarModoOrdenCatalogo(modo);
+
+                // Si está en modo personalizado, persistir las posiciones 1..N
+                if (modo == "PERSONALIZADO")
+                {
+                    var ordenes = _productosOrdenMemoria
+                        .Select(p => (p.ProductoID, p.OrdenPOS))
+                        .ToList();
+
+                    _configService.GuardarOrdenPersonalizadoProductos(ordenes);
+                }
+
+                MessageBox.Show("Configuración del catálogo guardada exitosamente.\nLos cambios se reflejarán de inmediato en el Punto de Venta.", "Catálogo POS", MessageBoxButtons.OK, MessageBoxIcon.Information);
+            }
+            catch (Exception ex)
+            {
+                MessageBox.Show($"Error al guardar configuración: {ex.Message}", "Error", MessageBoxButtons.OK, MessageBoxIcon.Error);
+            }
         }
 
         private void CargarDatosFidelizacionUI()

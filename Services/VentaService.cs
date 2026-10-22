@@ -17,7 +17,7 @@ namespace SISTEMAACTUALIZADO.Services
             DateTime ahora = DateTime.Now;
             int ultimoNroInT = db.TVE2607.Max(v => (int?)v.nroInT) ?? 0;
             int siguienteNroInT = ultimoNroInT + 1;
-            int nroTicketAtencion = (int)(ahora.Ticks % 1000000);
+            int nroTicketAtencion = ObtenerSiguienteNroTicketCorrelativo(db); // ✔ CORRELATIVO (1 - 999.999)
 
             string rutLimpio = RutHelper.Limpiar(clienteRut ?? "");
             var clienteDb = db.Clientes.FirstOrDefault(c => !string.IsNullOrEmpty(rutLimpio) && (c.Rut == rutLimpio || c.Rut == clienteRut));
@@ -159,7 +159,7 @@ namespace SISTEMAACTUALIZADO.Services
                 {
                     int ultimoNroInT = db.TVE2607.Max(v => (int?)v.nroInT) ?? 0;
                     int siguienteNroInT = ultimoNroInT + 1;
-                    int nroTicket = (int)(ahora.Ticks % 1000000);
+                    int nroTicket = ObtenerSiguienteNroTicketCorrelativo(db); // ✔ CORRELATIVO (1 - 999.999)
 
                     venta = new TVE2607
                     {
@@ -460,7 +460,24 @@ namespace SISTEMAACTUALIZADO.Services
                 })
                 .ToList();
         }
+        private int ObtenerSiguienteNroTicketCorrelativo(AppDbContext db)
+        {
+            const int LIMITE_TICKET = 999999;
 
+            // Obtener el NroTicket de la última venta registrada por orden de creación (idTve)
+            int ultimoTicket = db.TVE2607
+                .OrderByDescending(v => v.idTve)
+                .Select(v => v.NroTicket)
+                .FirstOrDefault();
+
+            // Si no hay ventas, o si el último llegó al tope, reinicia en 1
+            if (ultimoTicket <= 0 || ultimoTicket >= LIMITE_TICKET)
+            {
+                return 1;
+            }
+
+            return ultimoTicket + 1;
+        }
         public TVE2607? ObtenerVentaPorId(int idTve)
         {
             using var db = new AppDbContext();

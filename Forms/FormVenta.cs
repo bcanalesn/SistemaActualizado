@@ -134,6 +134,10 @@ namespace SISTEMAACTUALIZADO
                     }));
                 }
             };
+            this.Activated += (s, e) =>
+            {
+                CargarProductosDesdeBD();
+            };
 
             this.Shown += (s, e) =>
             {
@@ -836,7 +840,8 @@ namespace SISTEMAACTUALIZADO
                 filtrados = filtrados.Where(p => p.NFamilia == _familiaActivaNombre);
             }
 
-            var lista = filtrados.ToList();
+            var configService = new ConfiguracionService();
+            var lista = configService.AplicarCriterioOrdenPOS(filtrados).ToList();
             var tarjetas = new List<Control>(lista.Count);
 
             foreach (var prod in lista)
@@ -1046,7 +1051,10 @@ namespace SISTEMAACTUALIZADO
             ).ToList();
 
             var tarjetas = new List<Control>(filtrados.Count);
-            foreach (var prod in filtrados)
+            var configService = new ConfiguracionService();
+            var filtradosOrdenados = configService.AplicarCriterioOrdenPOS(filtrados).ToList();
+
+            foreach (var prod in filtradosOrdenados)
             {
                 tarjetas.Add(CrearTarjetaProductoUI(prod));
             }
