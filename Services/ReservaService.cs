@@ -107,7 +107,7 @@ namespace SISTEMAACTUALIZADO.Services
                         sql += " AND (r.CodigoReserva LIKE @q OR c.RazonSocial LIKE @q OR c.Rut LIKE @q) ";
                     }
 
-                    sql += " ORDER BY r.FechaEntregaPactada ASC ";
+                    sql += " ORDER BY r.FechaRegistro DESC, r.IdReserva DESC ";
 
                     using (var cmd = conn.CreateCommand())
                     {

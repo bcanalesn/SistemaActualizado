@@ -15,14 +15,15 @@ namespace SISTEMAACTUALIZADO.Modals
     public class FormNuevoProductoModal : Form
     {
         private readonly ProductoService _productoService = new ProductoService();
+        private readonly ConfiguracionService _configService = new ConfiguracionService();
 
         // Campos Base
         private TextBox txtCodigoBarra = null!;
         private TextBox txtNombre = null!;
         private ComboBox cbCategoria = null!;
+        private Button btnNuevaCat = null!;
         private ComboBox cbFamilia = null!;
-        private Button btnColorMuestra = null!; // 👈 Muestra visual del color
-        private ComboBox cbColorCategoria = null!; // 👈 Selector del color
+        private Button btnNuevaFam = null!;
         private TextBox txtPrecioCosto = null!;
         private Label lblTitCosto = null!;
         private Label lblSubCosto = null!;
@@ -109,57 +110,65 @@ namespace SISTEMAACTUALIZADO.Modals
             pnlFila1.Controls.Add(CrearCampo("|||||| Código de Barra / SKU", txtCodigoBarra, 0, 300));
             pnlFila1.Controls.Add(CrearCampo("📦 Nombre del Producto", txtNombre, 320, 310));
 
-            // Fila 2: Categoría, Color y Familia
-            cbCategoria = new ComboBox { Width = 195, Font = new Font("Segoe UI", 9.5F), DropDownStyle = ComboBoxStyle.DropDown };
-            
-            // Selector de color para la categoría
-            btnColorMuestra = new Button
-            {
-                Size = new Size(24, 24),
-                Location = new Point(200, 22),
-                FlatStyle = FlatStyle.Flat,
-                Enabled = false,
-                Cursor = Cursors.Default
-            };
-            btnColorMuestra.FlatAppearance.BorderSize = 1;
-
-            cbColorCategoria = new ComboBox
-            {
-                Location = new Point(228, 20),
-                Size = new Size(90, 26),
-                DropDownStyle = ComboBoxStyle.DropDownList,
-                Font = new Font("Segoe UI", 8.5F, FontStyle.Bold)
-            };
-            foreach (var opc in CategoriaColorHelper.OpcionesPaleta)
-            {
-                cbColorCategoria.Items.Add(opc.Nombre);
-            }
-            cbColorCategoria.SelectedIndex = 0;
-
-            cbColorCategoria.SelectedIndexChanged += (s, e) =>
-            {
-                if (cbColorCategoria.SelectedIndex >= 0)
-                {
-                    var pal = CategoriaColorHelper.OpcionesPaleta[cbColorCategoria.SelectedIndex];
-                    btnColorMuestra.BackColor = pal.Texto;
-                    btnColorMuestra.FlatAppearance.BorderColor = pal.Borde;
-                }
-            };
-
-            cbCategoria.TextChanged += (s, e) => SincronizarColorSegunCategoria();
-
-            cbFamilia = new ComboBox { Width = 300, Font = new Font("Segoe UI", 9.5F), DropDownStyle = ComboBoxStyle.DropDown };
-            
+            // Fila 2: Categoría con botón [+] y Familia con botón [+]
             Panel pnlFila2 = new Panel { Size = new Size(630, 56) };
-            
-            // Contenedor Categoría + Color
-            Panel pnlCatWrapper = new Panel { Location = new Point(0, 0), Size = new Size(320, 52) };
-            pnlCatWrapper.Controls.Add(new Label { Text = "Categoría y Color", Font = new Font("Segoe UI", 8F, FontStyle.Bold), ForeColor = Color.FromArgb(71, 85, 105), Location = new Point(0, 0), AutoSize = true });
-            cbCategoria.Location = new Point(0, 20);
-            pnlCatWrapper.Controls.AddRange(new Control[] { cbCategoria, btnColorMuestra, cbColorCategoria });
 
-            pnlFila2.Controls.Add(pnlCatWrapper);
-            pnlFila2.Controls.Add(CrearCampo("Familia de Producto", cbFamilia, 330, 300));
+            // Panel Izquierdo: Categoría
+            Panel pnlCatGroup = new Panel { Location = new Point(0, 0), Size = new Size(305, 52) };
+            Label lblCat = new Label { Text = "Categoría", Font = new Font("Segoe UI", 8F, FontStyle.Bold), ForeColor = Color.FromArgb(71, 85, 105), Location = new Point(0, 0), AutoSize = true };
+            cbCategoria = new ComboBox 
+            { 
+                Location = new Point(0, 20), 
+                Width = 265, 
+                Font = new Font("Segoe UI", 9.5F), 
+                DropDownStyle = ComboBoxStyle.DropDownList 
+            };
+            btnNuevaCat = new Button
+            {
+                Text = "➕",
+                Location = new Point(270, 19),
+                Size = new Size(32, 28),
+                BackColor = Color.FromArgb(241, 245, 249),
+                ForeColor = Color.FromArgb(16, 185, 129),
+                FlatStyle = FlatStyle.Flat,
+                Font = new Font("Segoe UI", 9F, FontStyle.Bold),
+                Cursor = Cursors.Hand
+            };
+            btnNuevaCat.FlatAppearance.BorderColor = Color.FromArgb(226, 232, 240);
+            btnNuevaCat.Click += BtnNuevaCat_Click;
+            pnlCatGroup.Controls.AddRange(new Control[] { lblCat, cbCategoria, btnNuevaCat });
+
+            // Panel Derecho: Familia
+            Panel pnlFamGroup = new Panel { Location = new Point(325, 0), Size = new Size(305, 52) };
+            Label lblFam = new Label { Text = "Familia de Producto", Font = new Font("Segoe UI", 8F, FontStyle.Bold), ForeColor = Color.FromArgb(71, 85, 105), Location = new Point(0, 0), AutoSize = true };
+            cbFamilia = new ComboBox 
+            { 
+                Location = new Point(0, 20), 
+                Width = 265, 
+                Font = new Font("Segoe UI", 9.5F), 
+                DropDownStyle = ComboBoxStyle.DropDownList,
+                Enabled = false
+            };
+            btnNuevaFam = new Button
+            {
+                Text = "➕",
+                Location = new Point(270, 19),
+                Size = new Size(32, 28),
+                BackColor = Color.FromArgb(241, 245, 249),
+                ForeColor = Color.FromArgb(16, 185, 129),
+                FlatStyle = FlatStyle.Flat,
+                Font = new Font("Segoe UI", 9F, FontStyle.Bold),
+                Cursor = Cursors.Hand,
+                Enabled = false
+            };
+            btnNuevaFam.FlatAppearance.BorderColor = Color.FromArgb(226, 232, 240);
+            btnNuevaFam.Click += BtnNuevaFam_Click;
+            pnlFamGroup.Controls.AddRange(new Control[] { lblFam, cbFamilia, btnNuevaFam });
+
+            cbCategoria.SelectedIndexChanged += (s, e) => ActualizarFamiliasSegunCategoria();
+
+            pnlFila2.Controls.Add(pnlCatGroup);
+            pnlFila2.Controls.Add(pnlFamGroup);
 
             // Tarjeta Tipo de Venta: Pesable / Unidad
             Panel pnlCardPesable = CrearCardPanel(630, 50);
@@ -507,19 +516,102 @@ namespace SISTEMAACTUALIZADO.Modals
         {
             try
             {
-                var categorias = _productoService.ObtenerCategoriasRegistradas();
-                var familias = _productoService.ObtenerTodasLasFamilias();
+                var categoriasBD = _configService.ObtenerCategoriasPOS();
 
                 cbCategoria.Items.Clear();
-                cbCategoria.Items.AddRange(categorias.Count > 0 ? categorias.ToArray() : new string[] { "Abarrotes", "Lácteos", "Bebidas", "Aseo", "General" });
+                cbCategoria.Items.Add("Sin Asignar");
 
-                cbFamilia.Items.Clear();
-                cbFamilia.Items.AddRange(familias.Count > 0 ? familias.ToArray() : new string[] { "Aderezos", "Leche", "Quesos", "General" });
+                foreach (var cat in categoriasBD)
+                {
+                    cbCategoria.Items.Add(cat.Nombre);
+                }
 
-                cbCategoria.Text = "Abarrotes";
-                cbFamilia.Text = "Aderezos";
+                if (_productoAEditar == null)
+                {
+                    cbCategoria.SelectedItem = "Sin Asignar";
+                    ActualizarFamiliasSegunCategoria();
+                }
             }
-            catch { }
+            catch (Exception ex)
+            {
+                MessageBox.Show($"Error al cargar categorías: {ex.Message}", "Error", MessageBoxButtons.OK, MessageBoxIcon.Error);
+            }
+        }
+
+        private void ActualizarFamiliasSegunCategoria(string? familiaASeleccionar = null)
+        {
+            string catNombre = cbCategoria.SelectedItem?.ToString() ?? "";
+
+            cbFamilia.Items.Clear();
+
+            if (string.IsNullOrEmpty(catNombre) || catNombre == "Sin Asignar")
+            {
+                cbFamilia.Items.Add("General");
+                cbFamilia.SelectedIndex = 0;
+                cbFamilia.Enabled = false;
+                btnNuevaFam.Enabled = false;
+                return;
+            }
+
+            cbFamilia.Enabled = true;
+            btnNuevaFam.Enabled = true;
+
+            var categoriasBD = _configService.ObtenerCategoriasPOS();
+            var cat = categoriasBD.FirstOrDefault(c => c.Nombre.Equals(catNombre, StringComparison.OrdinalIgnoreCase));
+
+            cbFamilia.Items.Add("General");
+
+            if (cat != null)
+            {
+                var familias = cat.Familias.Where(f => f.Activo).OrderBy(f => f.Orden).ToList();
+                foreach (var fam in familias)
+                {
+                    if (!fam.Nombre.Equals("General", StringComparison.OrdinalIgnoreCase))
+                    {
+                        cbFamilia.Items.Add(fam.Nombre);
+                    }
+                }
+            }
+
+            if (!string.IsNullOrEmpty(familiaASeleccionar) && cbFamilia.Items.Contains(familiaASeleccionar))
+            {
+                cbFamilia.SelectedItem = familiaASeleccionar;
+            }
+            else
+            {
+                cbFamilia.SelectedIndex = 0;
+            }
+        }
+
+        private void BtnNuevaCat_Click(object? sender, EventArgs e)
+        {
+            using var modal = new FormNuevaCategoriaModal(_configService);
+            if (modal.ShowDialog(this) == DialogResult.OK && !string.IsNullOrEmpty(modal.CategoriaCreada))
+            {
+                CargarListasDesplegables();
+                cbCategoria.SelectedItem = modal.CategoriaCreada;
+                ActualizarFamiliasSegunCategoria();
+            }
+        }
+
+        private void BtnNuevaFam_Click(object? sender, EventArgs e)
+        {
+            string catNombre = cbCategoria.SelectedItem?.ToString() ?? "";
+            if (string.IsNullOrEmpty(catNombre) || catNombre == "Sin Asignar")
+            {
+                MessageBox.Show("Debe seleccionar una categoría antes de agregar una subfamilia.", "Atención", MessageBoxButtons.OK, MessageBoxIcon.Information);
+                return;
+            }
+
+            var categoriasBD = _configService.ObtenerCategoriasPOS();
+            var cat = categoriasBD.FirstOrDefault(c => c.Nombre.Equals(catNombre, StringComparison.OrdinalIgnoreCase));
+            if (cat == null) return;
+
+            using var modal = new FormNuevaFamiliaModal(cat.Id, cat.Nombre, _configService);
+            if (modal.ShowDialog(this) == DialogResult.OK && !string.IsNullOrEmpty(modal.FamiliaCreada))
+            {
+                ActualizarFamiliasSegunCategoria(modal.FamiliaCreada);
+            }
         }
 
         private void CargarDatosSiEsEdicion()
@@ -532,8 +624,15 @@ namespace SISTEMAACTUALIZADO.Modals
                     chkEsPesable.Checked = _productoAEditar.EsPesable;
                     txtCodigoBarra.Text = _productoAEditar.CodigoBarra;
                     txtNombre.Text = _productoAEditar.Nombre;
-                    cbCategoria.Text = !string.IsNullOrWhiteSpace(_productoAEditar.Categoria) ? _productoAEditar.Categoria : "General";
-                    cbFamilia.Text = !string.IsNullOrWhiteSpace(_productoAEditar.NFamilia) ? _productoAEditar.NFamilia : cbCategoria.Text;
+                    string catExistente = !string.IsNullOrWhiteSpace(_productoAEditar.Categoria) ? _productoAEditar.Categoria : "Sin Asignar";
+                    if (!cbCategoria.Items.Contains(catExistente))
+                    {
+                        cbCategoria.Items.Add(catExistente);
+                    }
+                    cbCategoria.SelectedItem = catExistente;
+
+                    string famExistente = !string.IsNullOrWhiteSpace(_productoAEditar.NFamilia) ? _productoAEditar.NFamilia : "General";
+                    ActualizarFamiliasSegunCategoria(famExistente);
 
                     decimal factor = _productoAEditar.EsPesable ? 1000m : 1m;
                     txtPrecioCosto.Text = MonedaHelper.Formatear(_productoAEditar.PrecioCosto * factor);
@@ -748,9 +847,32 @@ namespace SISTEMAACTUALIZADO.Modals
                     ? _productoService.ObtenerSiguienteCodigoBarraSugerido() 
                     : txtCodigoBarra.Text.Trim();
                 productoGuardar.Nombre = nombre;
-                productoGuardar.Categoria = cbCategoria.Text.Trim();
-                productoGuardar.NFamilia = cbFamilia.Text.Trim();
+
+                string catSeleccionada = cbCategoria.SelectedItem?.ToString() ?? "Sin Asignar";
+                string famSeleccionada = cbFamilia.SelectedItem?.ToString() ?? "General";
+
+                productoGuardar.Categoria = catSeleccionada;
+                productoGuardar.NFamilia = famSeleccionada;
                 productoGuardar.ListaDefectoPOS = listaSeleccionada;
+
+                // Si es un producto nuevo o no tiene posición asignada en el lienzo:
+                if (productoGuardar.ProductoID == 0 || productoGuardar.OrdenPOS == 0)
+                {
+                    if (catSeleccionada == "Sin Asignar")
+                    {
+                        productoGuardar.OrdenPOS = 0; // Almacén
+                    }
+                    else
+                    {
+                        // Asignar automáticamente al final del lienzo de esa categoría
+                        using var db = new SISTEMAACTUALIZADO.Data.AppDbContext();
+                        int maxOrden = db.Productos
+                            .Where(p => p.Estado && p.Categoria == catSeleccionada)
+                            .Max(p => (int?)p.OrdenPOS) ?? 0;
+
+                        productoGuardar.OrdenPOS = maxOrden + 1;
+                    }
+                }
                 
                 // ASIGNAR EL STOCK REAL DIGITADO (evita que se guarde en 1)
                 productoGuardar.Stock = stockFinal; 
@@ -790,13 +912,6 @@ namespace SISTEMAACTUALIZADO.Modals
                 // Pasamos 0 en cantidadFacturaInicial para que no pise el Stock asignado arriba
                 ProductoResultado = _productoService.GuardarProducto(productoGuardar, tramos, rbModoEscala.Checked, cantidadFacturaInicial: 0);
 
-                // Guardar la asociación del color con el nombre de la categoría
-                if (cbColorCategoria.SelectedIndex >= 0)
-                {
-                    var pal = CategoriaColorHelper.OpcionesPaleta[cbColorCategoria.SelectedIndex];
-                    CategoriaColorHelper.GuardarColor(cbCategoria.Text.Trim(), pal.Fondo, pal.Texto, pal.Borde);
-                }
-
                 this.DialogResult = DialogResult.OK;
                 this.Close();
             }
@@ -805,24 +920,7 @@ namespace SISTEMAACTUALIZADO.Modals
                 MessageBox.Show($"Error al guardar: {ex.Message}", "Error", MessageBoxButtons.OK, MessageBoxIcon.Error);
             }
         }
-        private void SincronizarColorSegunCategoria()
-        {
-            string cat = cbCategoria.Text.Trim();
-            if (string.IsNullOrWhiteSpace(cat)) return;
-
-            var estilo = CategoriaColorHelper.ObtenerColor(cat);
-            for (int i = 0; i < CategoriaColorHelper.OpcionesPaleta.Count; i++)
-            {
-                if (CategoriaColorHelper.OpcionesPaleta[i].Texto == estilo.Texto || 
-                    CategoriaColorHelper.OpcionesPaleta[i].Fondo == estilo.Fondo)
-                {
-                    cbColorCategoria.SelectedIndex = i;
-                    btnColorMuestra.BackColor = estilo.Texto;
-                    btnColorMuestra.FlatAppearance.BorderColor = estilo.Borde;
-                    break;
-                }
-            }
-        }
+        
 
         private class FilaTramoUI
         {

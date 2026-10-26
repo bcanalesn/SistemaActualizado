@@ -811,7 +811,7 @@ namespace SISTEMAACTUALIZADO.Modals
 
             using var db = new AppDbContext();
             
-            // 1. Traer los productos según el filtro de asignación
+            // 1. Filtrar productos según la pestaña seleccionada
             var query = db.Productos.Where(p => p.Estado);
 
             if (soloSinAsignar)
@@ -825,7 +825,7 @@ namespace SISTEMAACTUALIZADO.Modals
 
             var productosBase = query.ToList();
 
-            // 2. Coincidencia estricta: que comience por la palabra (StartsWith)
+            // 2. Coincidencia estricta: que comience con la palabra buscada
             List<Producto> lista;
             if (!string.IsNullOrEmpty(filtro))
             {
@@ -847,20 +847,51 @@ namespace SISTEMAACTUALIZADO.Modals
 
             foreach (var p in lista)
             {
+                // Tarjeta ligeramente más alta para alojar la miniatura
                 Panel item = new Panel
                 {
-                    Size = new Size(245, 42),
+                    Size = new Size(245, 48),
                     BackColor = Color.White,
                     Margin = new Padding(0, 0, 0, 4),
                     Cursor = Cursors.Hand
                 };
                 item.Paint += (s, e) => ControlPaint.DrawBorder(e.Graphics, item.ClientRectangle, Color.FromArgb(226, 232, 240), ButtonBorderStyle.Solid);
 
+                // Miniatura de imagen o emoji
+                Control ctrlImg;
+                Image? imgProd = ImagenHelper.CargarImagenSegura(p.ImagenPath);
+
+                if (imgProd != null)
+                {
+                    ctrlImg = new PictureBoxCalidadAlta
+                    {
+                        Location = new Point(5, 5),
+                        Size = new Size(38, 38),
+                        SizeMode = PictureBoxSizeMode.Zoom,
+                        BackColor = Color.FromArgb(248, 250, 252),
+                        Image = imgProd,
+                        Cursor = Cursors.Hand
+                    };
+                }
+                else
+                {
+                    ctrlImg = new Label
+                    {
+                        Text = p.EsPesable ? "⚖️" : "📦",
+                        Font = new Font("Segoe UI", 12F),
+                        Location = new Point(5, 5),
+                        Size = new Size(38, 38),
+                        TextAlign = ContentAlignment.MiddleCenter,
+                        BackColor = Color.FromArgb(248, 250, 252),
+                        Cursor = Cursors.Hand
+                    };
+                }
+
                 Label lbl = new Label
                 {
                     Text = p.Nombre,
-                    Location = new Point(6, 4),
-                    Size = new Size(160, 18),
+                    Location = new Point(48, 5),
+                    Size = new Size(165, 18),
                     AutoSize = false,
                     Font = new Font("Segoe UI", 8F, FontStyle.Bold)
                 };
@@ -872,8 +903,8 @@ namespace SISTEMAACTUALIZADO.Modals
                 Label lblSub = new Label
                 {
                     Text = $"{p.Categoria} • {precioStr}",
-                    Location = new Point(6, 22),
-                    Size = new Size(180, 16),
+                    Location = new Point(48, 25),
+                    Size = new Size(165, 16),
                     ForeColor = Color.FromArgb(100, 116, 139),
                     Font = new Font("Segoe UI", 7F)
                 };
@@ -881,19 +912,21 @@ namespace SISTEMAACTUALIZADO.Modals
                 Label lblDrag = new Label
                 {
                     Text = "⋮⋮",
-                    Location = new Point(220, 10),
+                    Location = new Point(220, 14),
                     Size = new Size(20, 20),
                     ForeColor = Color.FromArgb(148, 163, 184),
                     Font = new Font("Segoe UI", 11F, FontStyle.Bold)
                 };
 
+                // Asignar inicio de Drag & Drop en todos los elementos del ítem
                 Action dragAction = () => item.DoDragDrop(p, DragDropEffects.Move);
                 item.MouseDown += (s, e) => dragAction();
+                ctrlImg.MouseDown += (s, e) => dragAction();
                 lbl.MouseDown += (s, e) => dragAction();
                 lblSub.MouseDown += (s, e) => dragAction();
                 lblDrag.MouseDown += (s, e) => dragAction();
 
-                item.Controls.AddRange(new Control[] { lbl, lblSub, lblDrag });
+                item.Controls.AddRange(new Control[] { ctrlImg, lbl, lblSub, lblDrag });
                 flowAlmacenProductos.Controls.Add(item);
             }
 
@@ -916,74 +949,11 @@ namespace SISTEMAACTUALIZADO.Modals
 
         private void PromptNuevaCategoria()
         {
-            using Form prompt = new Form
+            using var modal = new FormNuevaCategoriaModal(_configService);
+            if (modal.ShowDialog(this) == DialogResult.OK && !string.IsNullOrEmpty(modal.CategoriaCreada))
             {
-                Width = 380,
-                Height = 230,
-                FormBorderStyle = FormBorderStyle.FixedDialog,
-                Text = "Nueva Categoría",
-                StartPosition = FormStartPosition.CenterParent,
-                MaximizeBox = false,
-                MinimizeBox = false,
-                BackColor = Color.White
-            };
-
-            Label lblNom = new Label { Left = 20, Top = 15, Text = "Nombre de la categoría:", AutoSize = true, Font = new Font("Segoe UI", 9F, FontStyle.Bold) };
-            TextBox txtNom = new TextBox { Left = 20, Top = 38, Width = 320, Font = new Font("Segoe UI", 9.5F) };
-
-            Label lblColor = new Label { Left = 20, Top = 72, Text = "Color de la categoría:", AutoSize = true, Font = new Font("Segoe UI", 9F, FontStyle.Bold) };
-            Button btnMuestra = new Button { Left = 20, Top = 95, Size = new Size(24, 24), FlatStyle = FlatStyle.Flat, Enabled = false };
-            btnMuestra.FlatAppearance.BorderSize = 1;
-
-            ComboBox cbColor = new ComboBox { Left = 50, Top = 95, Width = 290, DropDownStyle = ComboBoxStyle.DropDownList, Font = new Font("Segoe UI", 9F, FontStyle.Bold) };
-            foreach (var opc in CategoriaColorHelper.OpcionesPaleta) cbColor.Items.Add(opc.Nombre);
-
-            cbColor.SelectedIndexChanged += (s, e) =>
-            {
-                if (cbColor.SelectedIndex >= 0)
-                {
-                    var pal = CategoriaColorHelper.OpcionesPaleta[cbColor.SelectedIndex];
-                    btnMuestra.BackColor = pal.Texto;
-                    btnMuestra.FlatAppearance.BorderColor = pal.Borde;
-                }
-            };
-            cbColor.SelectedIndex = 0;
-
-            Button btnCrear = new Button { Text = "Crear Categoría", Left = 190, Width = 150, Top = 140, DialogResult = DialogResult.OK, BackColor = Color.FromArgb(16, 185, 129), ForeColor = Color.White, FlatStyle = FlatStyle.Flat, Font = new Font("Segoe UI", 9F, FontStyle.Bold) };
-            btnCrear.FlatAppearance.BorderSize = 0;
-
-            prompt.Controls.AddRange(new Control[] { lblNom, txtNom, lblColor, btnMuestra, cbColor, btnCrear });
-            prompt.AcceptButton = btnCrear;
-
-            if (prompt.ShowDialog(this) == DialogResult.OK)
-            {
-                string nombre = txtNom.Text.Trim();
-                if (string.IsNullOrWhiteSpace(nombre)) return;
-
-                if (_categoriasCache.Any(c => c.Nombre.Equals(nombre, StringComparison.OrdinalIgnoreCase)))
-                {
-                    MessageBox.Show($"Ya existe una categoría activa con el nombre '{nombre}'.", "Categoría Existente", MessageBoxButtons.OK, MessageBoxIcon.Warning);
-                    return;
-                }
-
-                var pal = CategoriaColorHelper.OpcionesPaleta[Math.Max(0, cbColor.SelectedIndex)];
-
-                try
-                {
-                    _configService.CrearOCargarCategoria(
-                        nombre,
-                        ColorTranslator.ToHtml(pal.Fondo),
-                        ColorTranslator.ToHtml(pal.Texto),
-                        ColorTranslator.ToHtml(pal.Borde)
-                    );
-
-                    _catEdicionActiva = nombre;
-                    CargarDatosEspejoConfig();
-                }
-                catch (Exception ex)
-                {
-                    MessageBox.Show($"Error al procesar la categoría: {ex.Message}", "Error", MessageBoxButtons.OK, MessageBoxIcon.Error);
-                }
+                _catEdicionActiva = modal.CategoriaCreada;
+                CargarDatosEspejoConfig();
             }
         }
 
@@ -1109,33 +1079,11 @@ namespace SISTEMAACTUALIZADO.Modals
 
         private void PromptNuevaFamilia(PosCategoria cat)
         {
-            using Form prompt = new Form
+            using var modal = new FormNuevaFamiliaModal(cat.Id, cat.Nombre, _configService);
+            if (modal.ShowDialog(this) == DialogResult.OK && !string.IsNullOrEmpty(modal.FamiliaCreada))
             {
-                Width = 350,
-                Height = 160,
-                FormBorderStyle = FormBorderStyle.FixedDialog,
-                Text = $"Nueva Familia en {cat.Nombre}",
-                StartPosition = FormStartPosition.CenterParent,
-                MaximizeBox = false,
-                MinimizeBox = false,
-                BackColor = Color.White
-            };
-            Label textLabel = new Label { Left = 20, Top = 15, Text = "Nombre de la subfamilia:", AutoSize = true, Font = new Font("Segoe UI", 9F, FontStyle.Bold) };
-            TextBox textBox = new TextBox { Left = 20, Top = 40, Width = 295, Font = new Font("Segoe UI", 10F) };
-            Button confirmation = new Button { Text = "Crear", Left = 215, Width = 100, Top = 75, DialogResult = DialogResult.OK, BackColor = Color.FromArgb(16, 185, 129), ForeColor = Color.White, FlatStyle = FlatStyle.Flat };
-            confirmation.FlatAppearance.BorderSize = 0;
-
-            prompt.Controls.AddRange(new Control[] { textLabel, textBox, confirmation });
-            prompt.AcceptButton = confirmation;
-
-            if (prompt.ShowDialog(this) == DialogResult.OK)
-            {
-                string nombre = textBox.Text.Trim();
-                if (string.IsNullOrWhiteSpace(nombre)) return;
-
-                _configService.CrearFamilia(cat.Id, nombre);
                 _categoriasCache = _configService.ObtenerCategoriasPOS();
-                _famEdicionActiva = nombre;
+                _famEdicionActiva = modal.FamiliaCreada;
                 RenderizarFamiliasConfig();
                 RefrescarLienzoYAlmacen();
             }
