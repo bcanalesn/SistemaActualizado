@@ -11,6 +11,7 @@ namespace SISTEMAACTUALIZADO.Modals
     {
         private readonly ClienteService _clienteService = new ClienteService();
         private readonly Cliente? _clienteAEditar;
+        public Cliente? ClienteGuardado { get; private set; }
 
         private TextBox txtRut = null!;
         private TextBox txtRazon = null!;
@@ -341,7 +342,8 @@ namespace SISTEMAACTUALIZADO.Modals
 
             try
             {
-                bool esNuevo = (_clienteAEditar == null);
+                // Un cliente es realmente nuevo si no tiene ID asignado por la base de datos (> 0)
+                bool esNuevo = (_clienteAEditar == null || _clienteAEditar.IdCliente <= 0);
                 Cliente clienteGuardar = _clienteAEditar ?? new Cliente();
 
                 int diasAnteriores = clienteGuardar.DiasCreditoHabiles;
@@ -369,6 +371,9 @@ namespace SISTEMAACTUALIZADO.Modals
                 clienteGuardar.Estado = true;
 
                 _clienteService.GuardarCliente(clienteGuardar, esNuevo);
+
+                // 👇 Guardamos la referencia del cliente persistido
+                this.ClienteGuardado = clienteGuardar;
 
                 MessageBox.Show("Cliente guardado correctamente.", "Éxito", MessageBoxButtons.OK, MessageBoxIcon.Information);
                 this.DialogResult = DialogResult.OK;

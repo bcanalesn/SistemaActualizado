@@ -290,7 +290,8 @@ namespace SISTEMAACTUALIZADO
             Agregar("NFamilia", "Familia", 110, DataGridViewContentAlignment.MiddleLeft);
 
             // Stock y Precios CENTRADOS para quedar debajo de su título
-            Agregar("Stock", "Stock", 85, DataGridViewContentAlignment.MiddleCenter, "", null, true);
+            Agregar("Stock", "Stock Físico", 90, DataGridViewContentAlignment.MiddleCenter, "", null, false);
+            Agregar("StockDisponible", "Stock Disponible", 110, DataGridViewContentAlignment.MiddleCenter, "", Color.FromArgb(22, 101, 52), true);
             Agregar("PrecioCosto", "Costo Neto", 100, DataGridViewContentAlignment.MiddleCenter);
             Agregar("PrecioUnitario", "Precio Venta (L1)", 125, DataGridViewContentAlignment.MiddleCenter, "", Color.FromArgb(16, 185, 129), true);
 
@@ -349,8 +350,8 @@ namespace SISTEMAACTUALIZADO
                         e.FormattingApplied = true;
                     }
                 }
-                // 2. FORMATEO DE STOCK
-                else if (colName == "Stock")
+                // 2. FORMATEO DE STOCK (Físico y Disponible)
+                else if (colName == "Stock" || colName == "StockDisponible")
                 {
                     if (e.Value is int stockInt)
                     {

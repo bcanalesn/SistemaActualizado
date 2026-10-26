@@ -97,7 +97,8 @@ namespace SISTEMAACTUALIZADO.Services
         {
             using var db = new AppDbContext();
 
-            if (esNuevo)
+            // Si esNuevo es true O el IdCliente es 0, debe insertarse en la BD
+            if (esNuevo || cliente.IdCliente <= 0)
             {
                 db.Clientes.Add(cliente);
             }
@@ -146,9 +147,14 @@ namespace SISTEMAACTUALIZADO.Services
                         });
                     }
                 }
+                else
+                {
+                    // Si no encontró el ID para editar, lo inserta como nuevo
+                    db.Clientes.Add(cliente);
+                }
             }
 
-            db.SaveChanges();
+            db.SaveChanges(); // Aquí MySQL genera el IdCliente autoincremental
         }
 
         public void CambiarEstado(int idCliente)
@@ -171,6 +177,30 @@ namespace SISTEMAACTUALIZADO.Services
                 cliente.Estado = false;
                 db.SaveChanges();
             }
+        }
+
+        public InfoCrediticiaClienteDTO? ObtenerInfoCrediticiaPorClienteId(int clienteId)
+        {
+            using var db = new AppDbContext();
+            var cli = db.Clientes.Find(clienteId);
+            if (cli == null) return null;
+
+            // Calcular facturas impagas asociadas a este IdCliente
+            var facturasImpagas = db.TVE2607
+                .Where(v => v.Idcliente == clienteId && v.status == "CreditoEmitido")
+                .ToList();
+
+            decimal deudaTotal = facturasImpagas.Sum(f => f.Total);
+            int facturasVencidas = facturasImpagas.Count(f => f.FecDoc.AddDays(cli.DiasCreditoHabiles > 0 ? cli.DiasCreditoHabiles : cli.DiasCredito) < DateTime.Now);
+            decimal cupoDisponible = Math.Max(0, cli.CupoCredito - deudaTotal);
+
+            return new InfoCrediticiaClienteDTO
+            {
+                Cliente = cli,
+                DeudaTotal = deudaTotal,
+                CupoDisponible = cupoDisponible,
+                FacturasVencidas = facturasVencidas
+            };
         }
     }
 }
