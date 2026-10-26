@@ -100,6 +100,7 @@ namespace SISTEMAACTUALIZADO.Services
                 {
                     prodBd.CodigoBarra = producto.CodigoBarra;
                     prodBd.Nombre = producto.Nombre;
+                    prodBd.NmbCorto = producto.NmbCorto;
                     prodBd.Categoria = producto.Categoria;
                     prodBd.NFamilia = producto.NFamilia;
                     prodBd.PrecioCosto = producto.PrecioCosto;
@@ -119,6 +120,7 @@ namespace SISTEMAACTUALIZADO.Services
 
                     prodBd.Stock = producto.Stock;
                     prodBd.StockMinimo = producto.StockMinimo;
+                    prodBd.PorcentajeMerma = producto.PorcentajeMerma;
                     prodBd.ImagenPath = producto.ImagenPath;
                     prodBd.FchUpd = DateTime.Now;
                     prodBd.Sincro = 0;

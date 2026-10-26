@@ -46,7 +46,7 @@ namespace SISTEMAACTUALIZADO.Modals
             _producto = producto;
             _listaCliente = Math.Max(1, listaCliente);
 
-            string nombre = _producto?.Nombre ?? nombreAlternativo ?? "Producto";
+            string nombre = (!string.IsNullOrWhiteSpace(_producto?.NmbCorto) ? _producto.NmbCorto : _producto?.Nombre) ?? nombreAlternativo ?? "Producto";
             _esPorGramos = esPorGramos || EsNombrePorGramos(nombre);
 
             if (_esPorGramos)

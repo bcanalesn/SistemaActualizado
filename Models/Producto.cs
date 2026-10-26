@@ -117,6 +117,27 @@ namespace SISTEMAACTUALIZADO.Models
         public int Stock { get; set; }
         public int StockMinimo { get; set; } = 5;
 
+        [Column(TypeName = "decimal(5,2)")]
+        public decimal PorcentajeMerma { get; set; } = 0.00m;
+
+        [NotMapped]
+        public int StockDisponible
+        {
+            get
+            {
+                if (PorcentajeMerma <= 0) return Stock;
+
+                decimal factor = 1.0m - (PorcentajeMerma / 100.0m);
+                decimal disponible = Stock * factor;
+
+                // Si es pesable, los gramos pueden truncarse o redondearse al entero más cercano
+                // Si es por unidad, siempre hacia abajo (Floor) para no vender unidades inexistentes
+                return EsPesable 
+                    ? (int)Math.Round(disponible, MidpointRounding.AwayFromZero) 
+                    : (int)Math.Floor(disponible);
+            }
+        }
+
         [Column(TypeName = "decimal(10,2)")]
         public decimal Qini { get; set; } = 0.00m;
 

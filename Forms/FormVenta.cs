@@ -916,9 +916,11 @@ namespace SISTEMAACTUALIZADO
                 };
             }
 
+            string nombreAMostrar = !string.IsNullOrWhiteSpace(prod.NmbCorto) ? prod.NmbCorto : prod.Nombre;
+
             Label lblNombre = new Label
             {
-                Text = prod.Nombre,
+                Text = nombreAMostrar,
                 Font = new Font("Segoe UI", 8.5F, FontStyle.Bold),
                 ForeColor = Color.FromArgb(15, 23, 42),
                 Location = new Point(4, 84),
@@ -953,10 +955,15 @@ namespace SISTEMAACTUALIZADO
                 TextAlign = ContentAlignment.MiddleCenter
             };
 
-            Color stockColor = prod.Stock > 10 ? Color.FromArgb(16, 185, 129) : (prod.Stock > 0 ? Color.FromArgb(245, 158, 11) : Color.FromArgb(239, 68, 68));
+            int stockParaVenta = prod.StockDisponible;
+
+            Color stockColor = stockParaVenta > prod.StockMinimo 
+                ? Color.FromArgb(16, 185, 129) 
+                : (stockParaVenta > 0 ? Color.FromArgb(245, 158, 11) : Color.FromArgb(239, 68, 68));
+
             string stockTexto = esPesable 
-                ? (prod.Stock >= 1000 ? $"Stock: {(prod.Stock / 1000.0):0.0} kg" : $"Stock: {prod.Stock} g") 
-                : $"Stock: {prod.Stock} un.";
+                ? (stockParaVenta >= 1000 ? $"Stock: {(stockParaVenta / 1000.0):0.0} kg" : $"Stock: {stockParaVenta} g") 
+                : $"Stock: {stockParaVenta} un.";
 
             Label lblStock = new Label
             {
@@ -978,7 +985,7 @@ namespace SISTEMAACTUALIZADO
             void AlEntrarMouse(object? s, EventArgs e)
             {
                 card.BackColor = Color.FromArgb(241, 245, 249);
-                VentanaPreviewProducto.Mostrar(card, imgProd, prod.Nombre, textoPrecio, $"Cód. {prod.CodigoBarra}", stockTexto, stockColor);
+                VentanaPreviewProducto.Mostrar(card, imgProd, nombreAMostrar, textoPrecio, $"Cód. {prod.CodigoBarra}", stockTexto, stockColor);
             }
 
             void AlSalirMouse(object? s, EventArgs e)
@@ -1149,9 +1156,11 @@ namespace SISTEMAACTUALIZADO
 
         private void SolicitarCantidadYAgregar(Producto prod)
         {
-            if (prod.Stock <= 0)
+            int stockDisponibleReal = prod.StockDisponible;
+
+            if (stockDisponibleReal <= 0)
             {
-                MessageBox.Show($"El producto '{prod.Nombre}' no tiene stock disponible.", "Sin Stock", MessageBoxButtons.OK, MessageBoxIcon.Warning);
+                MessageBox.Show($"El producto '{prod.Nombre}' no tiene stock disponible para venta.", "Sin Stock", MessageBoxButtons.OK, MessageBoxIcon.Warning);
                 return;
             }
 
@@ -1163,7 +1172,7 @@ namespace SISTEMAACTUALIZADO
             decimal precioBaseVenta = ObtenerPrecioActivoProducto(prod);
 
             // Se le pasa el producto completo y la lista activa del cliente para evaluar si conviene mostrar tramos
-            using (FormCantidadModal modal = new FormCantidadModal(prod, _listaClienteActivo, precioBaseVenta, cantidadInicial, prod.Stock, prod.ImagenPath, esPorGramos))
+            using (FormCantidadModal modal = new FormCantidadModal(prod, _listaClienteActivo, precioBaseVenta, cantidadInicial, stockDisponibleReal, prod.ImagenPath, esPorGramos))
             {
                 if (modal.ShowDialog(this) == DialogResult.OK)
                 {
@@ -1194,10 +1203,12 @@ namespace SISTEMAACTUALIZADO
                         }
                         else
                         {
+                            string nombreVenta = !string.IsNullOrWhiteSpace(prod.NmbCorto) ? prod.NmbCorto : prod.Nombre;
+
                             cart.Add(new DetalleCarrito
                             {
                                 ProductoID = prod.ProductoID,
-                                Nombre = prod.Nombre,
+                                Nombre = nombreVenta,
                                 PrecioLista1 = prod.PrecioUnitario,
                                 PrecioUnitario = precioFinal,
                                 Cantidad = nuevaCantidad,
