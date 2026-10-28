@@ -1208,7 +1208,7 @@ namespace SISTEMAACTUALIZADO
                             cart.Add(new DetalleCarrito
                             {
                                 ProductoID = prod.ProductoID,
-                                Nombre = nombreVenta,
+                                Nombre = prod.Nombre,
                                 PrecioLista1 = prod.PrecioUnitario,
                                 PrecioUnitario = precioFinal,
                                 Cantidad = nuevaCantidad,
@@ -1259,7 +1259,11 @@ namespace SISTEMAACTUALIZADO
                 bool esGramos = item.EsPesable || (prodOriginal != null && prodOriginal.EsPesable);
                 int pasoCarrito = esGramos ? 50 : 1;
 
-                Label lblNombre = new Label { Name = "lblNombre", Text = item.Nombre, Font = new Font("Segoe UI", 8.5F, FontStyle.Bold), ForeColor = Color.FromArgb(15, 23, 42), Location = new Point(6, 4), AutoSize = false, Size = new Size(110, 18) };
+                string nombreEnCarro = (prodOriginal != null && !string.IsNullOrWhiteSpace(prodOriginal.NmbCorto)) 
+                    ? prodOriginal.NmbCorto 
+                    : item.Nombre;
+
+                Label lblNombre = new Label { Name = "lblNombre", Text = nombreEnCarro, Font = new Font("Segoe UI", 8.5F, FontStyle.Bold), ForeColor = Color.FromArgb(15, 23, 42), Location = new Point(6, 4), AutoSize = false, Size = new Size(110, 18) };
                 
                 string txtUnit = esGramos 
                     ? $"{MonedaHelper.Formatear(item.PrecioUnitario * 1000m, conSigno: true)}/Kg" 

@@ -142,43 +142,21 @@ namespace SISTEMAACTUALIZADO.Services
             string nombreLimpio = nombre.Trim();
 
             var catExistente = db.PosCategorias.FirstOrDefault(c => c.Nombre.ToLower() == nombreLimpio.ToLower());
-
             if (catExistente != null)
             {
-                catExistente.Activo = true;
-                string nombreAnterior = catExistente.Nombre;
-                catExistente.Nombre = nombreLimpio;
-
-                if (nombreAnterior != nombreLimpio)
-                {
-                    var prods = db.Productos.Where(p => p.Categoria == nombreAnterior).ToList();
-                    foreach (var p in prods)
-                    {
-                        p.Categoria = nombreLimpio;
-                        p.FchUpd = DateTime.Now;
-                    }
-                }
-
-                catExistente.FondoHex = fondoHex;
-                catExistente.TextoHex = textoHex;
-                catExistente.BordeHex = bordeHex;
-
-                int maxOrden = db.PosCategorias.Where(c => c.Activo && c.Id != catExistente.Id).Max(c => (int?)c.Orden) ?? 0;
-                catExistente.Orden = maxOrden + 1;
+                throw new InvalidOperationException($"La categoría '{nombreLimpio}' ya existe.");
             }
-            else
+
+            int maxOrden = db.PosCategorias.Max(c => (int?)c.Orden) ?? 0;
+            db.PosCategorias.Add(new PosCategoria
             {
-                int maxOrden = db.PosCategorias.Where(c => c.Activo).Max(c => (int?)c.Orden) ?? 0;
-                db.PosCategorias.Add(new PosCategoria
-                {
-                    Nombre = nombreLimpio,
-                    Orden = maxOrden + 1,
-                    FondoHex = fondoHex,
-                    TextoHex = textoHex,
-                    BordeHex = bordeHex,
-                    Activo = true
-                });
-            }
+                Nombre = nombreLimpio,
+                Orden = maxOrden + 1,
+                FondoHex = fondoHex,
+                TextoHex = textoHex,
+                BordeHex = bordeHex,
+                Activo = true
+            });
 
             db.SaveChanges();
         }
@@ -186,16 +164,31 @@ namespace SISTEMAACTUALIZADO.Services
         public void RenombrarCategoria(int idCategoria, string nuevoNombre)
         {
             using var db = new AppDbContext();
+            string nombreLimpio = nuevoNombre.Trim();
+
             var cat = db.PosCategorias.Find(idCategoria);
             if (cat == null) return;
 
-            string viejoNombre = cat.Nombre;
-            cat.Nombre = nuevoNombre.Trim();
+            if (string.Equals(cat.Nombre, nombreLimpio, StringComparison.OrdinalIgnoreCase))
+            {
+                return;
+            }
 
+            // Validar si otra categoría ya se llama así
+            bool existeOtra = db.PosCategorias.Any(c => c.Id != idCategoria && c.Nombre.ToLower() == nombreLimpio.ToLower());
+            if (existeOtra)
+            {
+                throw new InvalidOperationException($"Ya existe una categoría con el nombre '{nombreLimpio}'.");
+            }
+
+            string viejoNombre = cat.Nombre;
+            cat.Nombre = nombreLimpio;
+
+            // Actualizar nombre en productos vinculados
             var prods = db.Productos.Where(p => p.Categoria == viejoNombre).ToList();
             foreach (var p in prods)
             {
-                p.Categoria = cat.Nombre;
+                p.Categoria = nombreLimpio;
                 p.FchUpd = DateTime.Now;
             }
 
@@ -221,9 +214,10 @@ namespace SISTEMAACTUALIZADO.Services
             var cat = db.PosCategorias.Find(idCategoria);
             if (cat == null) return;
 
-            cat.Activo = false;
+            string nombreCat = cat.Nombre;
 
-            var prods = db.Productos.Where(p => p.Categoria == cat.Nombre).ToList();
+            // 1. Dejar productos en 'Sin Asignar'
+            var prods = db.Productos.Where(p => p.Categoria == nombreCat).ToList();
             foreach (var p in prods)
             {
                 p.Categoria = "Sin Asignar";
@@ -232,6 +226,15 @@ namespace SISTEMAACTUALIZADO.Services
                 p.FchUpd = DateTime.Now;
             }
 
+            // 2. Eliminar físicamente sus familias asociadas
+            var familias = db.PosFamilias.Where(f => f.CategoriaId == idCategoria).ToList();
+            if (familias.Count > 0)
+            {
+                db.PosFamilias.RemoveRange(familias);
+            }
+
+            // 3. Eliminar físicamente la categoría
+            db.PosCategorias.Remove(cat);
             db.SaveChanges();
         }
 
@@ -244,41 +247,21 @@ namespace SISTEMAACTUALIZADO.Services
             using var db = new AppDbContext();
             string nombreLimpio = nombreFamilia.Trim();
 
-            var famExistente = db.PosFamilias.FirstOrDefault(f => f.CategoriaId == categoriaId && f.Nombre.ToLower() == nombreLimpio.ToLower());
-
-            if (famExistente != null)
+            // Valida si ya existe una subfamilia con ese nombre dentro de la misma categoría
+            bool existe = db.PosFamilias.Any(f => f.CategoriaId == categoriaId && f.Nombre.ToLower() == nombreLimpio.ToLower());
+            if (existe)
             {
-                famExistente.Activo = true;
-                string viejoNombre = famExistente.Nombre;
-                famExistente.Nombre = nombreLimpio;
-
-                var cat = db.PosCategorias.Find(categoriaId);
-                if (cat != null && viejoNombre != nombreLimpio)
-                {
-                    var prods = db.Productos
-                        .Where(p => p.Categoria == cat.Nombre && p.NFamilia == viejoNombre)
-                        .ToList();
-                    foreach (var p in prods)
-                    {
-                        p.NFamilia = nombreLimpio;
-                        p.FchUpd = DateTime.Now;
-                    }
-                }
-
-                int maxOrden = db.PosFamilias.Where(f => f.CategoriaId == categoriaId && f.Activo && f.Id != famExistente.Id).Max(f => (int?)f.Orden) ?? 0;
-                famExistente.Orden = maxOrden + 1;
+                throw new InvalidOperationException($"La subfamilia '{nombreLimpio}' ya existe en esta categoría.");
             }
-            else
+
+            int maxOrden = db.PosFamilias.Where(f => f.CategoriaId == categoriaId).Max(f => (int?)f.Orden) ?? 0;
+            db.PosFamilias.Add(new PosFamilia
             {
-                int maxOrden = db.PosFamilias.Where(f => f.CategoriaId == categoriaId && f.Activo).Max(f => (int?)f.Orden) ?? 0;
-                db.PosFamilias.Add(new PosFamilia
-                {
-                    CategoriaId = categoriaId,
-                    Nombre = nombreLimpio,
-                    Orden = maxOrden + 1,
-                    Activo = true
-                });
-            }
+                CategoriaId = categoriaId,
+                Nombre = nombreLimpio,
+                Orden = maxOrden + 1,
+                Activo = true
+            });
 
             db.SaveChanges();
         }
@@ -289,15 +272,32 @@ namespace SISTEMAACTUALIZADO.Services
             var fam = db.PosFamilias.Find(familiaId);
             if (fam == null) return;
 
-            string viejoNombre = fam.Nombre;
-            fam.Nombre = nuevoNombre.Trim();
+            string nombreLimpio = nuevoNombre.Trim();
 
+            // Si el nombre no varió, no hace nada
+            if (string.Equals(fam.Nombre, nombreLimpio, StringComparison.OrdinalIgnoreCase))
+            {
+                return;
+            }
+
+            // Validar que no choque con otra subfamilia de la misma categoría
+            bool existeOtra = db.PosFamilias.Any(f => f.CategoriaId == fam.CategoriaId && f.Id != familiaId && f.Nombre.ToLower() == nombreLimpio.ToLower());
+            if (existeOtra)
+            {
+                throw new InvalidOperationException($"Ya existe una subfamilia con el nombre '{nombreLimpio}' en esta categoría.");
+            }
+
+            string viejoNombre = fam.Nombre;
+            fam.Nombre = nombreLimpio;
+
+            // Actualizar el nombre de la subfamilia en los productos asociados
             var cat = db.PosCategorias.Find(fam.CategoriaId);
             if (cat != null)
             {
                 var prods = db.Productos
                     .Where(p => p.Categoria == cat.Nombre && p.NFamilia == viejoNombre)
                     .ToList();
+
                 foreach (var p in prods)
                 {
                     p.NFamilia = fam.Nombre;
@@ -326,14 +326,16 @@ namespace SISTEMAACTUALIZADO.Services
             var fam = db.PosFamilias.Find(familiaId);
             if (fam == null) return;
 
-            fam.Activo = false;
-
+            string nombreFam = fam.Nombre;
             var cat = db.PosCategorias.Find(fam.CategoriaId);
+
+            // 1. Restablecer los productos asociados a la subfamilia por defecto 'General'
             if (cat != null)
             {
                 var prods = db.Productos
-                    .Where(p => p.Categoria == cat.Nombre && p.NFamilia == fam.Nombre)
+                    .Where(p => p.Categoria == cat.Nombre && p.NFamilia == nombreFam)
                     .ToList();
+
                 foreach (var p in prods)
                 {
                     p.NFamilia = "General";
@@ -341,6 +343,8 @@ namespace SISTEMAACTUALIZADO.Services
                 }
             }
 
+            // 2. Eliminación física directa de la base de datos
+            db.PosFamilias.Remove(fam);
             db.SaveChanges();
         }
 
