@@ -169,16 +169,18 @@ namespace SISTEMAACTUALIZADO.Services
             var cat = db.PosCategorias.Find(idCategoria);
             if (cat == null) return;
 
-            if (string.Equals(cat.Nombre, nombreLimpio, StringComparison.OrdinalIgnoreCase))
-            {
-                return;
-            }
+            // 1. Si sólo cambió de mayúsculas a minúsculas en la misma categoría (ej: "bebida" a "Bebida")
+            bool esMismaCategoria = string.Equals(cat.Nombre.Trim(), nombreLimpio, StringComparison.OrdinalIgnoreCase);
 
-            // Validar si otra categoría ya se llama así
-            bool existeOtra = db.PosCategorias.Any(c => c.Id != idCategoria && c.Nombre.ToLower() == nombreLimpio.ToLower());
-            if (existeOtra)
+            // 2. Si no es la misma categoría, validar si OTRA categoría ya está usando ese nombre
+            if (!esMismaCategoria)
             {
-                throw new InvalidOperationException($"Ya existe una categoría con el nombre '{nombreLimpio}'.");
+                bool existeOtra = db.PosCategorias.Any(c => c.Id != idCategoria && 
+                                                        c.Nombre.ToLower() == nombreLimpio.ToLower());
+                if (existeOtra)
+                {
+                    throw new InvalidOperationException($"Ya existe otra categoría con el nombre '{nombreLimpio}'.");
+                }
             }
 
             string viejoNombre = cat.Nombre;

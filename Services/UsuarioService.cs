@@ -39,6 +39,7 @@ namespace SISTEMAACTUALIZADO.Services
                     existente.NombreUsuario = usuario.NombreUsuario;
                     existente.NombreCompleto = usuario.NombreCompleto;
                     existente.Clave = usuario.Clave;
+                    existente.Pin = usuario.Pin; 
                     existente.Rol = usuario.Rol;
                     existente.HorasTurno = usuario.HorasTurno;
                     existente.Estado = usuario.Estado;

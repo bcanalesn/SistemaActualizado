@@ -166,13 +166,23 @@ namespace SISTEMAACTUALIZADO.Modals
 
             string vendedorFila = dgvVentas.CurrentRow.Cells["Vendedor"].Value?.ToString() ?? "";
 
-            // RESTRICCIÓN: Solo el vendedor asignado puede reanudar su venta
+            // 1. RESTRICCIÓN: Solo el vendedor asignado puede reanudar su venta
             if (!vendedorFila.Equals(_vendedorActual, StringComparison.OrdinalIgnoreCase))
             {
                 MessageBox.Show($"Esta venta pertenece a '{vendedorFila}'.\nSolo el vendedor asignado puede reanudarla.", "Acceso Restringido", MessageBoxButtons.OK, MessageBoxIcon.Warning);
                 return;
             }
 
+            // 2. SEGURIDAD: Solicitar PIN de 4 dígitos del vendedor
+            using (var modalPin = new FormValidarPinModal(vendedorFila))
+            {
+                if (modalPin.ShowDialog(this) != DialogResult.OK || !modalPin.PinValidado)
+                {
+                    return; // Cancela la recuperación si el PIN no fue correcto
+                }
+            }
+
+            // 3. Confirmar la recuperación[cite: 29]
             IdTveSeleccionado = Convert.ToInt32(dgvVentas.CurrentRow.Cells["idTve"].Value);
             this.DialogResult = DialogResult.OK;
             this.Close();

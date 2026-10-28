@@ -379,7 +379,7 @@ namespace SISTEMAACTUALIZADO
             using Form modal = new Form 
             {
                 Text = esNuevo ? "Crear Nueva Cuenta de Usuario" : "Editar Usuario y Contraseña", 
-                Size = new Size(400, 520), 
+                Size = new Size(400, 580), 
                 StartPosition = FormStartPosition.CenterParent, 
                 FormBorderStyle = FormBorderStyle.FixedDialog, 
                 MaximizeBox = false, 
@@ -399,15 +399,19 @@ namespace SISTEMAACTUALIZADO
             Label lblPass = new Label { Text = "Contraseña:", Location = new Point(25, 170), AutoSize = true, Font = new Font("Segoe UI", 9F, FontStyle.Bold) }; 
             TextBox txtPass = new TextBox { Text = u.Clave, Location = new Point(25, 190), Size = new Size(330, 28), Font = new Font("Segoe UI", 9.5F), UseSystemPasswordChar = true }; 
 
-            Label lblRol = new Label { Text = "Rol / Nivel de Acceso:", Location = new Point(25, 228), AutoSize = true, Font = new Font("Segoe UI", 9F, FontStyle.Bold) }; 
-            ComboBox cbRol = new ComboBox { Location = new Point(25, 248), Size = new Size(330, 28), DropDownStyle = ComboBoxStyle.DropDownList, Font = new Font("Segoe UI", 9.5F) }; 
+            Label lblPin = new Label { Text = "PIN de Seguridad (4 Dígitos):", Location = new Point(25, 226), AutoSize = true, Font = new Font("Segoe UI", 9F, FontStyle.Bold) }; 
+            TextBox txtPin = new TextBox { Text = u.Pin ?? "", Location = new Point(25, 246), Size = new Size(330, 28), Font = new Font("Segoe UI", 9.5F), MaxLength = 4, UseSystemPasswordChar = true, PlaceholderText = "Ej: 1234 (Obligatorio para Vendedores)" };
+            txtPin.KeyPress += (s, e) => { if (!char.IsControl(e.KeyChar) && !char.IsDigit(e.KeyChar)) e.Handled = true; };
+
+            Label lblRol = new Label { Text = "Rol / Nivel de Acceso:", Location = new Point(25, 282), AutoSize = true, Font = new Font("Segoe UI", 9F, FontStyle.Bold) }; 
+            ComboBox cbRol = new ComboBox { Location = new Point(25, 302), Size = new Size(330, 28), DropDownStyle = ComboBoxStyle.DropDownList, Font = new Font("Segoe UI", 9.5F) }; 
             cbRol.Items.AddRange(new string[] { "Administrador", "Cajero", "Vendedor", "Supervisor", "Bodeguero" }); 
             cbRol.SelectedItem = string.IsNullOrEmpty(u.Rol) ? "Vendedor" : u.Rol; 
 
-            Label lblHoras = new Label { Text = "Horas de Turno Asignadas (Jornada):", Location = new Point(25, 286), AutoSize = true, Font = new Font("Segoe UI", 9F, FontStyle.Bold) };
+            Label lblHoras = new Label { Text = "Horas de Turno Asignadas (Jornada):", Location = new Point(25, 338), AutoSize = true, Font = new Font("Segoe UI", 9F, FontStyle.Bold) };
             NumericUpDown numHoras = new NumericUpDown
             {
-                Location = new Point(25, 308),
+                Location = new Point(25, 358),
                 Size = new Size(330, 28),
                 Font = new Font("Segoe UI", 9.5F),
                 Minimum = 1,
@@ -416,26 +420,46 @@ namespace SISTEMAACTUALIZADO
             };
 
             Button btnGuardar = CrearBoton(esNuevo ? "💾 Registrar Usuario" : "💾 Guardar Cambios", Color.FromArgb(0, 102, 255), Color.White, new Size(330, 40), 8); 
-            btnGuardar.Location = new Point(25, 365); 
+            btnGuardar.Location = new Point(25, 415); 
 
             btnGuardar.Click += (s, e) =>
             {
+                string rolSeleccionado = cbRol.SelectedItem?.ToString() ?? "Vendedor";
+                string pinIngresado = txtPin.Text.Trim();
+
                 if (string.IsNullOrWhiteSpace(txtUser.Text) || string.IsNullOrWhiteSpace(txtPass.Text)) 
                 {
                     MessageBox.Show("El usuario y la contraseña son obligatorios.", "Validación", MessageBoxButtons.OK, MessageBoxIcon.Warning); 
                     return; 
                 }
 
+                // Validación de PIN: Obligatorio de 4 números para rol Vendedor
+                if (rolSeleccionado == "Vendedor")
+                {
+                    if (pinIngresado.Length != 4 || !pinIngresado.All(char.IsDigit))
+                    {
+                        MessageBox.Show("Para usuarios con rol 'Vendedor', el PIN de seguridad debe contener exactamente 4 números.", "PIN Obligatorio", MessageBoxButtons.OK, MessageBoxIcon.Warning);
+                        txtPin.Focus();
+                        return;
+                    }
+                }
+                else if (!string.IsNullOrEmpty(pinIngresado) && (pinIngresado.Length != 4 || !pinIngresado.All(char.IsDigit)))
+                {
+                    MessageBox.Show("Si asigna un PIN opcional, este debe ser de exactamente 4 números.", "PIN Inválido", MessageBoxButtons.OK, MessageBoxIcon.Warning);
+                    txtPin.Focus();
+                    return;
+                }
+
                 u.NombreUsuario = txtUser.Text.Trim(); 
                 u.NombreCompleto = txtNombre.Text.Trim(); 
                 u.Clave = txtPass.Text.Trim(); 
-                u.Rol = cbRol.SelectedItem?.ToString() ?? "Vendedor"; 
+                u.Pin = string.IsNullOrEmpty(pinIngresado) ? null : pinIngresado;
+                u.Rol = rolSeleccionado; 
                 u.HorasTurno = (int)numHoras.Value;
 
                 try
                 {
                     _usuarioService.GuardarUsuario(u, esNuevo); 
-
                     MessageBox.Show("Cuenta de usuario guardada con éxito.", "Éxito", MessageBoxButtons.OK, MessageBoxIcon.Information); 
                     modal.Close(); 
                     CargarUsuarios(txtBuscar.Text.Trim()); 
@@ -446,10 +470,10 @@ namespace SISTEMAACTUALIZADO
                 }
             };
 
-            // 2. Establecer el botón Guardar como acción por defecto para Enter
+            // 1. Establecer el botón Guardar como acción por defecto para Enter
             modal.AcceptButton = btnGuardar;
 
-            // 3. Capturar Enter en cualquier campo de texto o selector numérico
+            // 2. Declarar PRIMERO el manejador de la tecla Enter
             KeyEventHandler enterHandler = (s, e) =>
             {
                 if (e.KeyCode == Keys.Enter)
@@ -459,13 +483,16 @@ namespace SISTEMAACTUALIZADO
                 }
             };
 
+            // 3. Asignar el evento a todos los campos
             txtUser.KeyDown += enterHandler;
             txtNombre.KeyDown += enterHandler;
             txtPass.KeyDown += enterHandler;
+            txtPin.KeyDown += enterHandler;
             cbRol.KeyDown += enterHandler;
             numHoras.KeyDown += enterHandler;
 
-            modal.Controls.AddRange(new Control[] { lblTitle, lblUser, txtUser, lblNombre, txtNombre, lblPass, txtPass, lblRol, cbRol, lblHoras, numHoras, btnGuardar }); 
+            // 4. Agregar controles al formulario una sola vez
+            modal.Controls.AddRange(new Control[] { lblTitle, lblUser, txtUser, lblNombre, txtNombre, lblPass, txtPass, lblPin, txtPin, lblRol, cbRol, lblHoras, numHoras, btnGuardar }); 
             modal.ShowDialog(); 
         }
 

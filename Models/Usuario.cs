@@ -11,5 +11,6 @@ namespace SISTEMAACTUALIZADO.Models
         public string Rol { get; set; } = "Cajero"; // Administrador / Cajero
         public int HorasTurno { get; set; } = 9;
         public bool Estado { get; set; } = true;
+        public string? Pin { get; set; } = null;
     }
 }

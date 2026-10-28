@@ -1062,18 +1062,29 @@ namespace SISTEMAACTUALIZADO.Modals
                 string nuevoNombre = txtNom.Text.Trim();
                 var pal = CategoriaColorHelper.OpcionesPaleta[Math.Max(0, cbColor.SelectedIndex)];
 
-                if (!string.IsNullOrWhiteSpace(nuevoNombre) && nuevoNombre != cat.Nombre)
+                try
                 {
-                    _configService.RenombrarCategoria(cat.Id, nuevoNombre);
-                    _catEdicionActiva = nuevoNombre;
+                    if (!string.IsNullOrWhiteSpace(nuevoNombre) && nuevoNombre != cat.Nombre)
+                    {
+                        _configService.RenombrarCategoria(cat.Id, nuevoNombre);
+                        _catEdicionActiva = nuevoNombre;
+                    }
+
+                    _configService.ActualizarColorCategoria(cat.Id,
+                        ColorTranslator.ToHtml(pal.Fondo),
+                        ColorTranslator.ToHtml(pal.Texto),
+                        ColorTranslator.ToHtml(pal.Borde));
+
+                    CargarDatosEspejoConfig();
                 }
-
-                _configService.ActualizarColorCategoria(cat.Id,
-                    ColorTranslator.ToHtml(pal.Fondo),
-                    ColorTranslator.ToHtml(pal.Texto),
-                    ColorTranslator.ToHtml(pal.Borde));
-
-                CargarDatosEspejoConfig();
+                catch (InvalidOperationException ex)
+                {
+                    MessageBox.Show(ex.Message, "Categoría Duplicada", MessageBoxButtons.OK, MessageBoxIcon.Warning);
+                }
+                catch (Exception ex)
+                {
+                    MessageBox.Show($"Ocurrió un error inesperado al guardar la categoría:\n{ex.Message}", "Error DB", MessageBoxButtons.OK, MessageBoxIcon.Error);
+                }
             }
         }
 
@@ -1164,9 +1175,20 @@ namespace SISTEMAACTUALIZADO.Modals
                 string nuevo = textBox.Text.Trim();
                 if (!string.IsNullOrWhiteSpace(nuevo) && nuevo != fam.Nombre)
                 {
-                    _configService.RenombrarFamilia(fam.Id, nuevo);
-                    if (_famEdicionActiva == fam.Nombre) _famEdicionActiva = nuevo;
-                    CargarDatosEspejoConfig();
+                    try
+                    {
+                        _configService.RenombrarFamilia(fam.Id, nuevo);
+                        if (_famEdicionActiva == fam.Nombre) _famEdicionActiva = nuevo;
+                        CargarDatosEspejoConfig();
+                    }
+                    catch (InvalidOperationException ex)
+                    {
+                        MessageBox.Show(ex.Message, "Subfamilia Duplicada", MessageBoxButtons.OK, MessageBoxIcon.Warning);
+                    }
+                    catch (Exception ex)
+                    {
+                        MessageBox.Show($"Ocurrió un error inesperado al guardar la subfamilia:\n{ex.Message}", "Error DB", MessageBoxButtons.OK, MessageBoxIcon.Error);
+                    }
                 }
             }
         }

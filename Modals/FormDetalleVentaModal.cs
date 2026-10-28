@@ -100,22 +100,59 @@ namespace SISTEMAACTUALIZADO.Modals
             Panel pnlSpacer1 = new Panel { Dock = DockStyle.Top, Height = 10, BackColor = Color.Transparent };
 
             // =========================================================================
-            // 2. BANNER DE ESTADO REDONDEADO
+            // 2. BANNER DE ESTADO REDONDEADO (Emitido, Pendiente / Enviado a Caja, Anulado)
             // =========================================================================
-            bool isAnulado = _venta.status != null && _venta.status.Contains("Anulado");
-            Panel pnlStatusBanner = CrearTarjetaRedondeada(0, 0, 0, 42,
-                isAnulado ? Color.FromArgb(254, 242, 242) : Color.FromArgb(240, 253, 244),
-                isAnulado ? Color.FromArgb(254, 202, 202) : Color.FromArgb(187, 247, 208));
+            string status = _venta.status ?? "";
+            bool isAnulado = status.Equals("Anulado", StringComparison.OrdinalIgnoreCase);
+            bool isPendiente = status.Equals("Pendiente", StringComparison.OrdinalIgnoreCase) || 
+                               status.Contains("Espera", StringComparison.OrdinalIgnoreCase);
+
+            // Colores e iconos según el estado real del ticket
+            Color fondoBanner;
+            Color bordeBanner;
+            Color textoBanner;
+            string iconoBanner;
+            string textoEstado;
+
+            if (isAnulado)
+            {
+                fondoBanner = Color.FromArgb(254, 242, 242);
+                bordeBanner = Color.FromArgb(254, 202, 202);
+                textoBanner = Color.FromArgb(185, 28, 28);
+                iconoBanner = "❌";
+                textoEstado = "Documento Anulado";
+            }
+            else if (isPendiente)
+            {
+                // Paleta amarilla/ámbar idéntica a la tarjeta y etiqueta "Enviado a caja"
+                fondoBanner = Color.FromArgb(254, 249, 195);
+                bordeBanner = Color.FromArgb(253, 230, 138);
+                textoBanner = Color.FromArgb(180, 83, 9);
+                iconoBanner = "⏳";
+                textoEstado = "Enviado a Caja (Pendiente de Pago)";
+            }
+            else
+            {
+                // Verde Pagado / Emitido
+                fondoBanner = Color.FromArgb(240, 253, 244);
+                bordeBanner = Color.FromArgb(187, 247, 208);
+                textoBanner = Color.FromArgb(22, 101, 52);
+                iconoBanner = "✔️";
+                textoEstado = "Emitido / Pagado Exitosamente";
+            }
+
+            Panel pnlStatusBanner = CrearTarjetaRedondeada(0, 0, 0, 42, fondoBanner, bordeBanner);
             pnlStatusBanner.Dock = DockStyle.Top;
             pnlStatusBanner.Padding = new Padding(12, 6, 12, 6);
 
             Label lblStatusIcon = new Label
             {
-                Text = isAnulado ? "❌" : "✔️",
+                Text = iconoBanner,
                 Font = new Font("Segoe UI", 10F),
                 Location = new Point(12, 11),
                 AutoSize = true
             };
+
             Label lblStatusTitle = new Label
             {
                 Text = "ESTADO DEL DOCUMENTO:",
@@ -124,14 +161,16 @@ namespace SISTEMAACTUALIZADO.Modals
                 Location = new Point(40, 6),
                 AutoSize = true
             };
+
             Label lblStatusValue = new Label
             {
-                Text = isAnulado ? "Documento Anulado" : "Emitido / Pagado Exitosamente",
+                Text = textoEstado,
                 Font = new Font("Segoe UI", 9F, FontStyle.Bold),
-                ForeColor = isAnulado ? Color.FromArgb(185, 28, 28) : Color.FromArgb(22, 101, 52),
+                ForeColor = textoBanner,
                 Location = new Point(40, 21),
                 AutoSize = true
             };
+
             pnlStatusBanner.Controls.AddRange(new Control[] { lblStatusIcon, lblStatusTitle, lblStatusValue });
 
             // Separador vertical
@@ -259,7 +298,14 @@ namespace SISTEMAACTUALIZADO.Modals
             pnlResumenCard.Controls.Add(pnlNetoRow);
             pnlResumenCard.Controls.Add(lblResumenTitle);
 
-            Button btnImprimirModal = CrearBoton("🖨️  Imprimir DTE", Color.FromArgb(0, 102, 255), Color.White, new Size(200, 42));
+            // Solo es DTE si fue pagado/emitido formalmente; en pendiente o anulado siempre fue ticket de atención
+            string textoBotonImprimir = (_venta.status != null && _venta.status.Equals("Emitido", StringComparison.OrdinalIgnoreCase))
+                ? "🖨️  Imprimir DTE"
+                : "🖨️  Imprimir Ticket de Atención";
+
+            Button btnImprimirModal = CrearBoton(textoBotonImprimir, Color.FromArgb(0, 102, 255), Color.White, new Size(200, 42));
+            btnImprimirModal.Dock = DockStyle.Bottom;
+            btnImprimirModal.Font = new Font("Segoe UI", 9.5F, FontStyle.Bold);
             btnImprimirModal.Dock = DockStyle.Bottom;
             btnImprimirModal.Font = new Font("Segoe UI", 9.5F, FontStyle.Bold);
 
