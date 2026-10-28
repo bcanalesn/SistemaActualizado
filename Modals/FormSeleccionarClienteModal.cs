@@ -106,7 +106,7 @@ namespace SISTEMAACTUALIZADO.Modals
             // Selector para locales o sucursales con el mismo RUT
             lblSucursalesAviso = new Label
             {
-                Text = "🏢 Seleccione Cliente / Razón:",
+                Text = "🏢 Seleccione Sucursal / Razón:",
                 Location = new Point(24, 106),
                 AutoSize = true,
                 Font = new Font("Segoe UI", 8F, FontStyle.Bold),
@@ -127,6 +127,15 @@ namespace SISTEMAACTUALIZADO.Modals
                 if (cbSucursales.SelectedIndex >= 0 && cbSucursales.SelectedIndex < _clientesEncontrados.Count)
                 {
                     CargarFichaCliente(_clientesEncontrados[cbSucursales.SelectedIndex]);
+                }
+            };
+            cbSucursales.KeyDown += (s, e) =>
+            {
+                if (e.KeyCode == Keys.Enter && btnAsignar.Enabled)
+                {
+                    btnAsignar.PerformClick();
+                    e.SuppressKeyPress = true;
+                    e.Handled = true;
                 }
             };
 
@@ -198,7 +207,7 @@ namespace SISTEMAACTUALIZADO.Modals
 
             btnNuevaSucursal = new Button
             {
-                Text = "➕ Nuevo",
+                Text = "➕ Sucursal",
                 Location = new Point(275, 435),
                 Size = new Size(105, 38),
                 BackColor = Color.FromArgb(240, 253, 244),
@@ -231,6 +240,7 @@ namespace SISTEMAACTUALIZADO.Modals
             };
 
             this.Controls.AddRange(new Control[] { pnlHeader, lblRutCap, txtRut, lblSucursalesAviso, cbSucursales, pnlInfoCliente, btnAsignar, btnNuevaSucursal, btnConsumidorFinal });
+            this.AcceptButton = btnAsignar;
         }
 
         private void BuscarClientePorRut()

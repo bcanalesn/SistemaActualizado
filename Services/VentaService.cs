@@ -17,7 +17,7 @@ namespace SISTEMAACTUALIZADO.Services
             DateTime ahora = DateTime.Now;
             int ultimoNroInT = db.TVE2607.Max(v => (int?)v.nroInT) ?? 0;
             int siguienteNroInT = ultimoNroInT + 1;
-            int nroTicketAtencion = ObtenerSiguienteNroTicketCorrelativo(db); // ✔ CORRELATIVO (1 - 999.999)
+            int nroTicketAtencion = ObtenerSiguienteNroTicketCorrelativo(db);
 
             string rutLimpio = RutHelper.Limpiar(clienteRut ?? "");
             var clienteDb = db.Clientes.FirstOrDefault(c => !string.IsNullOrEmpty(rutLimpio) && (c.Rut == rutLimpio || c.Rut == clienteRut));
@@ -27,13 +27,8 @@ namespace SISTEMAACTUALIZADO.Services
             decimal ahorroListaPrecios = subtotalLista1 - subtotalConListaCliente;
             if (ahorroListaPrecios < 0) ahorroListaPrecios = 0;
 
-            // Descuento por puntos de fidelización
             decimal descuentoPuntosPesos = puntosCanjeados * FidelizacionConfig.ValorPesoPorPunto;
-
-            // Descuento total = Descuento de Lista del Cliente + Descuento por Puntos
             decimal descuentoTotal = ahorroListaPrecios + descuentoPuntosPesos;
-
-            // Monto real final que debe cobrarse en caja
             decimal totalCobrado = Math.Max(0, subtotalConListaCliente - descuentoPuntosPesos);
 
             decimal neto = Math.Round(totalCobrado / 1.19m, 0);
@@ -56,11 +51,11 @@ namespace SISTEMAACTUALIZADO.Services
                     nroDTE = nroTicketAtencion,
                     nroInT = siguienteNroInT,
                     FecDoc = ahora,
-                    SubTotal = subtotalLista1,    // Monto original Lista 1
-                    Descuento = descuentoTotal,   // Descuento comercial + Descuento puntos
-                    Neto = neto,                  // Afecto real
-                    IvA = iva,                    // IVA 19%
-                    Total = totalCobrado,         // Monto real con canje aplicado
+                    SubTotal = subtotalLista1,
+                    Descuento = descuentoTotal,
+                    Neto = neto,
+                    IvA = iva,
+                    Total = totalCobrado,
                     UserDTE = vendedor,
                     Vendedor = vendedor,
                     Idcliente = clienteDb?.IdCliente ?? 0,
@@ -109,6 +104,10 @@ namespace SISTEMAACTUALIZADO.Services
                     {
                         prodBD.Stock -= item.Cantidad;
                         if (prodBD.Stock < 0) prodBD.Stock = 0;
+
+                        // Descontar también de la columna física StockDisponible
+                        prodBD.StockDisponible -= item.Cantidad;
+                        if (prodBD.StockDisponible < 0) prodBD.StockDisponible = 0;
                     }
                 }
 
@@ -159,7 +158,7 @@ namespace SISTEMAACTUALIZADO.Services
                 {
                     int ultimoNroInT = db.TVE2607.Max(v => (int?)v.nroInT) ?? 0;
                     int siguienteNroInT = ultimoNroInT + 1;
-                    int nroTicket = ObtenerSiguienteNroTicketCorrelativo(db); // ✔ CORRELATIVO (1 - 999.999)
+                    int nroTicket = ObtenerSiguienteNroTicketCorrelativo(db);
 
                     venta = new TVE2607
                     {
@@ -380,6 +379,10 @@ namespace SISTEMAACTUALIZADO.Services
                     {
                         prodBD.Stock -= item.Cantidad;
                         if (prodBD.Stock < 0) prodBD.Stock = 0;
+
+                        // Descontar también de la columna física StockDisponible
+                        prodBD.StockDisponible -= item.Cantidad;
+                        if (prodBD.StockDisponible < 0) prodBD.StockDisponible = 0;
                     }
                 }
 
@@ -460,17 +463,16 @@ namespace SISTEMAACTUALIZADO.Services
                 })
                 .ToList();
         }
+
         private int ObtenerSiguienteNroTicketCorrelativo(AppDbContext db)
         {
             const int LIMITE_TICKET = 999999;
 
-            // Obtener el NroTicket de la última venta registrada por orden de creación (idTve)
             int ultimoTicket = db.TVE2607
                 .OrderByDescending(v => v.idTve)
                 .Select(v => v.NroTicket)
                 .FirstOrDefault();
 
-            // Si no hay ventas, o si el último llegó al tope, reinicia en 1
             if (ultimoTicket <= 0 || ultimoTicket >= LIMITE_TICKET)
             {
                 return 1;
@@ -478,6 +480,7 @@ namespace SISTEMAACTUALIZADO.Services
 
             return ultimoTicket + 1;
         }
+
         public TVE2607? ObtenerVentaPorId(int idTve)
         {
             using var db = new AppDbContext();

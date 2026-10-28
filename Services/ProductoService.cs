@@ -86,6 +86,7 @@ namespace SISTEMAACTUALIZADO.Services
                 if (cantidadFacturaInicial > 0)
                 {
                     producto.Stock = cantidadFacturaInicial;
+                    producto.StockDisponible = producto.CalcularStockDisponible();
                 }
                 db.Productos.Add(producto);
                 db.SaveChanges();
@@ -118,9 +119,12 @@ namespace SISTEMAACTUALIZADO.Services
                     prodBd.Precio9 = producto.Precio9;
                     prodBd.Precio10 = producto.Precio10;
 
+                    // PERSISTENCIA DE INVENTARIO Y MERMA
                     prodBd.Stock = producto.Stock;
                     prodBd.StockMinimo = producto.StockMinimo;
                     prodBd.PorcentajeMerma = producto.PorcentajeMerma;
+                    prodBd.StockDisponible = producto.StockDisponible;
+
                     prodBd.ImagenPath = producto.ImagenPath;
                     prodBd.FchUpd = DateTime.Now;
                     prodBd.Sincro = 0;

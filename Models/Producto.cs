@@ -120,22 +120,20 @@ namespace SISTEMAACTUALIZADO.Models
         [Column(TypeName = "decimal(5,2)")]
         public decimal PorcentajeMerma { get; set; } = 0.00m;
 
-        [NotMapped]
-        public int StockDisponible
+        // Columna persistente en MySQL
+        public int StockDisponible { get; set; } = 0;
+
+        // Método auxiliar de cálculo en vivo
+        public int CalcularStockDisponible()
         {
-            get
-            {
-                if (PorcentajeMerma <= 0) return Stock;
+            if (PorcentajeMerma <= 0) return Stock;
 
-                decimal factor = 1.0m - (PorcentajeMerma / 100.0m);
-                decimal disponible = Stock * factor;
+            decimal factor = 1.0m - (PorcentajeMerma / 100.0m);
+            decimal disponible = Stock * factor;
 
-                // Si es pesable, los gramos pueden truncarse o redondearse al entero más cercano
-                // Si es por unidad, siempre hacia abajo (Floor) para no vender unidades inexistentes
-                return EsPesable 
-                    ? (int)Math.Round(disponible, MidpointRounding.AwayFromZero) 
-                    : (int)Math.Floor(disponible);
-            }
+            return EsPesable 
+                ? (int)Math.Round(disponible, MidpointRounding.AwayFromZero) 
+                : (int)Math.Floor(disponible);
         }
 
         [Column(TypeName = "decimal(10,2)")]

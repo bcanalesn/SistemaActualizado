@@ -890,6 +890,7 @@ namespace SISTEMAACTUALIZADO.Modals
             bool esPesable = chkEsPesable.Checked;
             decimal divisor = esPesable ? 1000m : 1m;
 
+            // 1. Stock Físico digitado
             int stockFinal = 0;
             if (esPesable)
             {
@@ -904,9 +905,19 @@ namespace SISTEMAACTUALIZADO.Modals
                 stockFinal = (int)MonedaHelper.Limpiar(txtStockActual.Text);
             }
 
+            // 2. Porcentaje de Merma
             string mermaTxt = txtPorcentajeMerma.Text.Trim().Replace(",", ".");
             decimal.TryParse(mermaTxt, System.Globalization.NumberStyles.Any, System.Globalization.CultureInfo.InvariantCulture, out decimal pctMerma);
             pctMerma = Math.Max(0m, Math.Min(100m, pctMerma));
+
+            // 3. Stock Disponible a persistir
+            decimal factorDisponible = 1.0m - (pctMerma / 100.0m);
+            decimal disponibleCalculado = stockFinal * factorDisponible;
+            if (disponibleCalculado < 0m) disponibleCalculado = 0m;
+
+            int stockDisponibleFinal = esPesable 
+                ? (int)Math.Round(disponibleCalculado, MidpointRounding.AwayFromZero)
+                : (int)Math.Floor(disponibleCalculado);
 
             decimal stockMinDigito = MonedaHelper.Limpiar(txtStockMinimo.Text);
             int stockMin = stockMinDigito > 0 ? (int)stockMinDigito : 5;
@@ -925,7 +936,7 @@ namespace SISTEMAACTUALIZADO.Modals
                     ? _productoService.ObtenerSiguienteCodigoBarraSugerido() 
                     : txtCodigoBarra.Text.Trim();
                 productoGuardar.Nombre = nombre;
-                productoGuardar.NmbCorto = txtNombreCorto.Text.Trim(); // 👈 Guarda el nombre corto
+                productoGuardar.NmbCorto = txtNombreCorto.Text.Trim();
 
                 string catSeleccionada = cbCategoria.SelectedItem?.ToString() ?? "Sin Asignar";
                 string famSeleccionada = cbFamilia.SelectedItem?.ToString() ?? "General";
@@ -951,9 +962,12 @@ namespace SISTEMAACTUALIZADO.Modals
                     }
                 }
                 
+                // Asignar Stock Físico, Merma y Stock Disponible físico en MySQL
                 productoGuardar.Stock = stockFinal;
+                productoGuardar.PorcentajeMerma = pctMerma;
+                productoGuardar.StockDisponible = stockDisponibleFinal;
+                
                 productoGuardar.StockMinimo = stockMin;
-                productoGuardar.PorcentajeMerma = pctMerma; // 👈 Guarda el % de merma
                 productoGuardar.ImagenPath = _rutaImagenSeleccionada;
                 productoGuardar.Estado = true;
                 productoGuardar.FchUpd = DateTime.Now;

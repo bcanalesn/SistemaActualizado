@@ -1,5 +1,0 @@
-SET SQL_SAFE_UPDATES = 0;
-
-ALTER TABLE productos ADD COLUMN PorcentajeMerma decimal(5,2) NOT NULL DEFAULT 0.00;
-
-SET SQL_SAFE_UPDATES = 1;
