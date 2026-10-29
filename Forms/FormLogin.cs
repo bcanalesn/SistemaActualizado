@@ -16,12 +16,14 @@ namespace SISTEMAACTUALIZADO
         private TextBox txtClave = null!;
         private Button btnMostrarClave = null!;
         private CheckBox chkRecordarme = null!;
+        private CheckBox chkMaximizado = null!;
         private Button btnIngresar = null!;
         private Label lblError = null!;
         public Usuario? UsuarioAutenticado { get; private set; }
 
         // Ruta local para recordar el usuario
         private static readonly string _configPath = Path.Combine(AppDomain.CurrentDomain.BaseDirectory, "last_user.cfg");
+        private static readonly string _windowConfigPath = Path.Combine(AppDomain.CurrentDomain.BaseDirectory, "app_window.cfg");
 
         // Variables para permitir el arrastre de la ventana sin bordes
         private bool _dragging = false;
@@ -324,28 +326,42 @@ namespace SISTEMAACTUALIZADO
 
             pnlInputPass.Controls.AddRange(new Control[] { lblIconPassInside, txtClave, btnMostrarClave });
 
-            // Checkbox Recordarme + Link Olvidaste Contraseña
+            // 1. Checkbox Recordarme (Izquierda)
             chkRecordarme = new CheckBox
             {
                 Text = "Recordarme",
-                Font = new Font("Segoe UI", 8.5F),
+                Font = new Font("Segoe UI", 8.2F),
                 ForeColor = Color.FromArgb(71, 85, 105),
-                Location = new Point(44, 275),
-                Size = new Size(130, 22),
+                Location = new Point(42, 275),
+                Size = new Size(95, 22),
                 Cursor = Cursors.Hand,
                 Checked = true
             };
 
+            // 2. Checkbox Abrir maximizado (Centro-Izquierda, con espacio holgado)
+            chkMaximizado = new CheckBox
+            {
+                Text = "Abrir maximizado",
+                Font = new Font("Segoe UI", 8.2F),
+                ForeColor = Color.FromArgb(71, 85, 105),
+                Location = new Point(142, 275),
+                Size = new Size(130, 22),
+                Cursor = Cursors.Hand,
+                Checked = CargarPreferenciaMaximizado()
+            };
+
+            // 3. Enlace Olvidaste tu contraseña (Alineado al margen derecho del botón)
             LinkLabel linkOlvidaste = new LinkLabel
             {
                 Text = "¿Olvidaste tu contraseña?",
-                Font = new Font("Segoe UI", 8.5F),
+                Font = new Font("Segoe UI", 8.2F),
                 LinkColor = Color.FromArgb(37, 99, 235),
                 ActiveLinkColor = Color.FromArgb(29, 78, 216),
-                Location = new Point(285, 277),
+                Location = new Point(310, 278), // 👈 Deja ver la palabra completa "Abrir maximizado"
                 AutoSize = true,
                 Cursor = Cursors.Hand
             };
+
             linkOlvidaste.LinkClicked += (s, e) =>
             {
                 MessageBox.Show("Para restablecer tu contraseña o desbloquear el acceso, contacta al Administrador del sistema.", "Recuperación de Acceso", MessageBoxButtons.OK, MessageBoxIcon.Information);
@@ -395,6 +411,7 @@ namespace SISTEMAACTUALIZADO
                 lblPass,
                 pnlInputPass,
                 chkRecordarme,
+                chkMaximizado,
                 linkOlvidaste,
                 lblError,
                 btnIngresar,
@@ -498,6 +515,7 @@ namespace SISTEMAACTUALIZADO
             if (resultado.Exitoso && resultado.Usuario != null)
             {
                 GuardarOlimpiarUsuarioRecordado(user);
+                GuardarPreferenciaMaximizado(); 
                 UsuarioAutenticado = resultado.Usuario;
                 this.DialogResult = DialogResult.OK;
                 this.Close();
@@ -508,6 +526,28 @@ namespace SISTEMAACTUALIZADO
                 txtClave.Clear();
                 txtClave.Focus();
             }
+        }
+        private static bool CargarPreferenciaMaximizado()
+        {
+            try
+            {
+                if (File.Exists(_windowConfigPath))
+                {
+                    string valor = File.ReadAllText(_windowConfigPath).Trim();
+                    return valor == "1" || valor.Equals("true", StringComparison.OrdinalIgnoreCase);
+                }
+            }
+            catch { }
+            return false;
+        }
+
+        private void GuardarPreferenciaMaximizado()
+        {
+            try
+            {
+                File.WriteAllText(_windowConfigPath, chkMaximizado.Checked ? "1" : "0");
+            }
+            catch { }
         }
     }
 }

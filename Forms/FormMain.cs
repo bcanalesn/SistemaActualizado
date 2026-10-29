@@ -43,6 +43,17 @@ namespace SISTEMAACTUALIZADO
             InitializeComponent();
             AplicarPermisosPorRol();
 
+            // Verificar si el usuario configuró abrir en pantalla completa / maximizado
+            string windowConfigPath = System.IO.Path.Combine(AppDomain.CurrentDomain.BaseDirectory, "app_window.cfg");
+            if (System.IO.File.Exists(windowConfigPath))
+            {
+                string conf = System.IO.File.ReadAllText(windowConfigPath).Trim();
+                if (conf == "1" || conf.Equals("true", StringComparison.OrdinalIgnoreCase))
+                {
+                    this.WindowState = FormWindowState.Maximized; 
+                }
+            }
+
             // Pantalla inicial según el rol del usuario
             string rol = _usuarioActual?.Rol ?? "Administrador";
 
@@ -56,10 +67,9 @@ namespace SISTEMAACTUALIZADO
             }
             else
             {
-                // Administrador, Supervisor y Cajero inician en Control de Caja
+                // Administrador, Supervisor y Cajero inician en Control de Caja[cite: 35]
                 AbrirFormEnContent(new FormCaja(_usuarioActual), "Apertura y Cierre de Caja", btnCaja);
             }
-            
         }
         
 
