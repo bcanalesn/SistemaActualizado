@@ -204,11 +204,18 @@ namespace SISTEMAACTUALIZADO.Services
             var ticketBd = db.TVE2607.Find(ticket.idTve);
             if (ticketBd == null) throw new InvalidOperationException("El ticket no existe en la base de datos.");
 
-            // 1. Buscar los datos completos del cliente en la BD
+            // 1. Buscar los datos del cliente respetando prioritariamente el IdCliente específico (sucursal)
             string rutLimpio = RutHelper.Limpiar(ticket.RuT ?? "");
-            var clienteDb = db.Clientes.FirstOrDefault(c => 
-                (ticket.Idcliente > 0 && c.IdCliente == ticket.Idcliente) ||
-                (!string.IsNullOrEmpty(rutLimpio) && (c.Rut == rutLimpio || c.Rut == ticket.RuT)));
+            Cliente? clienteDb = null;
+
+            if (ticket.Idcliente > 0)
+            {
+                clienteDb = db.Clientes.Find(ticket.Idcliente);
+            }
+            if (clienteDb == null && !string.IsNullOrEmpty(rutLimpio))
+            {
+                clienteDb = db.Clientes.FirstOrDefault(c => c.Rut == rutLimpio || c.Rut == ticket.RuT);
+            }
 
             DateTime ahora = DateTime.Now;
 
@@ -229,12 +236,12 @@ namespace SISTEMAACTUALIZADO.Services
             ticketBd.Vuelto = vuelto;
             ticketBd.status = "Emitido";
 
-            // 2. Traspaso completo de datos del cliente
+            // 2. Traspaso completo de datos del cliente (limpiando etiquetas [ABONO ...] o [ENTREGA ...])
             if (clienteDb != null)
             {
                 ticketBd.Idcliente = clienteDb.IdCliente;
                 ticketBd.RuT = RutHelper.Formatear(clienteDb.Rut);
-                ticketBd.RazonSocial = clienteDb.RazonSocial;
+                ticketBd.RazonSocial = clienteDb.RazonSocial.Trim(); // 👈 Razón social limpia y real
                 ticketBd.Giro = !string.IsNullOrWhiteSpace(clienteDb.Giro) ? clienteDb.Giro : "PARTICULAR";
                 ticketBd.Direccion = clienteDb.Direccion ?? "";
                 ticketBd.nComuna = clienteDb.Comuna ?? "SANTIAGO";
@@ -246,12 +253,14 @@ namespace SISTEMAACTUALIZADO.Services
             {
                 if (iddoc == 33)
                 {
-                    throw new InvalidOperationException("No se puede emitir Factura Electrónica sin un cliente formal registrado. Seleccione o cree un cliente con RUT, Giro y Dirección.");
+                    throw new InvalidOperationException("No se puede emitir Factura Electrónica sin un cliente formal registrado.");
                 }
 
                 ticketBd.Idcliente = 0;
                 ticketBd.RuT = "";
-                ticketBd.RazonSocial = "Consumidor Final";
+                // Si es consumidor final, retiramos cualquier corchete de reserva previo
+                string limpia = System.Text.RegularExpressions.Regex.Replace(ticketBd.RazonSocial ?? "Consumidor Final", @"\s*\[.*?\]", "").Trim();
+                ticketBd.RazonSocial = string.IsNullOrWhiteSpace(limpia) ? "Consumidor Final" : limpia;
                 ticketBd.Giro = "PARTICULAR";
                 ticketBd.Direccion = "";
                 ticketBd.nComuna = "";

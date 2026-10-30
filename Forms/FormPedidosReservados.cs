@@ -514,17 +514,10 @@ namespace SISTEMAACTUALIZADO
         {
             if (_reservaSeleccionada == null || _reservaSeleccionada.SaldoPendiente <= 0) return;
 
-            var turno = _cajaService.ObtenerTurnoAbierto(_usuarioActual.NombreUsuario);
-            if (turno == null || turno.Estado != "Abierta")
-            {
-                MessageBox.Show("Debe tener una caja abierta para registrar ingresos de dinero por abonos.", "Caja Cerrada", MessageBoxButtons.OK, MessageBoxIcon.Warning);
-                return;
-            }
-
             using Form modalAbono = new Form
             {
                 Text = $"Registrar Abono - {_reservaSeleccionada.CodigoReserva}",
-                Size = new Size(360, 260),
+                Size = new Size(360, 210), // Más compacto, sin selector de pago
                 StartPosition = FormStartPosition.CenterParent,
                 FormBorderStyle = FormBorderStyle.FixedDialog,
                 MaximizeBox = false,
@@ -533,16 +526,11 @@ namespace SISTEMAACTUALIZADO
             };
 
             Label lblInf = new Label { Text = $"Saldo actual: {MonedaHelper.Formatear(_reservaSeleccionada.SaldoPendiente, conSigno: true)}", Location = new Point(20, 15), Font = new Font("Segoe UI", 10F, FontStyle.Bold), ForeColor = Color.FromArgb(239, 68, 68), AutoSize = true };
-            Label lblM = new Label { Text = "Monto a abonar ($):", Location = new Point(20, 48), AutoSize = true, Font = new Font("Segoe UI", 8.5F, FontStyle.Bold) };
+            Label lblM = new Label { Text = "Monto a abonar en Caja ($):", Location = new Point(20, 48), AutoSize = true, Font = new Font("Segoe UI", 8.5F, FontStyle.Bold) };
             TextBox txtM = new TextBox { Location = new Point(20, 70), Size = new Size(300, 26), Font = new Font("Segoe UI", 10.5F, FontStyle.Bold), MaxLength = 10 };
             txtM.TextChanged += (s, ev) => MonedaHelper.AplicarMascaraEnVivo(txtM);
 
-            Label lblMp = new Label { Text = "Medio de Pago:", Location = new Point(20, 106), AutoSize = true, Font = new Font("Segoe UI", 8.5F, FontStyle.Bold) };
-            ComboBox cbMp = new ComboBox { Location = new Point(20, 128), Size = new Size(300, 26), DropDownStyle = ComboBoxStyle.DropDownList, Font = new Font("Segoe UI", 9F) };
-            cbMp.Items.AddRange(new object[] { "Efectivo", "Débito", "Tarjeta Crédito", "Transferencia" });
-            cbMp.SelectedIndex = 0;
-
-            Button btnGuardar = new Button { Text = "✔ Guardar Abono", Location = new Point(20, 168), Size = new Size(300, 38), BackColor = Color.FromArgb(16, 185, 129), ForeColor = Color.White, FlatStyle = FlatStyle.Flat, Font = new Font("Segoe UI", 9.5F, FontStyle.Bold), Cursor = Cursors.Hand };
+            Button btnGuardar = new Button { Text = "🎟️ Generar Ticket para Caja", Location = new Point(20, 115), Size = new Size(300, 38), BackColor = Color.FromArgb(16, 185, 129), ForeColor = Color.White, FlatStyle = FlatStyle.Flat, Font = new Font("Segoe UI", 9.5F, FontStyle.Bold), Cursor = Cursors.Hand };
             btnGuardar.FlatAppearance.BorderSize = 0;
 
             btnGuardar.Click += (s, ev) =>
@@ -559,21 +547,47 @@ namespace SISTEMAACTUALIZADO
                     return;
                 }
 
-                _reservaService.RegistrarAbono(_reservaSeleccionada.IdReserva, monto, cbMp.SelectedItem?.ToString() ?? "Efectivo", turno.CajaTurnoID, _usuarioActual.NombreUsuario);
-                MessageBox.Show("Abono registrado e ingresado al turno de caja exitosamente.", "Éxito", MessageBoxButtons.OK, MessageBoxIcon.Information);
-                modalAbono.DialogResult = DialogResult.OK;
-                modalAbono.Close();
+                try
+                {
+                    string vendedorOriginal = !string.IsNullOrWhiteSpace(_reservaSeleccionada.UsuarioRegistro) 
+                        ? _reservaSeleccionada.UsuarioRegistro 
+                        : _usuarioActual.NombreUsuario;
+
+                    string usuarioSesion = _usuarioActual.NombreUsuario; 
+
+                    int nroTicket = _reservaService.GenerarTicketAbonoPosteriorACaja(
+                        _reservaSeleccionada.IdReserva,
+                        monto,
+                        vendedorOriginal,
+                        usuarioSesion
+                    );
+
+                    MessageBox.Show(
+                        $"¡Ticket N° {nroTicket} generado con éxito!\n\n" +
+                        $"Monto a cobrar en Caja: {MonedaHelper.Formatear(monto, conSigno: true)}\n" +
+                        "Pase al cliente a Caja para que realice el pago.",
+                        "Ticket Enviado a Caja",
+                        MessageBoxButtons.OK,
+                        MessageBoxIcon.Information
+                    );
+
+                    modalAbono.DialogResult = DialogResult.OK;
+                    modalAbono.Close();
+                }
+                catch (Exception ex)
+                {
+                    MessageBox.Show($"Error al generar ticket de abono: {ex.Message}", "Error", MessageBoxButtons.OK, MessageBoxIcon.Error);
+                }
             };
 
             modalAbono.AcceptButton = btnGuardar;
-            modalAbono.Controls.AddRange(new Control[] { lblInf, lblM, txtM, lblMp, cbMp, btnGuardar });
+            modalAbono.Controls.AddRange(new Control[] { lblInf, lblM, txtM, btnGuardar });
 
             if (modalAbono.ShowDialog(this) == DialogResult.OK)
             {
                 CargarReservas();
             }
         }
-
         private void BtnEntregarLiquidar_Click(object? sender, EventArgs e)
         {
             if (_reservaSeleccionada == null) return;

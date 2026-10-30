@@ -3,6 +3,7 @@ using System.Collections.Generic;
 using System.Data;
 using System.Linq;
 using Microsoft.EntityFrameworkCore;
+using SISTEMAACTUALIZADO.Helpers;
 using SISTEMAACTUALIZADO.Data;
 using SISTEMAACTUALIZADO.Models;
 
@@ -312,18 +313,18 @@ namespace SISTEMAACTUALIZADO.Services
                 }
             }
         }
-        public (Reserva Reserva, int NroTicketAbono) RegistrarReservaConTicketAbono(Reserva reserva, decimal montoAbono, string usuarioVendedor)
+        public (Reserva Reserva, int NroTicketAbono) RegistrarReservaConTicketAbono(Reserva reserva, decimal montoAbono, string usuarioVendedor, string usuarioSesion = "")
         {
             using var db = new AppDbContext();
             using var tr = db.Database.BeginTransaction();
             try
             {
-                // 1. Asignar código correlativo
+                // 1. Asignar código correlativo de reserva
                 string prefijoFecha = DateTime.Now.ToString("yyyyMMdd");
                 int countHoy = db.Reservas.Count(r => r.CodigoReserva.StartsWith($"RES-{prefijoFecha}"));
                 reserva.CodigoReserva = $"RES-{prefijoFecha}-{(countHoy + 1):D3}";
                 reserva.FechaRegistro = DateTime.Now;
-                reserva.TotalAbonado = 0m; // Se mantendrá en 0 hasta cobro real en caja
+                reserva.TotalAbonado = 0m;
                 reserva.SaldoPendiente = reserva.TotalPedido;
                 reserva.Estado = "Reservado";
                 reserva.StockDescontado = false;
@@ -348,19 +349,26 @@ namespace SISTEMAACTUALIZADO.Services
 
                 int nroTicketAbono = 0;
 
-                // 3. Si hay abono inicial, generar Ticket en TVE2607 para cobro en Caja
+                // 3. Si hay abono inicial, generar Ticket correlativo en TVE2607 para Caja
                 if (montoAbono > 0)
                 {
                     DateTime ahora = DateTime.Now;
                     int ultimoNroInT = db.TVE2607.Max(v => (int?)v.nroInT) ?? 0;
                     int siguienteNroInT = ultimoNroInT + 1;
-                    nroTicketAbono = (int)(ahora.Ticks % 1000000);
+                    nroTicketAbono = ObtenerSiguienteNroTicketCorrelativo(db);
 
-                    // Buscar datos cliente
                     var clienteDb = db.Clientes.Find(reserva.IdCliente);
 
                     decimal netoAbono = Math.Round(montoAbono / 1.19m, 0);
                     decimal ivaAbono = montoAbono - netoAbono;
+
+                    // Diferenciamos quién opera frente al PC de quién comisiona la venta[cite: 20]
+                    string usuarioOperador = !string.IsNullOrWhiteSpace(usuarioSesion) ? usuarioSesion : usuarioVendedor;
+
+                    // Razón Social oficial limpia[cite: 20]
+                    string razonLimpia = clienteDb != null 
+                        ? clienteDb.RazonSocial 
+                        : (!string.IsNullOrWhiteSpace(reserva.NombreCliente) ? reserva.NombreCliente : "Consumidor Final");
 
                     var ticketAbono = new TVE2607
                     {
@@ -378,11 +386,11 @@ namespace SISTEMAACTUALIZADO.Services
                         Neto = netoAbono,
                         IvA = ivaAbono,
                         Total = montoAbono,
-                        UserDTE = usuarioVendedor,
+                        UserDTE = usuarioOperador,
                         Vendedor = usuarioVendedor,
                         Idcliente = clienteDb?.IdCliente ?? 0,
                         RuT = clienteDb != null ? clienteDb.Rut : "",
-                        RazonSocial = clienteDb != null ? $"{clienteDb.RazonSocial} [ABONO {reserva.CodigoReserva}]" : $"Consumidor Final [ABONO {reserva.CodigoReserva}]",
+                        RazonSocial = razonLimpia, // 👈 Limpio, sin corchetes
                         Giro = clienteDb?.Giro ?? "",
                         Direccion = clienteDb?.Direccion ?? "",
                         nComuna = clienteDb?.Comuna ?? "",
@@ -390,13 +398,12 @@ namespace SISTEMAACTUALIZADO.Services
                         Fono1 = clienteDb?.Telefono ?? "",
                         email = clienteDb?.Email ?? "",
                         status = "Pendiente",
-                        idREF = reserva.IdReserva // Vinculación directa con la reserva
+                        idREF = reserva.IdReserva
                     };
 
                     db.TVE2607.Add(ticketAbono);
                     db.SaveChanges();
 
-                    // Detalle del ticket de abono
                     var detalleAbono = new TVD2607
                     {
                         idTve = ticketAbono.idTve,
@@ -439,15 +446,35 @@ namespace SISTEMAACTUALIZADO.Services
                 var reserva = db.Reservas.FirstOrDefault(r => r.IdReserva == idReserva);
                 if (reserva == null) throw new Exception("Reserva no encontrada.");
 
+                if (reserva.Estado == "Entregado" || reserva.Estado == "Anulado")
+                {
+                    throw new Exception($"El pedido ya se encuentra en estado '{reserva.Estado}'.");
+                }
+
+                // 🛑 CANDADO: Evitar duplicar tickets si ya se envió a caja y sigue pendiente
+                var ticketPendienteExistente = db.TVE2607.FirstOrDefault(t => t.idREF == idReserva && t.status == "Pendiente");
+                if (ticketPendienteExistente != null)
+                {
+                    tr.Rollback();
+                    return ticketPendienteExistente.NroTicket > 0 ? ticketPendienteExistente.NroTicket : ticketPendienteExistente.nroDTE;
+                }
+
                 decimal saldoCobrar = reserva.SaldoPendiente;
                 DateTime ahora = DateTime.Now;
                 int ultimoNroInT = db.TVE2607.Max(v => (int?)v.nroInT) ?? 0;
                 int siguienteNroInT = ultimoNroInT + 1;
-                int nroTicket = (int)(ahora.Ticks % 1000000);
+                int nroTicket = ObtenerSiguienteNroTicketCorrelativo(db);
+
 
                 var clienteDb = db.Clientes.Find(reserva.IdCliente);
                 decimal neto = Math.Round(saldoCobrar / 1.19m, 0);
                 decimal iva = saldoCobrar - neto;
+
+                string vendedorFinal = !string.IsNullOrWhiteSpace(reserva.UsuarioRegistro) ? reserva.UsuarioRegistro : usuarioOperador;
+
+                string razonLimpia = clienteDb != null 
+                    ? clienteDb.RazonSocial 
+                    : (!string.IsNullOrWhiteSpace(reserva.NombreCliente) ? reserva.NombreCliente : "Consumidor Final");
 
                 var ticketSaldo = new TVE2607
                 {
@@ -464,14 +491,12 @@ namespace SISTEMAACTUALIZADO.Services
                     Descuento = 0,
                     Neto = neto,
                     IvA = iva,
-                    Total = saldoCobrar, // Solo el saldo a cobrar en caja
-                    UserDTE = usuarioOperador,
-                    Vendedor = usuarioOperador,
+                    Total = saldoCobrar,
+                    UserDTE = usuarioOperador, // Quien liquidó la entrega
+                    Vendedor = vendedorFinal,  // Vendedor original comisionista
                     Idcliente = clienteDb?.IdCliente ?? 0,
                     RuT = clienteDb?.Rut ?? "",
-                    RazonSocial = clienteDb != null 
-                        ? $"{clienteDb.RazonSocial} [ENTREGA {reserva.CodigoReserva}]" 
-                        : $"Consumidor Final [ENTREGA {reserva.CodigoReserva}]",
+                    RazonSocial = razonLimpia, // 👈 Limpio, sin corchetes
                     Giro = clienteDb?.Giro ?? "",
                     Direccion = clienteDb?.Direccion ?? "",
                     nComuna = clienteDb?.Comuna ?? "",
@@ -485,7 +510,6 @@ namespace SISTEMAACTUALIZADO.Services
                 db.TVE2607.Add(ticketSaldo);
                 db.SaveChanges();
 
-                // Detalles: Los productos del pedido con el saldo prorrateado o una glosa de liquidación
                 var detalles = db.ReservaDetalles.Where(d => d.IdReserva == idReserva).ToList();
                 foreach (var item in detalles)
                 {
@@ -504,16 +528,19 @@ namespace SISTEMAACTUALIZADO.Services
                         Cantidad = item.Cantidad,
                         Precio = item.PrecioUnitario,
                         SubTotal = item.Subtotal,
-                        nmbVendedor = usuarioOperador,
+                        nmbVendedor = vendedorFinal,
                         Unidad = item.EsPesable ? "gr" : "UN"
                     });
 
-                    // Descontar inventario al momento de enviar el ticket de entrega
+                    // Descontar inventario físico Y disponible
                     var prod = db.Productos.FirstOrDefault(p => p.ProductoID == item.ProductoID);
                     if (prod != null)
                     {
                         prod.Stock -= item.Cantidad;
                         if (prod.Stock < 0) prod.Stock = 0;
+
+                        prod.StockDisponible -= item.Cantidad;
+                        if (prod.StockDisponible < 0) prod.StockDisponible = 0;
                     }
                 }
 
@@ -538,6 +565,134 @@ namespace SISTEMAACTUALIZADO.Services
                 return db.ReservaPagos
                          .Where(p => p.CajaTurnoID == cajaTurnoId && p.MedioPago == "Efectivo")
                          .Sum(p => (decimal?)p.Monto) ?? 0m;
+            }
+        }
+
+        private int ObtenerSiguienteNroTicketCorrelativo(AppDbContext db)
+        {
+            const int LIMITE_TICKET = 999999;
+
+            int ultimoTicket = db.TVE2607
+                .OrderByDescending(v => v.idTve)
+                .Select(v => v.NroTicket)
+                .FirstOrDefault();
+
+            if (ultimoTicket <= 0 || ultimoTicket >= LIMITE_TICKET)
+            {
+                return 1;
+            }
+
+            return ultimoTicket + 1;
+        }
+
+        public int GenerarTicketAbonoPosteriorACaja(int idReserva, decimal montoAbono, string usuarioVendedor, string usuarioSesion = "")
+        {
+            using var db = new AppDbContext();
+            using var tr = db.Database.BeginTransaction();
+            try
+            {
+                var reserva = db.Reservas.FirstOrDefault(r => r.IdReserva == idReserva);
+                if (reserva == null) throw new Exception("Reserva no encontrada.");
+
+                if (reserva.Estado == "Entregado" || reserva.Estado == "Anulado")
+                {
+                    throw new Exception($"La reserva ya se encuentra en estado '{reserva.Estado}'. No admite más abonos.");
+                }
+
+                // 🛑 CANDADO 1: Verificar si ya existe un ticket de abono o liquidación pendiente en Caja
+                var ticketPendiente = db.TVE2607.FirstOrDefault(t => t.idREF == idReserva && t.status == "Pendiente");
+                if (ticketPendiente != null)
+                {
+                    throw new Exception($"La reserva ya tiene el Ticket N° {ticketPendiente.NroTicket} pendiente de cobro en Caja por {MonedaHelper.Formatear(ticketPendiente.Total, conSigno: true)}.\nDebe cobrarlo o anularlo en Caja antes de emitir un nuevo abono.");
+                }
+
+                // 🛑 CANDADO 2: El abono no puede superar el saldo pendiente actual
+                if (montoAbono > reserva.SaldoPendiente)
+                {
+                    throw new Exception($"El monto a abonar ({MonedaHelper.Formatear(montoAbono, conSigno: true)}) supera el saldo pendiente ({MonedaHelper.Formatear(reserva.SaldoPendiente, conSigno: true)}).");
+                }
+
+                DateTime ahora = DateTime.Now;
+                int ultimoNroInT = db.TVE2607.Max(v => (int?)v.nroInT) ?? 0;
+                int siguienteNroInT = ultimoNroInT + 1;
+                int nroTicketAbono = ObtenerSiguienteNroTicketCorrelativo(db);
+
+                var clienteDb = db.Clientes.Find(reserva.IdCliente);
+                decimal netoAbono = Math.Round(montoAbono / 1.19m, 0);
+                decimal ivaAbono = montoAbono - netoAbono;
+
+                // Conservar el vendedor original que tomó la reserva[cite: 20]
+                string vendedorFinal = !string.IsNullOrWhiteSpace(usuarioVendedor) ? usuarioVendedor : reserva.UsuarioRegistro;
+                string operadorActivo = !string.IsNullOrWhiteSpace(usuarioSesion) ? usuarioSesion : vendedorFinal;
+
+                string razonLimpia = clienteDb != null 
+                    ? clienteDb.RazonSocial 
+                    : (!string.IsNullOrWhiteSpace(reserva.NombreCliente) ? reserva.NombreCliente : "Consumidor Final");
+
+                var ticketAbono = new TVE2607
+                {
+                    idLocal = 1,
+                    nmbLocal = "Local Principal",
+                    iddocDTE = 0,
+                    Documento = $"Abono Reserva {reserva.CodigoReserva}",
+                    NroTicket = nroTicketAbono,
+                    FechaTicket = ahora,
+                    nroDTE = nroTicketAbono,
+                    nroInT = siguienteNroInT,
+                    FecDoc = ahora,
+                    SubTotal = montoAbono,
+                    Descuento = 0,
+                    Neto = netoAbono,
+                    IvA = ivaAbono,
+                    Total = montoAbono,
+                    UserDTE = operadorActivo,
+                    Vendedor = vendedorFinal, 
+                    Idcliente = clienteDb?.IdCliente ?? 0,
+                    RuT = clienteDb != null ? clienteDb.Rut : "",
+                    RazonSocial = razonLimpia, // 👈 Limpio, sin corchetes
+                    Giro = clienteDb?.Giro ?? "",
+                    Direccion = clienteDb?.Direccion ?? "",
+                    nComuna = clienteDb?.Comuna ?? "",
+                    nCiudad = clienteDb?.Ciudad ?? "",
+                    Fono1 = clienteDb?.Telefono ?? "",
+                    email = clienteDb?.Email ?? "",
+                    status = "Pendiente",
+                    idREF = reserva.IdReserva
+                };
+
+                db.TVE2607.Add(ticketAbono);
+                db.SaveChanges();
+
+                var detalleAbono = new TVD2607
+                {
+                    idTve = ticketAbono.idTve,
+                    idLocal = 1,
+                    iddocDTE = 0,
+                    Documento = ticketAbono.Documento,
+                    NroDTE = nroTicketAbono,
+                    NroInT = siguienteNroInT,
+                    FecMoV = ahora,
+                    HoraMoV = ahora.ToString("HH:mm:ss"),
+                    IdProducto = 0,
+                    NmbProducto = $"Abono Parcial Pedido {reserva.CodigoReserva}",
+                    Cantidad = 1,
+                    Precio = montoAbono,
+                    SubTotal = montoAbono,
+                    nmbVendedor = vendedorFinal,
+                    Unidad = "UN"
+                };
+
+                db.TVD2607.Add(detalleAbono);
+                db.SaveChanges();
+
+                tr.Commit();
+                return nroTicketAbono;
+            }
+            catch (Exception ex)
+            {
+                tr.Rollback();
+                string msg = ex.InnerException != null ? ex.InnerException.Message : ex.Message;
+                throw new Exception(msg);
             }
         }
     }

@@ -1782,13 +1782,15 @@ namespace SISTEMAACTUALIZADO
                         Alignment = DataGridViewContentAlignment.MiddleRight 
                     };
                 }
-                if (dgvTicketsPendientes.Columns["UserDTE"] != null) dgvTicketsPendientes.Columns["UserDTE"].HeaderText = "VENDEDOR";
+                // Mostrar al verdadero Vendedor comisionista
+                if (dgvTicketsPendientes.Columns["Vendedor"] != null) 
+                    dgvTicketsPendientes.Columns["Vendedor"].HeaderText = "VENDEDOR";
 
-                // Se agrega "NroTicket" y "FechaTicket" a la lista para ocultar la columna duplicada
+                // Ocultar UserDTE y las columnas internas (sin ocultar "Vendedor")
                 string[] ocultar = new string[] { 
                     "idTve", "NroTicket", "FechaTicket", "CajaTurnoID", "idLocal", "nmbLocal", "iddocDTE", 
                     "Documento", "nroInT", "SubTotal", "Descuento", "Neto", "Impto1", "Impto2", "Impto3", 
-                    "IvA", "Vendedor", "nroZ", "Url", "nPAX", "Idcliente", "DNI", "RuT", "dv", "Giro", 
+                    "IvA", "UserDTE", "nroZ", "Url", "nPAX", "Idcliente", "DNI", "RuT", "dv", "Giro", 
                     "Direccion", "idcomuna", "nComuna", "idCiudad", "nCiudad", "Fono1", "Fono2", "email", 
                     "status", "idREF", "nroREF", "codigoREF", "FechaREF", "HoraDoc", "Detalles", "MedioPago", "Vuelto" 
                 };

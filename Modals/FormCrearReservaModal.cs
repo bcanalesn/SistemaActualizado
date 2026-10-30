@@ -16,6 +16,7 @@ namespace SISTEMAACTUALIZADO.Modals
         private readonly List<DetalleCarrito> _itemsCarrito;
         private readonly decimal _totalPedido;
         private readonly Usuario _usuarioActual;
+        private readonly Usuario? _usuarioSesion;
         private readonly int _cajaTurnoId;
 
         private DateTimePicker dtpFechaEntrega = null!;
@@ -33,12 +34,13 @@ namespace SISTEMAACTUALIZADO.Modals
         public Reserva? ReservaCreada { get; private set; }
         public int NroTicketAbonoGenerado { get; private set; } = 0;
 
-        public FormCrearReservaModal(Cliente cliente, List<DetalleCarrito> items, decimal total, Usuario usuario, int cajaTurnoId)
+        public FormCrearReservaModal(Cliente cliente, List<DetalleCarrito> items, decimal total, Usuario usuario, int cajaTurnoId, Usuario? usuarioSesion = null)
         {
             _cliente = cliente;
             _itemsCarrito = items;
             _totalPedido = total;
             _usuarioActual = usuario;
+            _usuarioSesion = usuarioSesion;
             _cajaTurnoId = cajaTurnoId;
 
             InitializeComponent();
@@ -310,8 +312,18 @@ namespace SISTEMAACTUALIZADO.Modals
 
                 var service = new ReservaService();
                 
-                // Si el cliente va a abonar, se genera la reserva Y el ticket pendiente para Caja
-                var resultado = service.RegistrarReservaConTicketAbono(nuevaReserva, abono, _usuarioActual.NombreUsuario);
+                // Obtenemos el nombre corto de la sesión (ej: "Victor")
+                string operadorSesion = _usuarioSesion?.NombreUsuario ?? "admin";
+                string vendedor = _usuarioActual.NombreUsuario;
+
+                // Enviamos ambos: Vendedor y Operador de Sesión
+                var resultado = service.RegistrarReservaConTicketAbono(
+                    nuevaReserva, 
+                    abono, 
+                    vendedor, 
+                    operadorSesion // 👈 4° parámetro para UserDTE
+                );
+
                 ReservaCreada = resultado.Reserva;
                 NroTicketAbonoGenerado = resultado.NroTicketAbono;
 

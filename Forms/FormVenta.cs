@@ -1494,6 +1494,7 @@ namespace SISTEMAACTUALIZADO
 
         private void CargarListaVendedoresBD()
         {
+            string vendedorPrevio = _vendedorActualNombre;
             cbVendedor.Items.Clear();
             var usuariosVenta = _usuarioService.ObtenerUsuariosParaVenta();
 
@@ -1508,19 +1509,35 @@ namespace SISTEMAACTUALIZADO
                 cbVendedor.Items.Add(_usuarioActual?.NombreCompleto ?? "Vendedor");
             }
 
-            string usuarioSesion = _usuarioActual?.NombreCompleto ?? _usuarioActual?.NombreUsuario ?? "";
-            int indexSesion = -1;
-
-            for (int i = 0; i < cbVendedor.Items.Count; i++)
+            // 1. Intentar mantener el vendedor que estaba seleccionado en el POS
+            int indexSeleccionado = -1;
+            if (!string.IsNullOrEmpty(vendedorPrevio))
             {
-                if (cbVendedor.Items[i]?.ToString()?.Equals(usuarioSesion, StringComparison.OrdinalIgnoreCase) == true)
+                for (int i = 0; i < cbVendedor.Items.Count; i++)
                 {
-                    indexSesion = i;
-                    break;
+                    if (cbVendedor.Items[i]?.ToString()?.Equals(vendedorPrevio, StringComparison.OrdinalIgnoreCase) == true)
+                    {
+                        indexSeleccionado = i;
+                        break;
+                    }
                 }
             }
 
-            cbVendedor.SelectedIndex = indexSesion >= 0 ? indexSesion : 0;
+            // 2. Si no existía, intentar con el usuario de sesión
+            if (indexSeleccionado < 0)
+            {
+                string usuarioSesion = _usuarioActual?.NombreCompleto ?? _usuarioActual?.NombreUsuario ?? "";
+                for (int i = 0; i < cbVendedor.Items.Count; i++)
+                {
+                    if (cbVendedor.Items[i]?.ToString()?.Equals(usuarioSesion, StringComparison.OrdinalIgnoreCase) == true)
+                    {
+                        indexSeleccionado = i;
+                        break;
+                    }
+                }
+            }
+
+            cbVendedor.SelectedIndex = indexSeleccionado >= 0 ? indexSeleccionado : 0;
             _vendedorActualNombre = cbVendedor.SelectedItem?.ToString() ?? "Vendedor";
         }
 
@@ -1741,14 +1758,19 @@ namespace SISTEMAACTUALIZADO
 
             try
             {
+                int clienteIdVenta = _clienteActual?.IdCliente ?? 0;
+                string clienteNombreParaModal = _clienteSeleccionadoNombre; // 👈 Guardar antes de limpiar
+
+                string usuarioSesion = _usuarioActual?.NombreUsuario ?? "admin";
+
                 int nroTicket;
                 if (_idTveEnEdicion > 0)
                 {
-                    nroTicket = _ventaService.ActualizarTicketExistenteACaja(_idTveEnEdicion, cartCopia, vendedorNombre, _clienteSeleccionadoNombre, _clienteSeleccionadoRut, puntosUsados);
+                    nroTicket = _ventaService.ActualizarTicketExistenteACaja(_idTveEnEdicion, cartCopia, vendedorNombre, _clienteSeleccionadoNombre, _clienteSeleccionadoRut, puntosUsados, clienteIdVenta, usuarioSesion);
                 }
                 else
                 {
-                    nroTicket = _ventaService.GenerarTicketVenta(cartCopia, vendedorNombre, _clienteSeleccionadoNombre, _clienteSeleccionadoRut, puntosUsados);
+                    nroTicket = _ventaService.GenerarTicketVenta(cartCopia, vendedorNombre, _clienteSeleccionadoNombre, _clienteSeleccionadoRut, puntosUsados, clienteIdVenta, usuarioSesion);
                 }
 
                 // Si la venta es Delivery, vinculamos y persistimos la información de entrega
@@ -1777,7 +1799,7 @@ namespace SISTEMAACTUALIZADO
                 AsignarClienteActivo(null);
 
                 // Mostrar el modal con el total rebajado con el descuento de puntos
-                FormPreVentaModal modalPreVenta = new FormPreVentaModal(nroTicket, vendedorNombre, _clienteSeleccionadoNombre, totalFinal, cartCopia);
+                FormPreVentaModal modalPreVenta = new FormPreVentaModal(nroTicket, vendedorNombre, clienteNombreParaModal, totalFinal, cartCopia);
                 modalPreVenta.ShowDialog(this);
             }
             catch (Exception ex)
@@ -1809,15 +1831,24 @@ namespace SISTEMAACTUALIZADO
                 }
             }
 
+            string vendedorSeleccionado = cbVendedor.SelectedItem?.ToString() ?? _vendedorActualNombre;
             string usuarioOperador = _usuarioActual?.NombreUsuario ?? "admin";
+            
             var turno = _cajaService.ObtenerTurnoAbierto(usuarioOperador);
             int cajaTurnoId = turno?.CajaTurnoID ?? 0;
 
             decimal total = cart.Sum(c => c.Subtotal);
             var cartCopia = cart.ToList();
-            var usuarioSesion = _usuarioActual ?? new Usuario { NombreUsuario = usuarioOperador, NombreCompleto = usuarioOperador };
+            
+            var vendedorVenta = new Usuario 
+            { 
+                NombreUsuario = vendedorSeleccionado, 
+                NombreCompleto = vendedorSeleccionado,
+                Rol = "Vendedor"
+            };
 
-            using (var modalReserva = new FormCrearReservaModal(_clienteActual, cartCopia, total, usuarioSesion, cajaTurnoId))
+            // Se le pasa vendedorVenta (comisionista) y _usuarioActual (operador de sesión)
+            using (var modalReserva = new FormCrearReservaModal(_clienteActual, cartCopia, total, vendedorVenta, cajaTurnoId, _usuarioActual))
             {
                 if (modalReserva.ShowDialog(this) == DialogResult.OK && modalReserva.ReservaCreada != null)
                 {

@@ -1,5 +1,6 @@
 using System;
 using System.Drawing;
+using System.Drawing.Drawing2D;
 using System.Linq;
 using System.Windows.Forms;
 using Microsoft.EntityFrameworkCore;
@@ -23,7 +24,8 @@ namespace SISTEMAACTUALIZADO.Modals
         private void InitializeComponent()
         {
             this.Text = "Autenticación de Vendedor";
-            this.Size = new Size(320, 430);
+            // 👈 Tamaño ampliado para formato Touch (430 x 570)
+            this.ClientSize = new Size(430, 570);
             this.StartPosition = FormStartPosition.CenterParent;
             this.FormBorderStyle = FormBorderStyle.FixedDialog;
             this.MaximizeBox = false;
@@ -31,42 +33,52 @@ namespace SISTEMAACTUALIZADO.Modals
             this.BackColor = Color.White;
             this.KeyPreview = true;
 
+            const int formW = 430;
+
             Label lblTitulo = new Label
             {
                 Text = "🔒 Ingrese PIN de 4 Dígitos",
-                Font = new Font("Segoe UI", 11F, FontStyle.Bold),
+                Font = new Font("Segoe UI", 13.5F, FontStyle.Bold),
                 ForeColor = Color.FromArgb(15, 23, 42),
-                Location = new Point(10, 16),
-                Size = new Size(285, 24),
+                Location = new Point(15, 18),
+                Size = new Size(formW - 30, 28),
                 TextAlign = ContentAlignment.MiddleCenter
             };
 
             Label lblVendedor = new Label
             {
                 Text = $"Vendedor: {_nombreVendedor}",
-                Font = new Font("Segoe UI", 8.5F, FontStyle.Bold),
+                Font = new Font("Segoe UI", 10F, FontStyle.Bold),
                 ForeColor = Color.FromArgb(100, 116, 139),
-                Location = new Point(10, 42),
-                Size = new Size(285, 20),
+                Location = new Point(15, 48),
+                Size = new Size(formW - 30, 22),
                 TextAlign = ContentAlignment.MiddleCenter
             };
 
+            // Display con altura táctil y círculos grandes
             lblPuntosDisplay = new Label
             {
-                Text = "○ ○ ○ ○",
-                Font = new Font("Segoe UI", 20F, FontStyle.Bold),
+                Text = "○  ○  ○  ○",
+                Font = new Font("Segoe UI", 26F, FontStyle.Bold),
                 ForeColor = Color.FromArgb(37, 99, 235),
-                Location = new Point(10, 68),
-                Size = new Size(285, 45),
+                Location = new Point(24, 76),
+                Size = new Size(formW - 48, 56),
                 TextAlign = ContentAlignment.MiddleCenter,
                 BackColor = Color.FromArgb(248, 250, 252)
             };
-            lblPuntosDisplay.Paint += (s, e) => ControlPaint.DrawBorder(e.Graphics, lblPuntosDisplay.ClientRectangle, Color.FromArgb(226, 232, 240), ButtonBorderStyle.Solid);
+            lblPuntosDisplay.Paint += (s, e) =>
+            {
+                e.Graphics.SmoothingMode = SmoothingMode.AntiAlias;
+                Rectangle r = new Rectangle(0, 0, lblPuntosDisplay.Width - 1, lblPuntosDisplay.Height - 1);
+                using Pen pen = new Pen(Color.FromArgb(203, 213, 225), 1.5f);
+                e.Graphics.DrawRectangle(pen, r);
+            };
 
+            // Botonera táctil: 382 px de ancho x 360 px de alto (cada botón queda aprox. de 120 x 82 px)
             TableLayoutPanel grid = new TableLayoutPanel
             {
-                Location = new Point(20, 126),
-                Size = new Size(265, 240),
+                Location = new Point(24, 148),
+                Size = new Size(formW - 48, 360),
                 ColumnCount = 3,
                 RowCount = 4
             };
@@ -89,19 +101,29 @@ namespace SISTEMAACTUALIZADO.Modals
                 for (int c = 0; c < 3; c++)
                 {
                     string texto = botones[r, c];
+                    bool esAccion = (texto == "C" || texto == "⌫");
+
                     Button btn = new Button
                     {
                         Text = texto,
                         Dock = DockStyle.Fill,
-                        Margin = new Padding(3),
+                        Margin = new Padding(5), // 👈 Margen entre botones para evitar pulsar números contiguos
                         FlatStyle = FlatStyle.Flat,
-                        Font = new Font("Segoe UI", 12F, FontStyle.Bold),
+                        Font = new Font("Segoe UI", esAccion ? 16F : 19F, FontStyle.Bold),
                         Cursor = Cursors.Hand,
                         TabStop = false,
-                        BackColor = (texto == "C" || texto == "⌫") ? Color.FromArgb(241, 245, 249) : Color.White,
-                        ForeColor = (texto == "C" || texto == "⌫") ? Color.FromArgb(100, 116, 139) : Color.FromArgb(15, 23, 42)
+                        BackColor = esAccion 
+                            ? (texto == "C" ? Color.FromArgb(254, 242, 242) : Color.FromArgb(241, 245, 249)) 
+                            : Color.White,
+                        ForeColor = esAccion 
+                            ? (texto == "C" ? Color.FromArgb(239, 68, 68) : Color.FromArgb(71, 85, 105)) 
+                            : Color.FromArgb(15, 23, 42)
                     };
-                    btn.FlatAppearance.BorderColor = Color.FromArgb(226, 232, 240);
+
+                    btn.FlatAppearance.BorderSize = 1;
+                    btn.FlatAppearance.BorderColor = esAccion && texto == "C" 
+                        ? Color.FromArgb(254, 202, 202) 
+                        : Color.FromArgb(203, 213, 225);
 
                     if (char.IsDigit(texto[0]))
                     {
@@ -119,6 +141,21 @@ namespace SISTEMAACTUALIZADO.Modals
                     grid.Controls.Add(btn, c, r);
                 }
             }
+
+            // Botón inferior para cancelar con el dedo
+            Button btnCancelarModal = new Button
+            {
+                Text = "✕ Cancelar",
+                Location = new Point(24, 518),
+                Size = new Size(formW - 48, 38),
+                FlatStyle = FlatStyle.Flat,
+                BackColor = Color.FromArgb(248, 250, 252),
+                ForeColor = Color.FromArgb(100, 116, 139),
+                Font = new Font("Segoe UI", 9.5F, FontStyle.Bold),
+                Cursor = Cursors.Hand
+            };
+            btnCancelarModal.FlatAppearance.BorderColor = Color.FromArgb(226, 232, 240);
+            btnCancelarModal.Click += (s, e) => { this.DialogResult = DialogResult.Cancel; this.Close(); };
 
             this.KeyDown += (s, e) =>
             {
@@ -144,7 +181,8 @@ namespace SISTEMAACTUALIZADO.Modals
                 }
             };
 
-            this.Controls.AddRange(new Control[] { lblTitulo, lblVendedor, lblPuntosDisplay, grid });
+            this.Controls.AddRange(new Control[] { lblTitulo, lblVendedor, lblPuntosDisplay, grid, btnCancelarModal });
+            this.CancelButton = btnCancelarModal;
         }
 
         private void AgregarDigito(string d)
@@ -177,7 +215,7 @@ namespace SISTEMAACTUALIZADO.Modals
             {
                 chars[i] = '●';
             }
-            lblPuntosDisplay.Text = string.Join(" ", chars);
+            lblPuntosDisplay.Text = string.Join("  ", chars);
         }
 
         private void ValidarPinConBD()
@@ -188,7 +226,6 @@ namespace SISTEMAACTUALIZADO.Modals
             var usuario = db.Usuarios.AsNoTracking().FirstOrDefault(u => 
                 u.Estado && (u.NombreCompleto.ToLower() == nombreLimpio || u.NombreUsuario.ToLower() == nombreLimpio));
 
-            // Si el vendedor tiene PIN asignado, debe coincidir exactamente
             if (usuario != null && !string.IsNullOrEmpty(usuario.Pin))
             {
                 if (usuario.Pin == _pinIngresado)
@@ -201,7 +238,6 @@ namespace SISTEMAACTUALIZADO.Modals
             }
             else
             {
-                // Si por migración previa no tuviera PIN configurado, permite el acceso
                 PinValidado = true;
                 this.DialogResult = DialogResult.OK;
                 this.Close();
