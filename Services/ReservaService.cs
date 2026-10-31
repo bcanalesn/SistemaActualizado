@@ -451,12 +451,12 @@ namespace SISTEMAACTUALIZADO.Services
                     throw new Exception($"El pedido ya se encuentra en estado '{reserva.Estado}'.");
                 }
 
-                // 🛑 CANDADO: Evitar duplicar tickets si ya se envió a caja y sigue pendiente
+                // 🛑 CANDADO: Evitar duplicar tickets si ya se envió un abono o liquidación y sigue pendiente
                 var ticketPendienteExistente = db.TVE2607.FirstOrDefault(t => t.idREF == idReserva && t.status == "Pendiente");
                 if (ticketPendienteExistente != null)
                 {
-                    tr.Rollback();
-                    return ticketPendienteExistente.NroTicket > 0 ? ticketPendienteExistente.NroTicket : ticketPendienteExistente.nroDTE;
+                    // Solo lanza la excepción; el catch inferior hará el Rollback limpio
+                    throw new Exception($"La reserva ya tiene el Ticket N° {ticketPendienteExistente.NroTicket} pendiente de cobro en Caja por {MonedaHelper.Formatear(ticketPendienteExistente.Total, conSigno: true)}.\nDebe cobrarlo o anularlo en Caja antes de liquidar la entrega.");
                 }
 
                 decimal saldoCobrar = reserva.SaldoPendiente;
