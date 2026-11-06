@@ -645,7 +645,23 @@ namespace SISTEMAACTUALIZADO
         {
             if (_reservaSeleccionada == null) return;
 
-            var r = MessageBox.Show($"¿Está seguro de anular la Reserva N° {_reservaSeleccionada.CodigoReserva}?\n\n⚠️ Los abonos quedarán registrados en el historial de la caja.", "Anulación", MessageBoxButtons.YesNo, MessageBoxIcon.Warning);
+            // CANDADO: Si ya existen abonos cobrados en caja, se debe emitir Nota de Crédito primero
+            if (_reservaSeleccionada.TotalAbonado > 0)
+            {
+                MessageBox.Show(
+                    $"No se puede anular la reserva {_reservaSeleccionada.CodigoReserva} directamente porque registra {MonedaHelper.Formatear(_reservaSeleccionada.TotalAbonado, conSigno: true)} en abonos cobrados mediante Boleta(s).\n\n" +
+                    "Para cancelar este pedido y devolver el dinero al cliente:\n" +
+                    "1. Diríjase a 'Libro Ventas LVE'.\n" +
+                    "2. Seleccione la(s) boleta(s) correspondiente(s) al abono.\n" +
+                    "3. Presione 'Emitir Nota de Crédito' para formalizar la devolución.",
+                    "Requiere Nota de Crédito",
+                    MessageBoxButtons.OK,
+                    MessageBoxIcon.Warning
+                );
+                return;
+            }
+
+            var r = MessageBox.Show($"¿Está seguro de anular la Reserva N° {_reservaSeleccionada.CodigoReserva}?", "Anulación", MessageBoxButtons.YesNo, MessageBoxIcon.Question);
             if (r == DialogResult.Yes)
             {
                 _reservaService.AnularReserva(_reservaSeleccionada.IdReserva);

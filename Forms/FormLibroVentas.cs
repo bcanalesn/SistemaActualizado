@@ -287,14 +287,14 @@ namespace SISTEMAACTUALIZADO
                 CellBorderStyle = DataGridViewCellBorderStyle.SingleHorizontal,
                 ColumnHeadersBorderStyle = DataGridViewHeaderBorderStyle.None,
                 SelectionMode = DataGridViewSelectionMode.FullRowSelect,
-                MultiSelect = true,
+                MultiSelect = false, // El multi-select se gestiona con los CheckBoxes táctiles
                 AllowUserToAddRows = false,
-                ReadOnly = true,
+                ReadOnly = false, // Permite marcar el CheckBox
                 RowHeadersVisible = false,
                 AutoSizeColumnsMode = DataGridViewAutoSizeColumnsMode.Fill
             };
             ConfigurarEstiloTabla(dgvLibro);
-            dgvLibro.SelectionChanged += DgvLibro_SelectionChanged;
+            dgvLibro.CellContentClick += DgvLibro_CellContentClick;
             dgvLibro.CellFormatting += DgvLibro_CellFormatting;
             dgvLibro.CellDoubleClick += DgvLibro_CellDoubleClick;
 
@@ -344,7 +344,7 @@ namespace SISTEMAACTUALIZADO
 
             Panel pnlSpacerBtn = new Panel { Dock = DockStyle.Top, Height = 6 };
 
-            btnNotaCredito = CrearBoton("📄  Emitir Nota de Crédito", Color.FromArgb(220, 38, 38), Color.White, new Size(200, 40), 8);
+            btnNotaCredito = CrearBoton("⚡ Emitir Nota Crédito / Débito", Color.FromArgb(220, 38, 38), Color.White, new Size(200, 44), 8);
             btnNotaCredito.Dock = DockStyle.Top;
             btnNotaCredito.Enabled = false;
             btnNotaCredito.Click += BtnNotaCredito_Click;
@@ -529,6 +529,23 @@ namespace SISTEMAACTUALIZADO
             return path;
         }
 
+        private void DgvLibro_CellContentClick(object? sender, DataGridViewCellEventArgs e)
+        {
+            if (e.RowIndex < 0) return;
+
+            if (dgvLibro.Columns[e.ColumnIndex].Name == "Seleccionado")
+            {
+                dgvLibro.CommitEdit(DataGridViewDataErrorContexts.Commit);
+                ActualizarEstadoBotonEmision();
+            }
+        }
+
+        private void ActualizarEstadoBotonEmision()
+        {
+            var seleccionadas = ObtenerVentasSeleccionadas();
+            btnNotaCredito.Enabled = seleccionadas.Any(v => v.iddocDTE != 61 && v.iddocDTE != 56 && !v.status.Equals("Anulado NC", StringComparison.OrdinalIgnoreCase));
+        }
+
         private void AplicarFiltroFecha(DateTime desde, DateTime hasta)
         {
             dtpDesde.Value = desde.Date;
@@ -582,6 +599,8 @@ namespace SISTEMAACTUALIZADO
             AplicarFiltroFecha(DateTime.Today, DateTime.Today.AddDays(1).AddTicks(-1));
         }
 
+        private List<ItemFilaLibroVentas> _filasVisibles = new List<ItemFilaLibroVentas>();
+
         private void FiltrarLocalmente()
         {
             var resultado = _ventasCargadas.AsQueryable();
@@ -599,8 +618,9 @@ namespace SISTEMAACTUALIZADO
                 resultado = resultado.Where(v => v.Documento.Contains(tipoSel));
             }
 
-            var listaFinal = resultado.Select(v => new
+            _filasVisibles = resultado.Select(v => new ItemFilaLibroVentas
             {
+                Seleccionado = false,
                 Documento = v.Documento,
                 FolioDTE = v.nroDTE,
                 FechaEmision = v.FecDoc,
@@ -611,67 +631,82 @@ namespace SISTEMAACTUALIZADO
                 ObjetoOriginal = v
             }).ToList();
 
-            dgvLibro.DataSource = listaFinal;
+            dgvLibro.DataSource = _filasVisibles;
 
-            // Estilo numérico con alineación centrada o a la derecha coordinada con el encabezado
             var estiloMonedaCL = new DataGridViewCellStyle
             {
                 FormatProvider = new System.Globalization.CultureInfo("es-CL"),
                 Format = "$ #,##0",
-                Alignment = DataGridViewContentAlignment.MiddleCenter // 👈 Centrado vertical y horizontal
+                Alignment = DataGridViewContentAlignment.MiddleCenter
             };
 
-            // 1. TIPO DOCUMENTO (A la izquierda)
+            // 0. COLUMNA CHECKBOX TÁCTIL
+            if (dgvLibro.Columns["Seleccionado"] != null)
+            {
+                dgvLibro.Columns["Seleccionado"].HeaderText = "SEL.";
+                dgvLibro.Columns["Seleccionado"].FillWeight = 6;
+                dgvLibro.Columns["Seleccionado"].ReadOnly = false;
+                dgvLibro.Columns["Seleccionado"].HeaderCell.Style.Alignment = DataGridViewContentAlignment.MiddleCenter;
+                dgvLibro.Columns["Seleccionado"].DefaultCellStyle.Alignment = DataGridViewContentAlignment.MiddleCenter;
+            }
+
+            // 1. TIPO DOCUMENTO
             if (dgvLibro.Columns["Documento"] != null)
             {
                 dgvLibro.Columns["Documento"].HeaderText = "TIPO DOCUMENTO";
-                dgvLibro.Columns["Documento"].FillWeight = 22;
+                dgvLibro.Columns["Documento"].FillWeight = 20;
+                dgvLibro.Columns["Documento"].ReadOnly = true;
                 dgvLibro.Columns["Documento"].HeaderCell.Style.Alignment = DataGridViewContentAlignment.MiddleLeft;
                 dgvLibro.Columns["Documento"].DefaultCellStyle.Alignment = DataGridViewContentAlignment.MiddleLeft;
             }
 
-            // 2. FOLIO DTE (Centrado)
+            // 2. FOLIO DTE
             if (dgvLibro.Columns["FolioDTE"] != null)
             {
                 dgvLibro.Columns["FolioDTE"].HeaderText = "FOLIO DTE";
                 dgvLibro.Columns["FolioDTE"].FillWeight = 11;
+                dgvLibro.Columns["FolioDTE"].ReadOnly = true;
                 dgvLibro.Columns["FolioDTE"].HeaderCell.Style.Alignment = DataGridViewContentAlignment.MiddleCenter;
                 dgvLibro.Columns["FolioDTE"].DefaultCellStyle.Alignment = DataGridViewContentAlignment.MiddleCenter;
             }
 
-            // 3. FECHA EMISIÓN (Centrada)
+            // 3. FECHA EMISIÓN
             if (dgvLibro.Columns["FechaEmision"] != null)
             {
                 dgvLibro.Columns["FechaEmision"].HeaderText = "FECHA EMISIÓN";
-                dgvLibro.Columns["FechaEmision"].FillWeight = 16;
+                dgvLibro.Columns["FechaEmision"].FillWeight = 15;
+                dgvLibro.Columns["FechaEmision"].ReadOnly = true;
                 dgvLibro.Columns["FechaEmision"].HeaderCell.Style.Alignment = DataGridViewContentAlignment.MiddleCenter;
                 dgvLibro.Columns["FechaEmision"].DefaultCellStyle.Alignment = DataGridViewContentAlignment.MiddleCenter;
                 dgvLibro.Columns["FechaEmision"].DefaultCellStyle.Format = "dd-MM-yyyy HH:mm";
             }
 
-            // 4. NETO (Centrado)
+            // 4. NETO
             if (dgvLibro.Columns["Neto"] != null)
             {
                 dgvLibro.Columns["Neto"].HeaderText = "NETO";
-                dgvLibro.Columns["Neto"].FillWeight = 13;
+                dgvLibro.Columns["Neto"].FillWeight = 12;
+                dgvLibro.Columns["Neto"].ReadOnly = true;
                 dgvLibro.Columns["Neto"].HeaderCell.Style.Alignment = DataGridViewContentAlignment.MiddleCenter;
                 dgvLibro.Columns["Neto"].DefaultCellStyle = estiloMonedaCL;
             }
 
-            // 5. IVA (19%) (Centrado)
+            // 5. IVA (19%)
             if (dgvLibro.Columns["IVA"] != null)
             {
                 dgvLibro.Columns["IVA"].HeaderText = "IVA (19%)";
                 dgvLibro.Columns["IVA"].FillWeight = 12;
+                dgvLibro.Columns["IVA"].ReadOnly = true;
                 dgvLibro.Columns["IVA"].HeaderCell.Style.Alignment = DataGridViewContentAlignment.MiddleCenter;
                 dgvLibro.Columns["IVA"].DefaultCellStyle = estiloMonedaCL;
             }
 
-            // 6. TOTAL (Centrado y en negrita azul)
+            // 6. TOTAL
             if (dgvLibro.Columns["Total"] != null)
             {
                 dgvLibro.Columns["Total"].HeaderText = "TOTAL";
-                dgvLibro.Columns["Total"].FillWeight = 13;
+                dgvLibro.Columns["Total"].FillWeight = 12;
+                dgvLibro.Columns["Total"].ReadOnly = true;
                 dgvLibro.Columns["Total"].HeaderCell.Style.Alignment = DataGridViewContentAlignment.MiddleCenter;
                 dgvLibro.Columns["Total"].DefaultCellStyle = new DataGridViewCellStyle(estiloMonedaCL)
                 {
@@ -680,18 +715,20 @@ namespace SISTEMAACTUALIZADO
                 };
             }
 
-            // 7. RUT CLIENTE (Centrado)
+            // 7. RUT CLIENTE
             if (dgvLibro.Columns["RUT"] != null)
             {
                 dgvLibro.Columns["RUT"].HeaderText = "RUT CLIENTE";
-                dgvLibro.Columns["RUT"].FillWeight = 13;
+                dgvLibro.Columns["RUT"].FillWeight = 12;
+                dgvLibro.Columns["RUT"].ReadOnly = true;
                 dgvLibro.Columns["RUT"].HeaderCell.Style.Alignment = DataGridViewContentAlignment.MiddleCenter;
                 dgvLibro.Columns["RUT"].DefaultCellStyle.Alignment = DataGridViewContentAlignment.MiddleCenter;
             }
 
             if (dgvLibro.Columns["ObjetoOriginal"] != null) dgvLibro.Columns["ObjetoOriginal"].Visible = false;
 
-            lblPaginadorInfo.Text = $"Mostrando {MonedaHelper.Formatear(listaFinal.Count)} de {MonedaHelper.Formatear(_ventasCargadas.Count)} documentos oficiales";
+            lblPaginadorInfo.Text = $"Mostrando {_filasVisibles.Count:N0} de {_ventasCargadas.Count:N0} documentos oficiales";
+            ActualizarEstadoBotonEmision();
         }
 
         private void DgvLibro_SelectionChanged(object? sender, EventArgs e)
@@ -702,22 +739,10 @@ namespace SISTEMAACTUALIZADO
 
         private List<TVE2607> ObtenerVentasSeleccionadas()
         {
-            var lista = new List<TVE2607>();
-            if (dgvLibro.SelectedRows.Count > 0)
-            {
-                foreach (DataGridViewRow row in dgvLibro.SelectedRows)
-                {
-                    if (row.DataBoundItem != null)
-                    {
-                        dynamic item = row.DataBoundItem;
-                        if (item.ObjetoOriginal is TVE2607 v)
-                        {
-                            lista.Add(v);
-                        }
-                    }
-                }
-            }
-            return lista;
+            return _filasVisibles
+                .Where(f => f.Seleccionado && f.ObjetoOriginal != null)
+                .Select(f => f.ObjetoOriginal)
+                .ToList();
         }
 
         private void DgvLibro_CellDoubleClick(object? sender, DataGridViewCellEventArgs e)
@@ -945,85 +970,52 @@ namespace SISTEMAACTUALIZADO
         private void BtnNotaCredito_Click(object? sender, EventArgs e)
         {
             var ventasParaAnular = ObtenerVentasSeleccionadas()
-                .Where(v => v.iddocDTE != 61 && !v.status.Equals("Anulado NC", StringComparison.OrdinalIgnoreCase))
+                .Where(v => v.iddocDTE != 61 && v.iddocDTE != 56 && !v.status.Equals("Anulado NC", StringComparison.OrdinalIgnoreCase))
                 .ToList();
 
             if (ventasParaAnular.Count == 0)
             {
-                MessageBox.Show("Seleccione una o más Boletas / Facturas válidas para emitir Nota de Crédito.", "Atención", MessageBoxButtons.OK, MessageBoxIcon.Warning);
+                MessageBox.Show("Seleccione una o más Boletas / Facturas válidas para emitir Nota de Crédito o Débito.", "Atención", MessageBoxButtons.OK, MessageBoxIcon.Warning);
                 return;
             }
 
-            decimal totalConsolidado = ventasParaAnular.Sum(v => v.Total);
-            decimal netoConsolidado = ventasParaAnular.Sum(v => v.Neto);
-            decimal ivaConsolidado = ventasParaAnular.Sum(v => v.IvA);
-            string foliosRef = string.Join(", ", ventasParaAnular.Select(v => $"#{v.nroDTE}"));
-
-            Form modalNC = new Form
+            // Regla: Si hay factura, debe ser estrictamente 1 documento
+            bool tieneFactura = ventasParaAnular.Any(v => v.iddocDTE == 33);
+            if (tieneFactura && ventasParaAnular.Count > 1)
             {
-                Text = $"Emitir Nota de Crédito Múltiple ({ventasParaAnular.Count} documentos)",
-                Size = new Size(500, 510),
-                StartPosition = FormStartPosition.CenterParent,
-                FormBorderStyle = FormBorderStyle.FixedDialog,
-                MaximizeBox = false,
-                MinimizeBox = false,
-                BackColor = Color.White
-            };
+                MessageBox.Show("Para operar sobre Facturas Electrónicas (DTE 33), debe seleccionar únicamente una factura por emisión.", "Regla Factura 1 a 1", MessageBoxButtons.OK, MessageBoxIcon.Warning);
+                return;
+            }
 
-            Label lblTitle = new Label { Text = "📄 Emitir Nota de Crédito Electrónica", Location = new Point(25, 18), Font = new Font("Segoe UI", 12F, FontStyle.Bold), ForeColor = Color.FromArgb(185, 28, 28), AutoSize = true };
-            Label lblInfo = new Label
+            // Regla: Límite de boletas configurado en Control de Folios
+            var configDteService = new ConfiguracionDteService();
+            int maxBoletas = configDteService.ObtenerConfiguracion().MaxBoletasPorNC;
+
+            if (!tieneFactura && ventasParaAnular.Count > maxBoletas)
             {
-                Text = $"Documentos seleccionados: {MonedaHelper.Formatear(ventasParaAnular.Count)} ({foliosRef})\nMonto Total a Anular: {MonedaHelper.Formatear(totalConsolidado, conSigno: true)} (Neto: {MonedaHelper.Formatear(netoConsolidado, conSigno: true)} | IVA: {MonedaHelper.Formatear(ivaConsolidado, conSigno: true)})",
-                Location = new Point(25, 48),
-                Font = new Font("Segoe UI", 8.5F, FontStyle.Bold),
-                ForeColor = Color.FromArgb(51, 65, 85),
-                AutoSize = true
-            };
+                MessageBox.Show($"Ha seleccionado {ventasParaAnular.Count} boletas, superando el límite máximo configurado de {maxBoletas} boletas por Nota de Crédito.\n\nPuede ajustar este límite en 'Control de Folios' -> '⚙️ Configuración NC'.", "Límite Excedido", MessageBoxButtons.OK, MessageBoxIcon.Warning);
+                return;
+            }
 
-            Label lblCausa = new Label { Text = "Código de Referencia SII:", Location = new Point(25, 105), AutoSize = true, Font = new Font("Segoe UI", 9F, FontStyle.Bold) };
-            ComboBox cbCausa = new ComboBox { Location = new Point(25, 127), Size = new Size(430, 30), DropDownStyle = ComboBoxStyle.DropDownList, Font = new Font("Segoe UI", 9.5F) };
-            cbCausa.Items.AddRange(new string[] { "1 - Anula Documento de Referencia (Anulación / Devolución Total)", "2 - Corregir Texto en Documento (Glosa / Datos)", "3 - Corregir Montos / Descuento Parcial" });
-            cbCausa.SelectedIndex = 0;
+            Usuario usuarioSesion = new Usuario { NombreUsuario = "Victor" }; // O el usuario activo de tu sesión
 
-            Label lblMotivo = new Label { Text = "Motivo / Glosa de la Anulación:", Location = new Point(25, 170), AutoSize = true, Font = new Font("Segoe UI", 9F, FontStyle.Bold) };
-            TextBox txtMotivo = new TextBox { Text = "Devolución masiva de mercadería / Anulación de ventas", Location = new Point(25, 192), Size = new Size(430, 28), Font = new Font("Segoe UI", 9.5F) };
-
-            CheckBox chkRestock = new CheckBox { Text = "🔄 Reintegrar automáticamente todos los productos al inventario", Location = new Point(25, 235), AutoSize = true, Checked = true, Font = new Font("Segoe UI", 8.5F, FontStyle.Bold), ForeColor = Color.FromArgb(3, 105, 161) };
-
-            Button btnEmitirNC = CrearBoton("⚡ GENERAR Y EMITIR NOTA DE CRÉDITO CONSOLIDADA", Color.FromArgb(220, 38, 38), Color.White, new Size(430, 48), 8);
-            btnEmitirNC.Location = new Point(25, 330);
-
-            btnEmitirNC.Click += (s, args) =>
+            using var modal = new FormEmitirNotaDteModal(ventasParaAnular, usuarioSesion);
+            if (modal.ShowDialog(this) == DialogResult.OK && modal.DocumentoEmitido)
             {
-                if (string.IsNullOrWhiteSpace(txtMotivo.Text))
-                {
-                    MessageBox.Show("Debe ingresar un motivo para la emisión.", "Validación", MessageBoxButtons.OK, MessageBoxIcon.Warning);
-                    return;
-                }
-
-                try
-                {
-                    var idsVentas = ventasParaAnular.Select(v => v.idTve);
-                    int totalEmitidas = NotaCreditoService.EmitirNotasCreditoDirecto(idsVentas, txtMotivo.Text.Trim(), (cbCausa.SelectedIndex + 1).ToString(), chkRestock.Checked);
-
-                    if (totalEmitidas == 0)
-                    {
-                        MessageBox.Show("No se emitieron Notas de Crédito. Verifique que las ventas seleccionadas sean válidas.", "Sin cambios", MessageBoxButtons.OK, MessageBoxIcon.Warning);
-                        return;
-                    }
-
-                    MessageBox.Show($"¡Se emitieron las Notas de Crédito exitosamente para {ventasParaAnular.Count} documento(s)!", "Proceso Exitoso", MessageBoxButtons.OK, MessageBoxIcon.Information);
-                    modalNC.Close();
-                    AplicarFiltroFecha(dtpDesde.Value.Date, dtpHasta.Value.Date.AddDays(1).AddTicks(-1));
-                }
-                catch (Exception ex)
-                {
-                    MessageBox.Show($"Error al emitir Notas de Crédito: {ex.Message}", "Error", MessageBoxButtons.OK, MessageBoxIcon.Error);
-                }
-            };
-
-            modalNC.Controls.AddRange(new Control[] { lblTitle, lblInfo, lblCausa, cbCausa, lblMotivo, txtMotivo, chkRestock, btnEmitirNC });
-            modalNC.ShowDialog();
+                AplicarFiltroFecha(dtpDesde.Value.Date, dtpHasta.Value.Date.AddDays(1).AddTicks(-1));
+            }
         }
+    }
+    public class ItemFilaLibroVentas
+    {
+        public bool Seleccionado { get; set; } = false;
+        public string Documento { get; set; } = string.Empty;
+        public int FolioDTE { get; set; }
+        public DateTime FechaEmision { get; set; }
+        public decimal Neto { get; set; }
+        public decimal IVA { get; set; }
+        public decimal Total { get; set; }
+        public string RUT { get; set; } = string.Empty;
+        public TVE2607 ObjetoOriginal { get; set; } = null!;
     }
 }

@@ -28,6 +28,8 @@ namespace SISTEMAACTUALIZADO.Data
         public DbSet<CajaTurno> CajaTurnos { get; set; } = null!;
         public DbSet<ClienteCuentaPuntos> ClienteCuentasPuntos { get; set; } = null!;
         public DbSet<PuntosMovimiento> PuntosMovimientos { get; set; } = null!;
+        public DbSet<DteReferencia> DteReferencias { get; set; } = null!;
+        public DbSet<ConfiguracionDte> ConfiguracionesDte { get; set; } = null!;
 
         // Reservas
         public DbSet<Reserva> Reservas { get; set; } = null!;

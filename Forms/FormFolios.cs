@@ -5,6 +5,7 @@ using System.Drawing.Drawing2D;
 using System.Linq;
 using System.Windows.Forms;
 using SISTEMAACTUALIZADO.Data;
+using SISTEMAACTUALIZADO.Modals;
 using SISTEMAACTUALIZADO.Models;
 using SISTEMAACTUALIZADO.Services;
 
@@ -13,16 +14,20 @@ namespace SISTEMAACTUALIZADO
     public class FormFolios : Form
     {
         private readonly FolioService _folioService = new FolioService();
+        private readonly Usuario _usuarioActual;
 
         private DataGridView dgvFolios = null!;
         private Button btnNuevo = null!;
         private Button btnEditar = null!;
         private Button btnRefrescar = null!;
+        private Button btnConfigDte = null!; // 👈 Botón táctil de configuración NC/ND
         private Label lblContadorFooter = null!;
         private Folio? _folioSeleccionado = null;
 
-        public FormFolios()
+        public FormFolios(Usuario? usuario = null)
         {
+            _usuarioActual = usuario ?? new Usuario { NombreUsuario = "admin" };
+
             this.DoubleBuffered = true;
             this.SetStyle(ControlStyles.AllPaintingInWmPaint | 
                            ControlStyles.UserPaint | 
@@ -62,7 +67,7 @@ namespace SISTEMAACTUALIZADO
             Panel pnlTitulos = new Panel
             {
                 Dock = DockStyle.Left,
-                Width = 460,
+                Width = 420,
                 BackColor = Color.Transparent
             };
 
@@ -97,20 +102,32 @@ namespace SISTEMAACTUALIZADO
                 Padding = new Padding(0, 2, 0, 0)
             };
 
-            btnNuevo = CrearBoton("➕ Cargar Nuevo Rango", Color.FromArgb(16, 185, 129), Color.White, new Size(185, 34), 6);
+            // Botón Cargar Nuevo Rango
+            btnNuevo = CrearBoton("➕ Cargar Nuevo Rango", Color.FromArgb(16, 185, 129), Color.White, new Size(175, 36), 6);
             btnNuevo.Margin = new Padding(4, 0, 0, 0);
             btnNuevo.Click += BtnNuevo_Click;
 
-            btnEditar = CrearBoton("✏️ Editar Rango", Color.FromArgb(2, 132, 199), Color.White, new Size(130, 34), 6);
+            // Botón Editar Rango
+            btnEditar = CrearBoton("✏️ Editar Rango", Color.FromArgb(2, 132, 199), Color.White, new Size(125, 36), 6);
             btnEditar.Margin = new Padding(4, 0, 0, 0);
             btnEditar.Enabled = false;
             btnEditar.Click += BtnEditar_Click;
 
-            btnRefrescar = CrearBoton("🔄 Recargar", Color.FromArgb(241, 245, 249), Color.FromArgb(51, 65, 85), new Size(110, 34), 6);
+            // Botón Configuración de Notas de Crédito / DTE (Formato Táctil)
+            btnConfigDte = CrearBoton("⚙️ Configuración NC", Color.FromArgb(124, 58, 237), Color.White, new Size(160, 36), 6);
+            btnConfigDte.Margin = new Padding(4, 0, 0, 0);
+            btnConfigDte.Click += (s, e) =>
+            {
+                using var modalConfig = new FormConfiguracionDteModal(_usuarioActual);
+                modalConfig.ShowDialog(this);
+            };
+
+            // Botón Recargar
+            btnRefrescar = CrearBoton("🔄 Recargar", Color.FromArgb(241, 245, 249), Color.FromArgb(51, 65, 85), new Size(100, 36), 6);
             btnRefrescar.Margin = new Padding(4, 0, 0, 0);
             btnRefrescar.Click += (s, e) => CargarFolios();
 
-            pnlBotonesAccion.Controls.AddRange(new Control[] { btnNuevo, btnEditar, btnRefrescar });
+            pnlBotonesAccion.Controls.AddRange(new Control[] { btnNuevo, btnEditar, btnConfigDte, btnRefrescar });
             pnlHeader.Controls.Add(pnlBotonesAccion);
             pnlHeader.Controls.Add(pnlTitulos);
 
@@ -135,7 +152,7 @@ namespace SISTEMAACTUALIZADO
                 RowHeadersVisible = false,
                 AutoSizeColumnsMode = DataGridViewAutoSizeColumnsMode.Fill,
                 AutoGenerateColumns = false,
-                RowTemplate = { Height = 34 }
+                RowTemplate = { Height = 36 }
             };
 
             ConfigurarEstiloYColumnasTabla();
@@ -173,11 +190,11 @@ namespace SISTEMAACTUALIZADO
             dgvFolios.ColumnHeadersDefaultCellStyle.Font = new Font("Segoe UI", 8.5F, FontStyle.Bold);
             dgvFolios.ColumnHeadersHeight = 36;
 
-            dgvFolios.DefaultCellStyle.Font = new Font("Segoe UI", 8.5F);
+            dgvFolios.DefaultCellStyle.Font = new Font("Segoe UI", 9F);
             dgvFolios.DefaultCellStyle.ForeColor = Color.FromArgb(15, 23, 42);
             dgvFolios.DefaultCellStyle.SelectionBackColor = Color.FromArgb(224, 242, 254);
             dgvFolios.DefaultCellStyle.SelectionForeColor = Color.FromArgb(15, 23, 42);
-            dgvFolios.RowTemplate.Height = 34;
+            dgvFolios.RowTemplate.Height = 36;
             dgvFolios.AlternatingRowsDefaultCellStyle.BackColor = Color.FromArgb(248, 250, 252);
             dgvFolios.GridColor = Color.FromArgb(226, 232, 240);
 
@@ -197,10 +214,10 @@ namespace SISTEMAACTUALIZADO
                 Name = "TipoDocumento", 
                 HeaderText = "TIPO DOCUMENTO (DTE)", 
                 DataPropertyName = "TipoDocumento", 
-                FillWeight = 24, 
+                FillWeight = 26, 
                 DefaultCellStyle = 
                 { 
-                    Font = new Font("Segoe UI", 8.5F, FontStyle.Bold), 
+                    Font = new Font("Segoe UI", 9F, FontStyle.Bold), 
                     ForeColor = Color.FromArgb(37, 99, 235) 
                 } 
             });
@@ -210,7 +227,7 @@ namespace SISTEMAACTUALIZADO
                 Name = "FolioDesde", 
                 HeaderText = "FOLIO DESDE", 
                 DataPropertyName = "FolioDesde", 
-                FillWeight = 14, 
+                FillWeight = 13, 
                 DefaultCellStyle = { Alignment = DataGridViewContentAlignment.MiddleCenter } 
             });
 
@@ -219,7 +236,7 @@ namespace SISTEMAACTUALIZADO
                 Name = "FolioHasta", 
                 HeaderText = "FOLIO HASTA", 
                 DataPropertyName = "FolioHasta", 
-                FillWeight = 14, 
+                FillWeight = 13, 
                 DefaultCellStyle = { Alignment = DataGridViewContentAlignment.MiddleCenter } 
             });
 
@@ -232,7 +249,7 @@ namespace SISTEMAACTUALIZADO
                 DefaultCellStyle = 
                 { 
                     Alignment = DataGridViewContentAlignment.MiddleCenter, 
-                    Font = new Font("Segoe UI", 8.5F, FontStyle.Bold), 
+                    Font = new Font("Segoe UI", 9F, FontStyle.Bold), 
                     ForeColor = Color.FromArgb(16, 185, 129) 
                 } 
             });
@@ -255,7 +272,7 @@ namespace SISTEMAACTUALIZADO
                 DefaultCellStyle = 
                 { 
                     Alignment = DataGridViewContentAlignment.MiddleCenter, 
-                    Font = new Font("Segoe UI", 8.5F, FontStyle.Bold) 
+                    Font = new Font("Segoe UI", 9F, FontStyle.Bold) 
                 } 
             });
 
@@ -310,7 +327,7 @@ namespace SISTEMAACTUALIZADO
             Form modal = new Form
             {
                 Text = esNuevo ? "Configurar Rango de Folios" : "Editar Rango de Folios",
-                Size = new Size(380, 360),
+                Size = new Size(400, 390),
                 StartPosition = FormStartPosition.CenterParent,
                 FormBorderStyle = FormBorderStyle.FixedDialog,
                 MaximizeBox = false,
@@ -318,24 +335,32 @@ namespace SISTEMAACTUALIZADO
                 BackColor = Color.White
             };
 
-            Label lblTitle = new Label { Text = esNuevo ? "📄 Nuevo Rango de Folios" : "✏️ Editar Rango", Location = new Point(25, 20), Font = new Font("Segoe UI", 12F, FontStyle.Bold), AutoSize = true, ForeColor = Color.FromArgb(15, 23, 42) };
+            Label lblTitle = new Label { Text = esNuevo ? "📄 Nuevo Rango de Folios" : "✏️ Editar Rango", Location = new Point(25, 18), Font = new Font("Segoe UI", 12F, FontStyle.Bold), AutoSize = true, ForeColor = Color.FromArgb(15, 23, 42) };
 
-            Label lblTipo = new Label { Text = "Tipo de Documento Tributario:", Location = new Point(25, 60), AutoSize = true, Font = new Font("Segoe UI", 9F, FontStyle.Bold) };
-            ComboBox cbTipo = new ComboBox { Location = new Point(25, 82), Size = new Size(310, 30), DropDownStyle = ComboBoxStyle.DropDownList, Font = new Font("Segoe UI", 9.5F) };
-            cbTipo.Items.AddRange(new string[] { "Boleta Electrónica", "Factura Electrónica", "Guía de Despacho", "Nota de Crédito Electrónica" });
+            Label lblTipo = new Label { Text = "Tipo de Documento Tributario:", Location = new Point(25, 56), AutoSize = true, Font = new Font("Segoe UI", 9F, FontStyle.Bold) };
+            ComboBox cbTipo = new ComboBox { Location = new Point(25, 78), Size = new Size(330, 30), DropDownStyle = ComboBoxStyle.DropDownList, Font = new Font("Segoe UI", 9.5F) };
+            
+            // Se incluye Nota de Débito Electrónica en la lista oficial
+            cbTipo.Items.AddRange(new string[] { 
+                "Boleta Electrónica", 
+                "Factura Electrónica", 
+                "Guía de Despacho", 
+                "Nota de Crédito Electrónica",
+                "Nota de Débito Electrónica" 
+            });
             cbTipo.SelectedItem = string.IsNullOrEmpty(f.TipoDocumento) ? "Boleta Electrónica" : f.TipoDocumento;
 
-            Label lblDesde = new Label { Text = "Folio Desde:", Location = new Point(25, 122), AutoSize = true, Font = new Font("Segoe UI", 9F, FontStyle.Bold) };
-            NumericUpDown numDesde = new NumericUpDown { Minimum = 1, Maximum = 9999999, Value = f.FolioDesde == 0 ? 1 : f.FolioDesde, Location = new Point(25, 144), Size = new Size(145, 30), Font = new Font("Segoe UI", 9.5F) };
+            Label lblDesde = new Label { Text = "Folio Desde:", Location = new Point(25, 120), AutoSize = true, Font = new Font("Segoe UI", 9F, FontStyle.Bold) };
+            NumericUpDown numDesde = new NumericUpDown { Minimum = 1, Maximum = 9999999, Value = f.FolioDesde == 0 ? 1 : f.FolioDesde, Location = new Point(25, 142), Size = new Size(155, 30), Font = new Font("Segoe UI", 9.5F) };
 
-            Label lblHasta = new Label { Text = "Folio Hasta:", Location = new Point(190, 122), AutoSize = true, Font = new Font("Segoe UI", 9F, FontStyle.Bold) };
-            NumericUpDown numHasta = new NumericUpDown { Minimum = 1, Maximum = 9999999, Value = f.FolioHasta == 0 ? 1000 : f.FolioHasta, Location = new Point(190, 144), Size = new Size(145, 30), Font = new Font("Segoe UI", 9.5F) };
+            Label lblHasta = new Label { Text = "Folio Hasta:", Location = new Point(200, 120), AutoSize = true, Font = new Font("Segoe UI", 9F, FontStyle.Bold) };
+            NumericUpDown numHasta = new NumericUpDown { Minimum = 1, Maximum = 9999999, Value = f.FolioHasta == 0 ? 1000 : f.FolioHasta, Location = new Point(200, 142), Size = new Size(155, 30), Font = new Font("Segoe UI", 9.5F) };
 
             Label lblActual = new Label { Text = "Siguiente Folio a Emitir:", Location = new Point(25, 184), AutoSize = true, Font = new Font("Segoe UI", 9F, FontStyle.Bold) };
-            NumericUpDown numActual = new NumericUpDown { Minimum = 1, Maximum = 9999999, Value = f.FolioActual == 0 ? 1 : f.FolioActual, Location = new Point(25, 206), Size = new Size(310, 30), Font = new Font("Segoe UI", 9.5F) };
+            NumericUpDown numActual = new NumericUpDown { Minimum = 1, Maximum = 9999999, Value = f.FolioActual == 0 ? 1 : f.FolioActual, Location = new Point(25, 206), Size = new Size(330, 30), Font = new Font("Segoe UI", 9.5F) };
 
-            Button btnGuardar = CrearBoton(esNuevo ? "💾 Guardar Rango" : "💾 Guardar Cambios", Color.FromArgb(0, 102, 255), Color.White, new Size(310, 42), 8);
-            btnGuardar.Location = new Point(25, 255);
+            Button btnGuardar = CrearBoton(esNuevo ? "💾 Guardar Rango" : "💾 Guardar Cambios", Color.FromArgb(16, 185, 129), Color.White, new Size(330, 44), 8);
+            btnGuardar.Location = new Point(25, 262);
 
             btnGuardar.Click += (s, e) =>
             {
@@ -371,7 +396,7 @@ namespace SISTEMAACTUALIZADO
             };
 
             modal.Controls.AddRange(new Control[] { lblTitle, lblTipo, cbTipo, lblDesde, numDesde, lblHasta, numHasta, lblActual, numActual, btnGuardar });
-            modal.ShowDialog();
+            modal.ShowDialog(this);
         }
 
         private Panel CrearTarjetaRedondeada(int x, int y, int ancho, int alto, Color colorFondo, Color colorBorde)
@@ -411,7 +436,7 @@ namespace SISTEMAACTUALIZADO
                 BackColor = back, 
                 ForeColor = fore, 
                 FlatStyle = FlatStyle.Flat, 
-                Font = new Font("Segoe UI", 8.5F, FontStyle.Bold), 
+                Font = new Font("Segoe UI", 9F, FontStyle.Bold), 
                 Cursor = Cursors.Hand 
             };
             b.FlatAppearance.BorderSize = 0;
