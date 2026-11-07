@@ -4,6 +4,7 @@ using System.Drawing;
 using System.Drawing.Drawing2D;
 using System.Linq;
 using System.Windows.Forms;
+using SISTEMAACTUALIZADO.Data;
 using SISTEMAACTUALIZADO.Helpers;
 using SISTEMAACTUALIZADO.Models;
 using SISTEMAACTUALIZADO.Services;
@@ -48,7 +49,7 @@ namespace SISTEMAACTUALIZADO.Modals
             this.SuspendLayout();
 
             this.Text = $"Detalle de Venta — {_venta.Documento} Folio N° {_venta.nroDTE}";
-            this.Size = new Size(880, 560);
+            this.Size = new Size(880, 580);
             this.StartPosition = FormStartPosition.CenterParent;
             this.FormBorderStyle = FormBorderStyle.FixedDialog;
             this.MaximizeBox = false;
@@ -96,25 +97,50 @@ namespace SISTEMAACTUALIZADO.Modals
 
             pnlMetaCard.Controls.Add(tlpMetadatos);
 
-            // Separador vertical
-            Panel pnlSpacer1 = new Panel { Dock = DockStyle.Top, Height = 10, BackColor = Color.Transparent };
+            Panel pnlSpacer1 = new Panel { Dock = DockStyle.Top, Height = 8, BackColor = Color.Transparent };
 
             // =========================================================================
-            // 2. BANNER DE ESTADO REDONDEADO (Emitido, Pendiente / Enviado a Caja, Anulado)
+            // 2. BANNER DE ESTADO REDONDEADO
             // =========================================================================
             string status = _venta.status ?? "";
-            bool isAnulado = status.Equals("Anulado", StringComparison.OrdinalIgnoreCase);
+            bool isAnuladoNC = status.Equals("Anulado NC", StringComparison.OrdinalIgnoreCase);
+            bool isAnuladoGeneral = status.Equals("Anulado", StringComparison.OrdinalIgnoreCase);
+            bool isNC = _venta.iddocDTE == 61 || _venta.Documento.Contains("Crédito") || status.Equals("Emitido NC", StringComparison.OrdinalIgnoreCase);
+            bool isND = _venta.iddocDTE == 56 || _venta.Documento.Contains("Débito") || status.Equals("Emitido ND", StringComparison.OrdinalIgnoreCase);
             bool isPendiente = status.Equals("Pendiente", StringComparison.OrdinalIgnoreCase) || 
                                status.Contains("Espera", StringComparison.OrdinalIgnoreCase);
 
-            // Colores e iconos según el estado real del ticket
             Color fondoBanner;
             Color bordeBanner;
             Color textoBanner;
             string iconoBanner;
             string textoEstado;
 
-            if (isAnulado)
+            if (isNC)
+            {
+                fondoBanner = Color.FromArgb(254, 242, 242);
+                bordeBanner = Color.FromArgb(254, 202, 202);
+                textoBanner = Color.FromArgb(220, 38, 38);
+                iconoBanner = "↩️";
+                textoEstado = "Nota de Crédito Emitida (Devolución / Descuento Tributario)";
+            }
+            else if (isND)
+            {
+                fondoBanner = Color.FromArgb(245, 243, 255);
+                bordeBanner = Color.FromArgb(221, 214, 254);
+                textoBanner = Color.FromArgb(124, 58, 237);
+                iconoBanner = "➕";
+                textoEstado = "Nota de Débito Emitida (Recargo / Ajuste de Monto)";
+            }
+            else if (isAnuladoNC)
+            {
+                fondoBanner = Color.FromArgb(254, 242, 242);
+                bordeBanner = Color.FromArgb(254, 202, 202);
+                textoBanner = Color.FromArgb(185, 28, 28);
+                iconoBanner = "❌";
+                textoEstado = "Venta Anulada mediante Nota de Crédito";
+            }
+            else if (isAnuladoGeneral)
             {
                 fondoBanner = Color.FromArgb(254, 242, 242);
                 bordeBanner = Color.FromArgb(254, 202, 202);
@@ -124,7 +150,6 @@ namespace SISTEMAACTUALIZADO.Modals
             }
             else if (isPendiente)
             {
-                // Paleta amarilla/ámbar idéntica a la tarjeta y etiqueta "Enviado a caja"
                 fondoBanner = Color.FromArgb(254, 249, 195);
                 bordeBanner = Color.FromArgb(253, 230, 138);
                 textoBanner = Color.FromArgb(180, 83, 9);
@@ -133,7 +158,6 @@ namespace SISTEMAACTUALIZADO.Modals
             }
             else
             {
-                // Verde Pagado / Emitido
                 fondoBanner = Color.FromArgb(240, 253, 244);
                 bordeBanner = Color.FromArgb(187, 247, 208);
                 textoBanner = Color.FromArgb(22, 101, 52);
@@ -173,8 +197,54 @@ namespace SISTEMAACTUALIZADO.Modals
 
             pnlStatusBanner.Controls.AddRange(new Control[] { lblStatusIcon, lblStatusTitle, lblStatusValue });
 
-            // Separador vertical
-            Panel pnlSpacer2 = new Panel { Dock = DockStyle.Top, Height = 10, BackColor = Color.Transparent };
+            // =========================================================================
+            // 2.1 REFERENCIAS TRIBUTARIAS EN PANTALLA (SI ES NOTA DE CRÉDITO O DÉBITO)
+            // =========================================================================
+            Panel? pnlReferenciasCard = null;
+            if (_venta.iddocDTE == 61 || _venta.iddocDTE == 56 || isNC || isND)
+            {
+                using var dbRef = new AppDbContext();
+                var listaRefs = dbRef.DteReferencias
+                    .Where(r => r.IdTveDTEModificador == _venta.idTve)
+                    .ToList();
+
+                if (listaRefs.Count > 0)
+                {
+                    int alto = Math.Min(95, 30 + (listaRefs.Count * 22));
+                    pnlReferenciasCard = CrearTarjetaRedondeada(0, 0, 0, alto, Color.FromArgb(248, 250, 252), Color.FromArgb(203, 213, 225));
+                    pnlReferenciasCard.Dock = DockStyle.Top;
+                    pnlReferenciasCard.Padding = new Padding(12, 6, 12, 6);
+
+                    Label lblTitRef = new Label
+                    {
+                        Text = "🔗 DOCUMENTO(S) DE REFERENCIA TRIBUTARIA (SII):",
+                        Font = new Font("Segoe UI", 7.5F, FontStyle.Bold),
+                        ForeColor = Color.FromArgb(71, 85, 105),
+                        Dock = DockStyle.Top,
+                        Height = 18
+                    };
+
+                    string detalleReferencias = string.Join("\n", listaRefs.Select(r =>
+                    {
+                        string nom = !string.IsNullOrEmpty(r.NombreDocOrigen) ? r.NombreDocOrigen : (r.TipoDocOrigen == 33 ? "Factura" : "Boleta");
+                        return $"• {nom} Folio N° {r.FolioOrigen}  —  Cód. {r.CodigoReferencia}: {r.RazonReferencia}  ({MonedaHelper.Formatear(r.MontoAfectado, conSigno: true)})";
+                    }));
+
+                    Label lblTextoRefs = new Label
+                    {
+                        Text = detalleReferencias,
+                        Font = new Font("Segoe UI", 8.5F, FontStyle.Bold),
+                        ForeColor = Color.FromArgb(15, 23, 42),
+                        Dock = DockStyle.Fill,
+                        TextAlign = ContentAlignment.MiddleLeft
+                    };
+
+                    pnlReferenciasCard.Controls.Add(lblTextoRefs);
+                    pnlReferenciasCard.Controls.Add(lblTitRef);
+                }
+            }
+
+            Panel pnlSpacer2 = new Panel { Dock = DockStyle.Top, Height = 8, BackColor = Color.Transparent };
 
             // =========================================================================
             // 3. CUERPO: GRILLA A LA IZQUIERDA Y TOTALES A LA DERECHA
@@ -190,7 +260,7 @@ namespace SISTEMAACTUALIZADO.Modals
             pnlBodyLayout.ColumnStyles.Add(new ColumnStyle(SizeType.Percent, 67F));
             pnlBodyLayout.ColumnStyles.Add(new ColumnStyle(SizeType.Percent, 33F));
 
-            // Contenedor izquierdo (Grilla con tarjeta redondeada)
+            // Contenedor izquierdo (Grilla)
             Panel pnlLeftWrapper = new Panel { Dock = DockStyle.Fill, Padding = new Padding(0, 0, 10, 0), BackColor = Color.Transparent };
             Panel pnlGridCard = CrearTarjetaRedondeada(0, 0, 0, 0, Color.White, Color.FromArgb(226, 232, 240));
             pnlGridCard.Dock = DockStyle.Fill;
@@ -249,7 +319,7 @@ namespace SISTEMAACTUALIZADO.Modals
             pnlGridCard.Controls.Add(dgvItems);
             pnlLeftWrapper.Controls.Add(pnlGridCard);
 
-            // Contenedor derecho (Tarjeta de resumen y botón de impresión)
+            // Contenedor derecho (Totales y Botón Impresión)
             Panel pnlRightWrapper = new Panel { Dock = DockStyle.Fill, Padding = new Padding(6, 0, 0, 0), BackColor = Color.Transparent };
 
             Panel pnlResumenCard = CrearTarjetaRedondeada(0, 0, 0, 210, Color.White, Color.FromArgb(226, 232, 240));
@@ -298,14 +368,11 @@ namespace SISTEMAACTUALIZADO.Modals
             pnlResumenCard.Controls.Add(pnlNetoRow);
             pnlResumenCard.Controls.Add(lblResumenTitle);
 
-            // Solo es DTE si fue pagado/emitido formalmente; en pendiente o anulado siempre fue ticket de atención
-            string textoBotonImprimir = (_venta.status != null && _venta.status.Equals("Emitido", StringComparison.OrdinalIgnoreCase))
+            string textoBotonImprimir = (_venta.iddocDTE > 0)
                 ? "🖨️  Imprimir DTE"
                 : "🖨️  Imprimir Ticket de Atención";
 
             Button btnImprimirModal = CrearBoton(textoBotonImprimir, Color.FromArgb(0, 102, 255), Color.White, new Size(200, 42));
-            btnImprimirModal.Dock = DockStyle.Bottom;
-            btnImprimirModal.Font = new Font("Segoe UI", 9.5F, FontStyle.Bold);
             btnImprimirModal.Dock = DockStyle.Bottom;
             btnImprimirModal.Font = new Font("Segoe UI", 9.5F, FontStyle.Bold);
 
@@ -331,8 +398,16 @@ namespace SISTEMAACTUALIZADO.Modals
             pnlBodyLayout.Controls.Add(pnlLeftWrapper, 0, 0);
             pnlBodyLayout.Controls.Add(pnlRightWrapper, 1, 0);
 
+            // =========================================================================
+            // APILAMIENTO ORDENADO (De abajo hacia arriba según DockStyle.Top / Fill)
+            // =========================================================================
             pnlMainModal.Controls.Add(pnlBodyLayout);
             pnlMainModal.Controls.Add(pnlSpacer2);
+            if (pnlReferenciasCard != null)
+            {
+                pnlMainModal.Controls.Add(pnlReferenciasCard);
+                pnlMainModal.Controls.Add(new Panel { Dock = DockStyle.Top, Height = 6, BackColor = Color.Transparent });
+            }
             pnlMainModal.Controls.Add(pnlStatusBanner);
             pnlMainModal.Controls.Add(pnlSpacer1);
             pnlMainModal.Controls.Add(pnlMetaCard);
@@ -379,9 +454,6 @@ namespace SISTEMAACTUALIZADO.Modals
             dgv.GridColor = Color.FromArgb(226, 232, 240);
         }
 
-        // =========================================================================
-        // MÉTODOS AUXILIARES: BOTÓN FLAT NATIVO Y TARJETAS SUAVES
-        // =========================================================================
         private Button CrearBoton(string texto, Color back, Color fore, Size size)
         {
             Button b = new Button

@@ -509,7 +509,9 @@ namespace SISTEMAACTUALIZADO.Services
         {
             const int LIMITE_TICKET = 999999;
 
+            // CANDADO: Solo considerar boletas, facturas o tickets de venta (ignorar NC=61 y ND=56)
             int ultimoTicket = db.TVE2607
+                .Where(v => v.iddocDTE != 61 && v.iddocDTE != 56)
                 .OrderByDescending(v => v.idTve)
                 .Select(v => v.NroTicket)
                 .FirstOrDefault();

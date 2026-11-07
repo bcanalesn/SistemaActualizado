@@ -11,19 +11,19 @@ namespace SISTEMAACTUALIZADO.Models
         public int IdReferencia { get; set; }
 
         public int IdTveDTEModificador { get; set; }
+        public int? TipoDocModificador { get; set; }
+        public string? NombreDocModificador { get; set; }
+        public int? FolioModificador { get; set; }
+
         public int IdTveDTEOrigen { get; set; }
-        public int FolioOrigen { get; set; }
         public int TipoDocOrigen { get; set; }
-        public int CodigoReferencia { get; set; } = 1;
-        public string RazonReferencia { get; set; } = string.Empty;
+        public string? NombreDocOrigen { get; set; }
+        public int FolioOrigen { get; set; }
+
+        public int CodigoReferencia { get; set; }
+        public string? RazonReferencia { get; set; }
         public decimal MontoAfectado { get; set; }
-        public DateTime FechaRegistro { get; set; } = DateTime.Now;
-        public string Usuario { get; set; } = "admin";
-
-        [ForeignKey("IdTveDTEModificador")]
-        public virtual TVE2607? DocumentoModificador { get; set; }
-
-        [ForeignKey("IdTveDTEOrigen")]
-        public virtual TVE2607? DocumentoOrigen { get; set; }
+        public DateTime FechaRegistro { get; set; }
+        public string? Usuario { get; set; }
     }
 }

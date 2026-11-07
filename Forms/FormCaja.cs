@@ -1115,6 +1115,41 @@ namespace SISTEMAACTUALIZADO
                 return;
             }
 
+            // 🛑 CANDADO 3: Verificación en caliente contra BD (Ticket anulado o Reserva cancelada)
+            using (var dbVerif = new AppDbContext())
+            {
+                var ticketBdFresco = dbVerif.TVE2607.AsNoTracking().FirstOrDefault(t => t.idTve == _ticketSeleccionado.idTve);
+                if (ticketBdFresco == null || !ticketBdFresco.status.Equals("Pendiente", StringComparison.OrdinalIgnoreCase))
+                {
+                    MessageBox.Show(
+                        "Este ticket ya no está disponible para cobro.\n\n" +
+                        "Motivo: El ticket fue cancelado o la reserva fue anulada.",
+                        "Ticket No Disponible",
+                        MessageBoxButtons.OK,
+                        MessageBoxIcon.Warning
+                    );
+                    CargarTicketsPendientes(); // Limpia y refresca la grilla de inmediato
+                    return;
+                }
+
+                // Si viene de una reserva, verificar que la reserva no esté anulada
+                if (ticketBdFresco.idREF.HasValue && ticketBdFresco.idREF.Value > 0)
+                {
+                    var resBd = dbVerif.Reservas.AsNoTracking().FirstOrDefault(r => r.IdReserva == ticketBdFresco.idREF.Value);
+                    if (resBd != null && resBd.Estado.Equals("Anulado", StringComparison.OrdinalIgnoreCase))
+                    {
+                        MessageBox.Show(
+                            $"La reserva asociada ({resBd.CodigoReserva}) se encuentra ANULADA.\nNo es posible cobrar este abono.",
+                            "Reserva Anulada",
+                            MessageBoxButtons.OK,
+                            MessageBoxIcon.Warning
+                        );
+                        CargarTicketsPendientes();
+                        return;
+                    }
+                }
+            }
+
             string tipoDoc = _tipoDocSeleccionado;
             string medioPago = _medioPagoSeleccionado;
             decimal pagaCon = 0;

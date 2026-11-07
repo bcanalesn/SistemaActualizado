@@ -120,7 +120,7 @@ namespace SISTEMAACTUALIZADO.Services
                     FecDoc = ahora,
                     nroDTE = folioNC,
                     nroInT = siguienteNroInT,
-                    NroTicket = folioNC,
+                    NroTicket = primerDoc.NroTicket > 0 ? primerDoc.NroTicket : primerDoc.nroDTE,
                     FechaTicket = ahora,
                     SubTotal = -sumaTotal,
                     Descuento = 0,
@@ -140,7 +140,7 @@ namespace SISTEMAACTUALIZADO.Services
                     nCiudad = primerDoc.nCiudad,
                     Fono1 = primerDoc.Fono1,
                     email = primerDoc.email,
-                    status = "Emitido",
+                    status = "Emitido NC",
                     MedioPago = primerDoc.MedioPago,
                     Vuelto = 0,
                     idREF = primerDoc.idREF // Preserva el IdReserva si provenía de un pedido
@@ -156,9 +156,15 @@ namespace SISTEMAACTUALIZADO.Services
                     var referencia = new DteReferencia
                     {
                         IdTveDTEModificador = tveNC.idTve,
+                        TipoDocModificador = 61,
+                        NombreDocModificador = "Nota de Crédito Electrónica",
+                        FolioModificador = folioNC,
+
                         IdTveDTEOrigen = venta.idTve,
-                        FolioOrigen = venta.nroDTE,
                         TipoDocOrigen = venta.iddocDTE,
+                        NombreDocOrigen = venta.Documento,
+                        FolioOrigen = venta.nroDTE,
+
                         CodigoReferencia = codigoCausa,
                         RazonReferencia = motivo,
                         MontoAfectado = venta.Total,
@@ -167,15 +173,58 @@ namespace SISTEMAACTUALIZADO.Services
                     };
                     _db.DteReferencias.Add(referencia);
 
-                    // Reintegrar stock con validación de entrega
+                    // ========================================================
+                    // 🛑 REVERSA DE ABONOS EN PEDIDOS Y RESERVAS (MODO LIBRE)
+                    // ========================================================
                     bool debeDevolverStock = true;
+
+                    // 1. Identificar la Reserva: primero por idREF, o como respaldo por el texto del detalle
+                    Reserva? reservaAfectada = null;
                     if (venta.idREF.HasValue && venta.idREF.Value > 0)
                     {
-                        var reserva = _db.Reservas.FirstOrDefault(r => r.IdReserva == venta.idREF.Value);
-                        if (reserva != null && !reserva.StockDescontado)
+                        reservaAfectada = _db.Reservas.FirstOrDefault(r => r.IdReserva == venta.idREF.Value);
+                    }
+
+                    // Respaldo inteligente: si idREF no venía en TVE2607, buscar por código de reserva en la glosa
+                    if (reservaAfectada == null)
+                    {
+                        var primerDetalle = _db.TVD2607.FirstOrDefault(d => d.idTve == venta.idTve);
+                        string glosaBusqueda = $"{venta.Documento} {primerDetalle?.NmbProducto}";
+                        var matchCodigo = System.Text.RegularExpressions.Regex.Match(glosaBusqueda, @"RES-\d{8}-\d{3}");
+                        if (matchCodigo.Success)
                         {
-                            debeDevolverStock = false; // El producto nunca salió físicamente
+                            string codRes = matchCodigo.Value;
+                            reservaAfectada = _db.Reservas.FirstOrDefault(r => r.CodigoReserva == codRes);
                         }
+                    }
+
+                    // 2. Si es una reserva, aplicar la reversa financiera
+                    if (reservaAfectada != null)
+                    {
+                        // Si la mercadería física no había salido de bodega, no reponer a stock
+                        if (!reservaAfectada.StockDescontado)
+                        {
+                            debeDevolverStock = false;
+                        }
+
+                        // Reversar el monto abonado
+                        reservaAfectada.TotalAbonado -= venta.Total;
+                        if (reservaAfectada.TotalAbonado < 0) reservaAfectada.TotalAbonado = 0;
+                        reservaAfectada.SaldoPendiente = Math.Max(0m, reservaAfectada.TotalPedido - reservaAfectada.TotalAbonado);
+
+                        // Registrar la fila negativa en el historial de pagos (reserva_pago)
+                        var pagoDevolucion = new ReservaPago
+                        {
+                            IdReserva = reservaAfectada.IdReserva,
+                            Monto = -venta.Total, // Monto negativo
+                            MedioPago = $"Devolución NC #{folioNC}",
+                            FechaPago = ahora,
+                            CajaTurnoID = primerDoc.CajaTurnoID,
+                            Usuario = usuarioOperador,
+                            EsAbonoInicial = false,
+                            EsLiquidacionFinal = false
+                        };
+                        _db.ReservaPagos.Add(pagoDevolucion);
                     }
 
                     // Duplicar detalles en TVD2607 en negativo para cuadratura de kardex
@@ -276,7 +325,7 @@ namespace SISTEMAACTUALIZADO.Services
                     FecDoc = ahora,
                     nroDTE = folioND,
                     nroInT = siguienteNroInT,
-                    NroTicket = folioND,
+                    NroTicket = factura.NroTicket > 0 ? factura.NroTicket : factura.nroDTE,
                     FechaTicket = ahora,
                     SubTotal = montoRecargo,
                     Descuento = 0,
@@ -296,7 +345,7 @@ namespace SISTEMAACTUALIZADO.Services
                     nCiudad = factura.nCiudad,
                     Fono1 = factura.Fono1,
                     email = factura.email,
-                    status = "Emitido",
+                    status = "Emitido ND",
                     MedioPago = factura.MedioPago,
                     Vuelto = 0
                 };
@@ -308,10 +357,16 @@ namespace SISTEMAACTUALIZADO.Services
                 var referencia = new DteReferencia
                 {
                     IdTveDTEModificador = tveND.idTve,
+                    TipoDocModificador = 56,
+                    NombreDocModificador = "Nota de Débito Electrónica",
+                    FolioModificador = folioND,
+
                     IdTveDTEOrigen = factura.idTve,
-                    FolioOrigen = factura.nroDTE,
                     TipoDocOrigen = 33,
-                    CodigoReferencia = 3, // Modifica montos
+                    NombreDocOrigen = "Factura Electrónica",
+                    FolioOrigen = factura.nroDTE,
+
+                    CodigoReferencia = 3,
                     RazonReferencia = motivo,
                     MontoAfectado = montoRecargo,
                     FechaRegistro = ahora,

@@ -182,10 +182,11 @@ namespace SISTEMAACTUALIZADO
             dtpHasta = new DateTimePicker { Size = new Size(120, 26), Format = DateTimePickerFormat.Short, Font = new Font("Segoe UI", 9.5F) };
             Panel pnlGrpHasta = CrearGrupoLimpio("Fecha hasta", dtpHasta, 125);
 
-            cbTipoDocumento = new ComboBox { Size = new Size(155, 26), DropDownStyle = ComboBoxStyle.DropDownList, Font = new Font("Segoe UI", 9.5F) };
-            cbTipoDocumento.Items.AddRange(new string[] { "Todos", "Boleta Electrónica", "Factura Electrónica", "Nota de Crédito" });
+            cbTipoDocumento = new ComboBox { Size = new Size(170, 26), DropDownStyle = ComboBoxStyle.DropDownList, Font = new Font("Segoe UI", 9.5F) };
+            cbTipoDocumento.Items.AddRange(new string[] { "Todos", "Boleta Electrónica", "Factura Electrónica", "Nota de Crédito", "Nota de Débito" });
             cbTipoDocumento.SelectedIndex = 0;
-            Panel pnlGrpTipoDoc = CrearGrupoLimpio("Tipo Documento", cbTipoDocumento, 160);
+            cbTipoDocumento.SelectedIndexChanged += (s, e) => FiltrarLocalmente();
+            Panel pnlGrpTipoDoc = CrearGrupoLimpio("Tipo Documento", cbTipoDocumento, 175);
 
             btnBuscar = CrearBoton("🔍  Buscar", Color.FromArgb(0, 102, 255), Color.White, new Size(95, 34), 8);
             btnBuscar.Margin = new Padding(8, 14, 6, 0);
@@ -297,6 +298,7 @@ namespace SISTEMAACTUALIZADO
             dgvLibro.CellContentClick += DgvLibro_CellContentClick;
             dgvLibro.CellFormatting += DgvLibro_CellFormatting;
             dgvLibro.CellDoubleClick += DgvLibro_CellDoubleClick;
+            dgvLibro.CellPainting += DgvLibro_CellPainting;
 
             Panel pnlPaginador = new Panel { Dock = DockStyle.Bottom, Height = 32, Padding = new Padding(4, 6, 4, 0) };
             lblPaginadorInfo = new Label
@@ -503,6 +505,9 @@ namespace SISTEMAACTUALIZADO
 
         private void DgvLibro_CellFormatting(object? sender, DataGridViewCellFormattingEventArgs e)
         {
+            if (e.RowIndex < 0 || e.RowIndex >= _filasVisibles.Count) return;
+
+            // 1. Color y tipografía según Tipo de Documento
             if (dgvLibro.Columns[e.ColumnIndex].Name == "Documento" && e.Value != null)
             {
                 string doc = e.Value.ToString() ?? "";
@@ -512,8 +517,45 @@ namespace SISTEMAACTUALIZADO
                     e.CellStyle!.ForeColor = Color.FromArgb(124, 58, 237);
                 else if (doc.Contains("Crédito"))
                     e.CellStyle!.ForeColor = Color.FromArgb(220, 38, 38);
+                else if (doc.Contains("Débito"))
+                    e.CellStyle!.ForeColor = Color.FromArgb(147, 51, 234);
 
-                e.CellStyle.Font = new Font("Segoe UI", 8.5F, FontStyle.Bold);
+                e.CellStyle!.Font = new Font("Segoe UI", 8.5F, FontStyle.Bold);
+            }
+
+            // 2. Candado visual para la casilla CheckBox de Selección
+            if (dgvLibro.Columns[e.ColumnIndex].Name == "Seleccionado")
+            {
+                var fila = _filasVisibles[e.RowIndex];
+                bool noEsSeleccionable = fila.ObjetoOriginal.iddocDTE == 61 || 
+                                        fila.ObjetoOriginal.iddocDTE == 56 || 
+                                        fila.ObjetoOriginal.status.Equals("Anulado NC", StringComparison.OrdinalIgnoreCase);
+
+                if (noEsSeleccionable)
+                {
+                    var celda = dgvLibro.Rows[e.RowIndex].Cells[e.ColumnIndex];
+                    celda.ReadOnly = true;
+                    e.Value = false;
+                }
+            }
+        }
+
+        private void DgvLibro_CellPainting(object? sender, DataGridViewCellPaintingEventArgs e)
+        {
+            if (e.RowIndex >= 0 && e.RowIndex < _filasVisibles.Count && dgvLibro.Columns[e.ColumnIndex].Name == "Seleccionado")
+            {
+                var fila = _filasVisibles[e.RowIndex];
+                bool noEsSeleccionable = fila.ObjetoOriginal.iddocDTE == 61 || 
+                                        fila.ObjetoOriginal.iddocDTE == 56 || 
+                                        fila.ObjetoOriginal.status.Equals("Anulado NC", StringComparison.OrdinalIgnoreCase);
+
+                if (noEsSeleccionable)
+                {
+                    e.PaintBackground(e.CellBounds, true);
+                    // Dibuja un guion tenue indicando que no aplica selección
+                    TextRenderer.DrawText(e.Graphics, "—", new Font("Segoe UI", 9F, FontStyle.Bold), e.CellBounds, Color.FromArgb(203, 213, 225), TextFormatFlags.HorizontalCenter | TextFormatFlags.VerticalCenter);
+                    e.Handled = true;
+                }
             }
         }
 
@@ -535,6 +577,19 @@ namespace SISTEMAACTUALIZADO
 
             if (dgvLibro.Columns[e.ColumnIndex].Name == "Seleccionado")
             {
+                var fila = _filasVisibles[e.RowIndex];
+
+                // CANDADO: No permitir marcar Notas de Crédito, Notas de Débito ni documentos ya anulados
+                if (fila.ObjetoOriginal.iddocDTE == 61 || 
+                    fila.ObjetoOriginal.iddocDTE == 56 || 
+                    fila.ObjetoOriginal.status.Equals("Anulado NC", StringComparison.OrdinalIgnoreCase))
+                {
+                    fila.Seleccionado = false;
+                    dgvLibro.CancelEdit();
+                    dgvLibro.RefreshEdit();
+                    return;
+                }
+
                 dgvLibro.CommitEdit(DataGridViewDataErrorContexts.Commit);
                 ActualizarEstadoBotonEmision();
             }
@@ -615,7 +670,18 @@ namespace SISTEMAACTUALIZADO
             string tipoSel = cbTipoDocumento.SelectedItem?.ToString() ?? "Todos";
             if (tipoSel != "Todos")
             {
-                resultado = resultado.Where(v => v.Documento.Contains(tipoSel));
+                if (tipoSel == "Nota de Débito")
+                {
+                    resultado = resultado.Where(v => v.iddocDTE == 56 || v.Documento.Contains("Débito", StringComparison.OrdinalIgnoreCase));
+                }
+                else if (tipoSel == "Nota de Crédito")
+                {
+                    resultado = resultado.Where(v => v.iddocDTE == 61 || v.Documento.Contains("Crédito", StringComparison.OrdinalIgnoreCase));
+                }
+                else
+                {
+                    resultado = resultado.Where(v => v.Documento.Contains(tipoSel, StringComparison.OrdinalIgnoreCase));
+                }
             }
 
             _filasVisibles = resultado.Select(v => new ItemFilaLibroVentas

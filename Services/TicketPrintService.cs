@@ -143,7 +143,8 @@ namespace SISTEMAACTUALIZADO.Services
                 y += 18;
             }
 
-            if (venta.iddocDTE == 33)
+            // Datos comerciales si es Factura (33) o Nota de Débito (56)
+            if (venta.iddocDTE == 33 || venta.iddocDTE == 56)
             {
                 if (!string.IsNullOrWhiteSpace(venta.Giro))
                 {
@@ -173,6 +174,54 @@ namespace SISTEMAACTUALIZADO.Services
                 {
                     g.DrawString($"CONTACTO      : {venta.email}", fontSub, brushText, 15, y);
                     y += 18;
+                }
+            }
+
+            // =========================================================================
+            // 📑 BLOQUE DE REFERENCIAS TRIBUTARIAS (OBLIGATORIO SII PARA DTE 61 Y 56)
+            // =========================================================================
+            if (venta.iddocDTE == 61 || venta.iddocDTE == 56)
+            {
+                using var dbRef = new AppDbContext();
+                var referencias = dbRef.DteReferencias
+                    .Where(r => r.IdTveDTEModificador == venta.idTve)
+                    .ToList();
+
+                if (referencias.Count > 0)
+                {
+                    g.DrawLine(penDash, 15, y, width - 15, y);
+                    y += 8;
+
+                    g.DrawString("DOCUMENTO(S) DE REFERENCIA (S.I.I.)", fontBold, Brushes.Black, 15, y);
+                    y += 18;
+
+                    foreach (var r in referencias)
+                    {
+                        string nombreDocOrigen = !string.IsNullOrEmpty(r.NombreDocOrigen)
+                            ? r.NombreDocOrigen
+                            : (r.TipoDocOrigen == 33 ? "Factura Electrónica" : "Boleta Electrónica");
+
+                        string causaTxt = r.CodigoReferencia switch
+                        {
+                            1 => "Anula Documento Referencia",
+                            2 => "Corrige Texto / Glosa",
+                            3 => "Corrige Montos / Recargo",
+                            _ => "Modificación Tributaria"
+                        };
+
+                        g.DrawString($"• {nombreDocOrigen.ToUpper()} N° {r.FolioOrigen}", fontBold, Brushes.Black, 15, y);
+                        y += 16;
+                        g.DrawString($"  Causa: Cód. {r.CodigoReferencia} ({causaTxt})", fontSmall, Brushes.Black, 15, y);
+                        y += 15;
+                        g.DrawString($"  Razón: {r.RazonReferencia}", fontSmall, Brushes.Black, 15, y);
+                        y += 18;
+
+                        if (referencias.Count > 1)
+                        {
+                            g.DrawString($"  Monto Afectado: {MonedaHelper.Formatear(r.MontoAfectado, conSigno: true)}", fontSmall, Brushes.Black, 15, y);
+                            y += 18;
+                        }
+                    }
                 }
             }
 
@@ -210,7 +259,6 @@ namespace SISTEMAACTUALIZADO.Services
             g.DrawLine(penDash, 15, y, width - 15, y);
             y += 12;
 
-            // 1. Si hubo descuento (por lista o por puntos de fidelización), se desglosa claramente
             if (venta.Descuento > 0)
             {
                 g.DrawString("DESCUENTO:", fontBold, Brushes.Green, 120, y);
@@ -226,7 +274,6 @@ namespace SISTEMAACTUALIZADO.Services
             g.DrawString(MonedaHelper.Formatear(venta.IvA, conSigno: true), fontSub, brushText, width - 95, y); 
             y += 18;
 
-            // 2. Muestra flete de delivery si aplica
             if (venta.TipoEntrega == TipoEntrega.Delivery || venta.CostoDelivery > 0)
             {
                 g.DrawString("FLETE DELIVERY:", fontBold, brushText, 100, y);
@@ -258,8 +305,6 @@ namespace SISTEMAACTUALIZADO.Services
             g.DrawString(emp.TextoPieTicket, fontBold, brushText, new RectangleF(0, y, width, 20), centerFormat);
         }
 
-        // 👈 NUEVO: Comanda de despacho impresa para repartidor y cocina
-        // 👈 Comanda de despacho impresa para repartidor y cocina
         public void ImprimirComandaDelivery(Delivery delivery, TVE2607 venta, List<DetalleCarrito> items)
         {
             try

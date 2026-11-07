@@ -17,7 +17,7 @@ namespace SISTEMAACTUALIZADO.Modals
         private readonly ConfiguracionDteService _configService = new ConfiguracionDteService();
 
         private bool _esNotaCredito = true;
-        private int _codigoCausaSeleccionado = 1; // 1: Anula, 2: Corrige Texto, 3: Corrige Montos
+        private int _codigoCausaSeleccionado = 1;
 
         private Button btnTipoNC = null!;
         private Button btnTipoND = null!;
@@ -47,7 +47,8 @@ namespace SISTEMAACTUALIZADO.Modals
         private void InitializeComponent()
         {
             this.Text = "⚡ Emisión de Documento Modificador DTE (SII)";
-            this.ClientSize = new Size(520, 680);
+            // 👈 Tamaño ampliado a 560 x 740 para evitar que aparezca la barra de scroll
+            this.ClientSize = new Size(560, 740);
             this.StartPosition = FormStartPosition.CenterParent;
             this.FormBorderStyle = FormBorderStyle.FixedDialog;
             this.MaximizeBox = false;
@@ -55,14 +56,12 @@ namespace SISTEMAACTUALIZADO.Modals
             this.BackColor = Color.White;
             this.Font = new Font("Segoe UI", 9.5F, FontStyle.Regular, GraphicsUnit.Point);
 
-            const int wCard = 480;
-
             Panel pnlMain = new Panel
             {
                 Dock = DockStyle.Fill,
-                Padding = new Padding(20, 14, 20, 14),
+                Padding = new Padding(22, 14, 22, 14),
                 BackColor = Color.White,
-                AutoScroll = true
+                AutoScroll = false // 👈 Evita que fuerce recorte horizontal
             };
 
             // 1. TÍTULO Y RESUMEN SELECCIÓN
@@ -78,7 +77,7 @@ namespace SISTEMAACTUALIZADO.Modals
             string foliosTexto = string.Join(", ", _documentosSeleccionados.Select(d => $"#{d.nroDTE}"));
             decimal totalDoc = _documentosSeleccionados.Sum(d => d.Total);
 
-            Panel pnlCardResumen = CrearTarjetaRedondeada(wCard, 68);
+            Panel pnlCardResumen = CrearTarjetaRedondeada(68);
             pnlCardResumen.Dock = DockStyle.Top;
             pnlCardResumen.Margin = new Padding(0, 8, 0, 10);
             pnlCardResumen.Padding = new Padding(12, 8, 12, 8);
@@ -89,20 +88,27 @@ namespace SISTEMAACTUALIZADO.Modals
             pnlCardResumen.Controls.Add(lblResumenTit);
 
             // 2. SELECTOR DE TIPO DE DOCUMENTO (NC vs ND)
-            // Aumentamos altura de 84 a 100 para que el texto y borde superior no se corten
-            Panel pnlCardTipo = CrearTarjetaRedondeada(wCard, 100);
+            Panel pnlCardTipo = CrearTarjetaRedondeada(100);
             pnlCardTipo.Dock = DockStyle.Top;
             pnlCardTipo.Margin = new Padding(0, 8, 0, 10);
             pnlCardTipo.Padding = new Padding(12);
 
             Label lblTitTipo = new Label { Text = "TIPO DE DOCUMENTO A EMITIR", Font = new Font("Segoe UI", 8F, FontStyle.Bold), ForeColor = Color.FromArgb(100, 116, 139), Dock = DockStyle.Top, Height = 20 };
 
-            int btnW = (wCard - 36) / 2;
+            TableLayoutPanel tlpBotonesTipo = new TableLayoutPanel
+            {
+                Dock = DockStyle.Fill,
+                ColumnCount = 2,
+                RowCount = 1
+            };
+            tlpBotonesTipo.ColumnStyles.Add(new ColumnStyle(SizeType.Percent, 50F));
+            tlpBotonesTipo.ColumnStyles.Add(new ColumnStyle(SizeType.Percent, 50F));
+
             btnTipoNC = new Button
             {
                 Text = "📄 NOTA DE CRÉDITO (61)\n(Resta / Anula Venta)",
-                Location = new Point(12, 32), // 👈 Más margen superior
-                Size = new Size(btnW, 52),
+                Dock = DockStyle.Fill,
+                Margin = new Padding(0, 4, 6, 0),
                 FlatStyle = FlatStyle.Flat,
                 Font = new Font("Segoe UI", 8.5F, FontStyle.Bold),
                 Cursor = Cursors.Hand
@@ -112,36 +118,60 @@ namespace SISTEMAACTUALIZADO.Modals
             btnTipoND = new Button
             {
                 Text = "📑 NOTA DE DÉBITO (56)\n(Suma / Aplica Recargo)",
-                Location = new Point(12 + btnW + 12, 32),
-                Size = new Size(btnW, 52),
+                Dock = DockStyle.Fill,
+                Margin = new Padding(6, 4, 0, 0),
                 FlatStyle = FlatStyle.Flat,
                 Font = new Font("Segoe UI", 8.5F, FontStyle.Bold),
                 Cursor = Cursors.Hand
             };
             btnTipoND.Click += (s, e) => SeleccionarTipoNota(esNC: false);
 
-            pnlCardTipo.Controls.AddRange(new Control[] { lblTitTipo, btnTipoNC, btnTipoND });
+            tlpBotonesTipo.Controls.Add(btnTipoNC, 0, 0);
+            tlpBotonesTipo.Controls.Add(btnTipoND, 1, 0);
+
+            pnlCardTipo.Controls.Add(tlpBotonesTipo);
+            pnlCardTipo.Controls.Add(lblTitTipo);
 
             // 3. SELECTOR TÁCTIL DE CAUSA SII
-            // Aumentamos altura de 150 a 168 para que el botón 1 no quede pegado al título
-            Panel pnlCardCausas = CrearTarjetaRedondeada(wCard, 168);
+            Panel pnlCardCausas = CrearTarjetaRedondeada(170);
             pnlCardCausas.Dock = DockStyle.Top;
             pnlCardCausas.Margin = new Padding(0, 8, 0, 10);
             pnlCardCausas.Padding = new Padding(12);
 
-            Label lblTitCausas = new Label { Text = "CÓDIGO DE REFERENCIA TRIBUTARIA (SII)", Font = new Font("Segoe UI", 8F, FontStyle.Bold), ForeColor = Color.FromArgb(100, 116, 139), Dock = DockStyle.Top, Height = 20 };
+            Label lblTitCausas = new Label 
+            { 
+                Text = "CÓDIGO DE REFERENCIA TRIBUTARIA (SII)", 
+                Font = new Font("Segoe UI", 8F, FontStyle.Bold), 
+                ForeColor = Color.FromArgb(100, 116, 139), 
+                Dock = DockStyle.Top, 
+                Height = 22 
+            };
 
-            btnCausa1 = CrearBotonOpcionCausa("1 - Anula Documento de Referencia (Anulación / Devolución Total)", 1, new Point(12, 32), wCard - 24);
-            btnCausa2 = CrearBotonOpcionCausa("2 - Corrige Texto en Documento (Glosa o Datos)", 2, new Point(12, 74), wCard - 24);
-            btnCausa3 = CrearBotonOpcionCausa("3 - Corrige Montos / Recargo o Descuento Parcial", 3, new Point(12, 116), wCard - 24);
+            // Contenedor vertical que auto-ajusta el ancho al 100% exacto
+            Panel pnlListaCausas = new Panel
+            {
+                Dock = DockStyle.Fill,
+                BackColor = Color.Transparent,
+                Padding = new Padding(0, 4, 0, 0)
+            };
 
-            pnlCardCausas.Controls.AddRange(new Control[] { lblTitCausas, btnCausa1, btnCausa2, btnCausa3 });
+            btnCausa1 = CrearBotonOpcionCausa("1 - Anula Documento de Referencia (Anulación / Devolución Total)", 1);
+            btnCausa2 = CrearBotonOpcionCausa("2 - Corrige Texto en Documento (Glosa o Datos)", 2);
+            btnCausa3 = CrearBotonOpcionCausa("3 - Corrige Montos / Recargo o Descuento Parcial", 3);
 
-            // 4. CAMPO MONTO RECARGO (SOLO PARA NOTA DE DÉBITO O AJUSTES)
-            pnlMontoNDContainer = CrearTarjetaRedondeada(wCard, 68);
+            // Al agregarlos en orden inverso con Dock = Top, quedan: 1 arriba, 2 al medio, 3 abajo
+            pnlListaCausas.Controls.Add(btnCausa3);
+            pnlListaCausas.Controls.Add(btnCausa2);
+            pnlListaCausas.Controls.Add(btnCausa1);
+
+            pnlCardCausas.Controls.Add(pnlListaCausas);
+            pnlCardCausas.Controls.Add(lblTitCausas);
+
+            // 4. CAMPO MONTO RECARGO (SOLO PARA NOTA DE DÉBITO)
+            pnlMontoNDContainer = CrearTarjetaRedondeada(68);
             pnlMontoNDContainer.Dock = DockStyle.Top;
             pnlMontoNDContainer.Margin = new Padding(0, 8, 0, 10);
-            pnlMontoNDContainer.Padding = new Padding(10);
+            pnlMontoNDContainer.Padding = new Padding(12, 8, 12, 8);
             pnlMontoNDContainer.Visible = false;
 
             Label lblTitMontoND = new Label { Text = "MONTO TOTAL A AGREGAR CON NOTA DE DÉBITO ($):", Font = new Font("Segoe UI", 8F, FontStyle.Bold), ForeColor = Color.FromArgb(124, 58, 237), Dock = DockStyle.Top, Height = 18 };
@@ -153,16 +183,21 @@ namespace SISTEMAACTUALIZADO.Modals
                 MaxLength = 10
             };
             txtMontoND.KeyPress += (s, e) => { if (!char.IsControl(e.KeyChar) && !char.IsDigit(e.KeyChar)) e.Handled = true; };
-            txtMontoND.TextChanged += (s, e) => MonedaHelper.AplicarMascaraEnVivo(txtMontoND);
+            txtMontoND.TextChanged += (s, e) =>
+            {
+                MonedaHelper.AplicarMascaraEnVivo(txtMontoND);
+                decimal monto = MonedaHelper.Limpiar(txtMontoND.Text);
+                lblTotalAfectado.Text = $"MONTO NOTA DE DÉBITO: +{MonedaHelper.Formatear(monto, conSigno: true)} (Ajuste a cobrar)";
+            };
 
             pnlMontoNDContainer.Controls.Add(txtMontoND);
             pnlMontoNDContainer.Controls.Add(lblTitMontoND);
 
             // 5. MOTIVO / GLOSA TRIBUTARIA
-            Panel pnlCardMotivo = CrearTarjetaRedondeada(wCard, 84);
+            Panel pnlCardMotivo = CrearTarjetaRedondeada(84);
             pnlCardMotivo.Dock = DockStyle.Top;
             pnlCardMotivo.Margin = new Padding(0, 8, 0, 10);
-            pnlCardMotivo.Padding = new Padding(10);
+            pnlCardMotivo.Padding = new Padding(12);
 
             Label lblTitMotivo = new Label { Text = "MOTIVO / GLOSA DE EMISIÓN:", Font = new Font("Segoe UI", 8F, FontStyle.Bold), ForeColor = Color.FromArgb(100, 116, 139), Dock = DockStyle.Top, Height = 18 };
             txtMotivo = new TextBox
@@ -175,8 +210,8 @@ namespace SISTEMAACTUALIZADO.Modals
             pnlCardMotivo.Controls.Add(txtMotivo);
             pnlCardMotivo.Controls.Add(lblTitMotivo);
 
-            // 6. TOTAL A DECLARAR EN LVE
-            Panel pnlTotalCard = CrearTarjetaRedondeada(wCard, 56);
+            // 6. TOTAL A DECLARAR
+            Panel pnlTotalCard = CrearTarjetaRedondeada(54);
             pnlTotalCard.Dock = DockStyle.Top;
             pnlTotalCard.BackColor = Color.FromArgb(248, 250, 252);
             pnlTotalCard.Padding = new Padding(12, 10, 12, 10);
@@ -201,9 +236,9 @@ namespace SISTEMAACTUALIZADO.Modals
 
             btnEmitir = new Button
             {
-                Text = "⚡ EMITIR DOCUMENTO OFICIAL",
+                Text = "⚡ EMITIR NOTA DE CRÉDITO (61)",
                 Dock = DockStyle.Top,
-                Height = 50, // 👈 Altura ergonómica táctil
+                Height = 50,
                 BackColor = Color.FromArgb(220, 38, 38),
                 ForeColor = Color.White,
                 FlatStyle = FlatStyle.Flat,
@@ -249,8 +284,6 @@ namespace SISTEMAACTUALIZADO.Modals
         private void ConfigurarEstadoInicial()
         {
             bool tieneFactura = _documentosSeleccionados.Any(d => d.iddocDTE == 33);
-            
-            // Si son solo boletas, la Nota de Débito queda deshabilitada porque es solo para Facturas
             if (!tieneFactura)
             {
                 btnTipoND.Enabled = false;
@@ -286,6 +319,12 @@ namespace SISTEMAACTUALIZADO.Modals
                 btnEmitir.Text = "⚡ EMITIR NOTA DE CRÉDITO (61)";
                 btnEmitir.BackColor = Color.FromArgb(220, 38, 38);
                 txtMotivo.Text = "Devolución de mercadería / Anulación de venta";
+
+                // En Nota de Crédito se habilitan las 3 causas
+                btnCausa1.Visible = true;
+                btnCausa2.Visible = true;
+                btnCausa3.Visible = true;
+                _codigoCausaSeleccionado = 1;
             }
             else
             {
@@ -301,27 +340,35 @@ namespace SISTEMAACTUALIZADO.Modals
 
                 pnlMontoNDContainer.Visible = true;
                 txtMontoND.Focus();
-                lblTotalAfectado.Text = "MONTO NOTA DE DÉBITO: +$ 0 (Ajuste a cobrar)";
+                decimal monto = MonedaHelper.Limpiar(txtMontoND.Text);
+                lblTotalAfectado.Text = $"MONTO NOTA DE DÉBITO: +{MonedaHelper.Formatear(monto, conSigno: true)} (Ajuste a cobrar)";
                 lblTotalAfectado.ForeColor = Color.FromArgb(124, 58, 237);
 
                 btnEmitir.Text = "⚡ EMITIR NOTA DE DÉBITO (56)";
                 btnEmitir.BackColor = Color.FromArgb(124, 58, 237);
-                txtMotivo.Text = "Intereses / Recargo sobre Factura";
-                _codigoCausaSeleccionado = 3; // Modifica montos
-                ActualizarEstiloCausas();
+                txtMotivo.Text = "Recargo por flete y transporte a local";
+
+                // En Nota de Débito solo aplica Modificación de Montos (Código 3)
+                btnCausa1.Visible = false;
+                btnCausa2.Visible = false;
+                btnCausa3.Visible = true;
+                _codigoCausaSeleccionado = 3;
             }
+            ActualizarEstiloCausas();
         }
 
-        private Button CrearBotonOpcionCausa(string texto, int codigo, Point loc, int ancho)
+        private Button CrearBotonOpcionCausa(string texto, int codigo)
         {
             Button btn = new Button
             {
                 Text = texto,
-                Location = loc,
-                Size = new Size(ancho, 36),
+                Dock = DockStyle.Top,
+                Height = 38,
+                Margin = new Padding(0, 0, 0, 6),
                 FlatStyle = FlatStyle.Flat,
                 Font = new Font("Segoe UI", 8.5F, FontStyle.Bold),
                 TextAlign = ContentAlignment.MiddleLeft,
+                Padding = new Padding(10, 0, 0, 0),
                 Cursor = Cursors.Hand
             };
             btn.Click += (s, e) =>
@@ -411,9 +458,14 @@ namespace SISTEMAACTUALIZADO.Modals
             }
         }
 
-        private Panel CrearTarjetaRedondeada(int ancho, int alto)
+        private Panel CrearTarjetaRedondeada(int alto)
         {
-            Panel pnl = new Panel { Size = new Size(ancho, alto), BackColor = Color.White };
+            Panel pnl = new Panel 
+            { 
+                Height = alto, 
+                BackColor = Color.White 
+            };
+            pnl.Resize += (s, e) => pnl.Invalidate();
             pnl.Paint += (s, e) =>
             {
                 e.Graphics.SmoothingMode = SmoothingMode.AntiAlias;

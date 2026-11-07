@@ -305,11 +305,51 @@ namespace SISTEMAACTUALIZADO.Services
         {
             using (var db = new AppDbContext())
             {
-                var reserva = db.Reservas.FirstOrDefault(r => r.IdReserva == idReserva);
-                if (reserva != null)
+                using (var tr = db.Database.BeginTransaction())
                 {
-                    reserva.Estado = "Anulado";
-                    db.SaveChanges();
+                    try
+                    {
+                        var reserva = db.Reservas.FirstOrDefault(r => r.IdReserva == idReserva);
+                        if (reserva == null) return;
+
+                        reserva.Estado = "Anulado";
+
+                        // 🛑 CONEXIÓN CON CAJA: Anular cualquier ticket de abono/saldo pendiente en Caja
+                        var ticketsPendientes = db.TVE2607
+                            .Where(t => t.idREF == idReserva && t.status == "Pendiente")
+                            .ToList();
+
+                        foreach (var ticket in ticketsPendientes)
+                        {
+                            ticket.status = "Anulado";
+
+                            // Si el ticket había apartado stock (ej: ticket de liquidación), reintegrarlo
+                            var detallesTicket = db.TVD2607.Where(d => d.idTve == ticket.idTve).ToList();
+                            foreach (var item in detallesTicket)
+                            {
+                                if (item.IdProducto > 0)
+                                {
+                                    var prod = db.Productos.FirstOrDefault(p => p.ProductoID == item.IdProducto);
+                                    if (prod != null)
+                                    {
+                                        prod.Stock += item.Cantidad;
+                                        prod.StockDisponible += item.Cantidad;
+                                    }
+                                }
+                            }
+                        }
+
+                        reserva.StockDescontado = false;
+
+                        db.SaveChanges();
+                        tr.Commit();
+                    }
+                    catch (Exception ex)
+                    {
+                        tr.Rollback();
+                        string msg = ex.InnerException != null ? ex.InnerException.Message : ex.Message;
+                        throw new Exception(msg);
+                    }
                 }
             }
         }
