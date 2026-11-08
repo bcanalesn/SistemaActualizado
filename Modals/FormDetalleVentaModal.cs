@@ -110,13 +110,25 @@ namespace SISTEMAACTUALIZADO.Modals
             bool isPendiente = status.Equals("Pendiente", StringComparison.OrdinalIgnoreCase) || 
                                status.Contains("Espera", StringComparison.OrdinalIgnoreCase);
 
+            // 🛑 Detectar si es una Nota de Crédito de Corrección de Texto ($0)
+            bool isNCCorreccionTexto = isNC && _venta.Total == 0;
+
             Color fondoBanner;
             Color bordeBanner;
             Color textoBanner;
             string iconoBanner;
             string textoEstado;
 
-            if (isNC)
+            if (isNCCorreccionTexto)
+            {
+                // Estilo informativo azul/celeste para rectificaciones formales de texto
+                fondoBanner = Color.FromArgb(239, 246, 255);
+                bordeBanner = Color.FromArgb(191, 219, 254);
+                textoBanner = Color.FromArgb(2, 132, 199);
+                iconoBanner = "ℹ️";
+                textoEstado = "Nota de Crédito Informativa (Corrección de Texto / Rectificación Administrativa)";
+            }
+            else if (isNC)
             {
                 fondoBanner = Color.FromArgb(254, 242, 242);
                 bordeBanner = Color.FromArgb(254, 202, 202);

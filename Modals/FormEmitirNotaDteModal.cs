@@ -4,6 +4,7 @@ using System.Drawing;
 using System.Drawing.Drawing2D;
 using System.Linq;
 using System.Windows.Forms;
+using SISTEMAACTUALIZADO.Data;
 using SISTEMAACTUALIZADO.Helpers;
 using SISTEMAACTUALIZADO.Models;
 using SISTEMAACTUALIZADO.Services;
@@ -26,6 +27,10 @@ namespace SISTEMAACTUALIZADO.Modals
         private Button btnCausa2 = null!;
         private Button btnCausa3 = null!;
 
+        private Panel pnlDetalleParcialContainer = null!;
+        private DataGridView dgvItemsDevolucion = null!;
+        private List<ItemDevolucionParcial> _itemsVentaOriginal = new List<ItemDevolucionParcial>();
+
         private TextBox txtMotivo = null!;
         private Panel pnlMontoNDContainer = null!;
         private TextBox txtMontoND = null!;
@@ -40,15 +45,41 @@ namespace SISTEMAACTUALIZADO.Modals
             _documentosSeleccionados = documentos ?? new List<TVE2607>();
             _usuarioActual = usuario ?? new Usuario { NombreUsuario = "admin" };
 
+            CargarDetallesVentaOriginal();
             InitializeComponent();
             ConfigurarEstadoInicial();
+        }
+
+        private void CargarDetallesVentaOriginal()
+        {
+            if (_documentosSeleccionados.Count == 1)
+            {
+                using var db = new AppDbContext();
+                int idTve = _documentosSeleccionados[0].idTve;
+                var detalles = db.TVD2607.Where(d => d.idTve == idTve).ToList();
+
+                _itemsVentaOriginal = detalles.Select(d =>
+                {
+                    bool pesable = d.Unidad == "gr" || (d.Cantidad >= 50 && d.Precio > 0 && d.Precio < 100);
+                    return new ItemDevolucionParcial
+                    {
+                        IdTvdOrigen = d.idTvd,
+                        IdProducto = d.IdProducto,
+                        NombreProducto = d.NmbProducto ?? "Producto",
+                        CantidadOriginal = d.Cantidad,
+                        CantidadADevolver = 0,
+                        PrecioUnitario = d.Precio,
+                        EsPesable = pesable,
+                        Unidad = pesable ? "gr" : "UN"
+                    };
+                }).ToList();
+            }
         }
 
         private void InitializeComponent()
         {
             this.Text = "⚡ Emisión de Documento Modificador DTE (SII)";
-            // 👈 Tamaño ampliado a 560 x 740 para evitar que aparezca la barra de scroll
-            this.ClientSize = new Size(560, 740);
+            this.ClientSize = new Size(590, 800);
             this.StartPosition = FormStartPosition.CenterParent;
             this.FormBorderStyle = FormBorderStyle.FixedDialog;
             this.MaximizeBox = false;
@@ -59,12 +90,11 @@ namespace SISTEMAACTUALIZADO.Modals
             Panel pnlMain = new Panel
             {
                 Dock = DockStyle.Fill,
-                Padding = new Padding(22, 14, 22, 14),
+                Padding = new Padding(22, 12, 22, 12),
                 BackColor = Color.White,
-                AutoScroll = false // 👈 Evita que fuerce recorte horizontal
+                AutoScroll = true
             };
 
-            // 1. TÍTULO Y RESUMEN SELECCIÓN
             Label lblTitulo = new Label
             {
                 Text = "Emisión de Nota de Crédito / Débito",
@@ -77,9 +107,9 @@ namespace SISTEMAACTUALIZADO.Modals
             string foliosTexto = string.Join(", ", _documentosSeleccionados.Select(d => $"#{d.nroDTE}"));
             decimal totalDoc = _documentosSeleccionados.Sum(d => d.Total);
 
-            Panel pnlCardResumen = CrearTarjetaRedondeada(68);
+            Panel pnlCardResumen = CrearTarjetaRedondeada(66);
             pnlCardResumen.Dock = DockStyle.Top;
-            pnlCardResumen.Margin = new Padding(0, 8, 0, 10);
+            pnlCardResumen.Margin = new Padding(0, 6, 0, 8);
             pnlCardResumen.Padding = new Padding(12, 8, 12, 8);
 
             Label lblResumenTit = new Label { Text = $"DOCUMENTO(S) SELECCIONADO(S): {_documentosSeleccionados.Count}", Font = new Font("Segoe UI", 8F, FontStyle.Bold), ForeColor = Color.FromArgb(100, 116, 139), Dock = DockStyle.Top, Height = 18 };
@@ -87,13 +117,12 @@ namespace SISTEMAACTUALIZADO.Modals
             pnlCardResumen.Controls.Add(lblResumenSub);
             pnlCardResumen.Controls.Add(lblResumenTit);
 
-            // 2. SELECTOR DE TIPO DE DOCUMENTO (NC vs ND)
-            Panel pnlCardTipo = CrearTarjetaRedondeada(100);
+            Panel pnlCardTipo = CrearTarjetaRedondeada(95);
             pnlCardTipo.Dock = DockStyle.Top;
-            pnlCardTipo.Margin = new Padding(0, 8, 0, 10);
+            pnlCardTipo.Margin = new Padding(0, 6, 0, 8);
             pnlCardTipo.Padding = new Padding(12);
 
-            Label lblTitTipo = new Label { Text = "TIPO DE DOCUMENTO A EMITIR", Font = new Font("Segoe UI", 8F, FontStyle.Bold), ForeColor = Color.FromArgb(100, 116, 139), Dock = DockStyle.Top, Height = 20 };
+            Label lblTitTipo = new Label { Text = "TIPO DE DOCUMENTO A EMITIR", Font = new Font("Segoe UI", 8F, FontStyle.Bold), ForeColor = Color.FromArgb(100, 116, 139), Dock = DockStyle.Top, Height = 18 };
 
             TableLayoutPanel tlpBotonesTipo = new TableLayoutPanel
             {
@@ -132,10 +161,9 @@ namespace SISTEMAACTUALIZADO.Modals
             pnlCardTipo.Controls.Add(tlpBotonesTipo);
             pnlCardTipo.Controls.Add(lblTitTipo);
 
-            // 3. SELECTOR TÁCTIL DE CAUSA SII
-            Panel pnlCardCausas = CrearTarjetaRedondeada(170);
+            Panel pnlCardCausas = CrearTarjetaRedondeada(168);
             pnlCardCausas.Dock = DockStyle.Top;
-            pnlCardCausas.Margin = new Padding(0, 8, 0, 10);
+            pnlCardCausas.Margin = new Padding(0, 6, 0, 8);
             pnlCardCausas.Padding = new Padding(12);
 
             Label lblTitCausas = new Label 
@@ -144,10 +172,9 @@ namespace SISTEMAACTUALIZADO.Modals
                 Font = new Font("Segoe UI", 8F, FontStyle.Bold), 
                 ForeColor = Color.FromArgb(100, 116, 139), 
                 Dock = DockStyle.Top, 
-                Height = 22 
+                Height = 20 
             };
 
-            // Contenedor vertical que auto-ajusta el ancho al 100% exacto
             Panel pnlListaCausas = new Panel
             {
                 Dock = DockStyle.Fill,
@@ -159,7 +186,6 @@ namespace SISTEMAACTUALIZADO.Modals
             btnCausa2 = CrearBotonOpcionCausa("2 - Corrige Texto en Documento (Glosa o Datos)", 2);
             btnCausa3 = CrearBotonOpcionCausa("3 - Corrige Montos / Recargo o Descuento Parcial", 3);
 
-            // Al agregarlos en orden inverso con Dock = Top, quedan: 1 arriba, 2 al medio, 3 abajo
             pnlListaCausas.Controls.Add(btnCausa3);
             pnlListaCausas.Controls.Add(btnCausa2);
             pnlListaCausas.Controls.Add(btnCausa1);
@@ -167,18 +193,54 @@ namespace SISTEMAACTUALIZADO.Modals
             pnlCardCausas.Controls.Add(pnlListaCausas);
             pnlCardCausas.Controls.Add(lblTitCausas);
 
-            // 4. CAMPO MONTO RECARGO (SOLO PARA NOTA DE DÉBITO)
-            pnlMontoNDContainer = CrearTarjetaRedondeada(68);
+            // 4. GRILLA INTERACTIVA PARA DEVOLUCIÓN PARCIAL (CAUSA 3)
+            pnlDetalleParcialContainer = CrearTarjetaRedondeada(170);
+            pnlDetalleParcialContainer.Dock = DockStyle.Top;
+            pnlDetalleParcialContainer.Margin = new Padding(0, 6, 0, 8);
+            pnlDetalleParcialContainer.Padding = new Padding(10);
+            pnlDetalleParcialContainer.Visible = false;
+
+            Label lblTitGrid = new Label
+            {
+                Text = "SELECCIONE LOS PRODUCTOS Y LA CANTIDAD A DEVOLVER:",
+                Font = new Font("Segoe UI", 8F, FontStyle.Bold),
+                ForeColor = Color.FromArgb(234, 88, 12),
+                Dock = DockStyle.Top,
+                Height = 20
+            };
+
+            dgvItemsDevolucion = new DataGridView
+            {
+                Dock = DockStyle.Fill,
+                BackgroundColor = Color.White,
+                BorderStyle = BorderStyle.None,
+                CellBorderStyle = DataGridViewCellBorderStyle.SingleHorizontal,
+                ColumnHeadersBorderStyle = DataGridViewHeaderBorderStyle.None,
+                SelectionMode = DataGridViewSelectionMode.CellSelect,
+                MultiSelect = false,
+                AllowUserToAddRows = false,
+                RowHeadersVisible = false,
+                AutoSizeColumnsMode = DataGridViewAutoSizeColumnsMode.Fill,
+                RowTemplate = { Height = 28 }
+            };
+            ConfigurarEstiloTablaParcial(dgvItemsDevolucion);
+            ConfigurarColumnasGrillaParcial();
+
+            pnlDetalleParcialContainer.Controls.Add(dgvItemsDevolucion);
+            pnlDetalleParcialContainer.Controls.Add(lblTitGrid);
+
+            // 5. CAMPO MONTO NOTA DE DÉBITO
+            pnlMontoNDContainer = CrearTarjetaRedondeada(64);
             pnlMontoNDContainer.Dock = DockStyle.Top;
-            pnlMontoNDContainer.Margin = new Padding(0, 8, 0, 10);
-            pnlMontoNDContainer.Padding = new Padding(12, 8, 12, 8);
+            pnlMontoNDContainer.Margin = new Padding(0, 6, 0, 8);
+            pnlMontoNDContainer.Padding = new Padding(12, 6, 12, 6);
             pnlMontoNDContainer.Visible = false;
 
             Label lblTitMontoND = new Label { Text = "MONTO TOTAL A AGREGAR CON NOTA DE DÉBITO ($):", Font = new Font("Segoe UI", 8F, FontStyle.Bold), ForeColor = Color.FromArgb(124, 58, 237), Dock = DockStyle.Top, Height = 18 };
             txtMontoND = new TextBox
             {
                 Dock = DockStyle.Top,
-                Font = new Font("Segoe UI", 12F, FontStyle.Bold),
+                Font = new Font("Segoe UI", 11.5F, FontStyle.Bold),
                 Text = "0",
                 MaxLength = 10
             };
@@ -193,10 +255,10 @@ namespace SISTEMAACTUALIZADO.Modals
             pnlMontoNDContainer.Controls.Add(txtMontoND);
             pnlMontoNDContainer.Controls.Add(lblTitMontoND);
 
-            // 5. MOTIVO / GLOSA TRIBUTARIA
-            Panel pnlCardMotivo = CrearTarjetaRedondeada(84);
+            // 6. MOTIVO / GLOSA TRIBUTARIA
+            Panel pnlCardMotivo = CrearTarjetaRedondeada(74);
             pnlCardMotivo.Dock = DockStyle.Top;
-            pnlCardMotivo.Margin = new Padding(0, 8, 0, 10);
+            pnlCardMotivo.Margin = new Padding(0, 6, 0, 8);
             pnlCardMotivo.Padding = new Padding(12);
 
             Label lblTitMotivo = new Label { Text = "MOTIVO / GLOSA DE EMISIÓN:", Font = new Font("Segoe UI", 8F, FontStyle.Bold), ForeColor = Color.FromArgb(100, 116, 139), Dock = DockStyle.Top, Height = 18 };
@@ -210,27 +272,27 @@ namespace SISTEMAACTUALIZADO.Modals
             pnlCardMotivo.Controls.Add(txtMotivo);
             pnlCardMotivo.Controls.Add(lblTitMotivo);
 
-            // 6. TOTAL A DECLARAR
-            Panel pnlTotalCard = CrearTarjetaRedondeada(54);
+            // 7. TOTAL A DECLARAR
+            Panel pnlTotalCard = CrearTarjetaRedondeada(48);
             pnlTotalCard.Dock = DockStyle.Top;
             pnlTotalCard.BackColor = Color.FromArgb(248, 250, 252);
-            pnlTotalCard.Padding = new Padding(12, 10, 12, 10);
+            pnlTotalCard.Padding = new Padding(12, 8, 12, 8);
 
             lblTotalAfectado = new Label
             {
                 Text = $"MONTO NOTA DE CRÉDITO: -{MonedaHelper.Formatear(totalDoc, conSigno: true)}",
-                Font = new Font("Segoe UI", 11.5F, FontStyle.Bold),
+                Font = new Font("Segoe UI", 11F, FontStyle.Bold),
                 ForeColor = Color.FromArgb(220, 38, 38),
                 Dock = DockStyle.Fill,
                 TextAlign = ContentAlignment.MiddleCenter
             };
             pnlTotalCard.Controls.Add(lblTotalAfectado);
 
-            // 7. BOTONES TÁCTILES INFERIORES
+            // 8. BOTONES INFERIORES
             Panel pnlBotones = new Panel
             {
                 Dock = DockStyle.Bottom,
-                Height = 105,
+                Height = 95,
                 Padding = new Padding(0, 4, 0, 0)
             };
 
@@ -238,27 +300,27 @@ namespace SISTEMAACTUALIZADO.Modals
             {
                 Text = "⚡ EMITIR NOTA DE CRÉDITO (61)",
                 Dock = DockStyle.Top,
-                Height = 50,
+                Height = 46,
                 BackColor = Color.FromArgb(220, 38, 38),
                 ForeColor = Color.White,
                 FlatStyle = FlatStyle.Flat,
-                Font = new Font("Segoe UI", 11F, FontStyle.Bold),
+                Font = new Font("Segoe UI", 10.5F, FontStyle.Bold),
                 Cursor = Cursors.Hand
             };
             btnEmitir.FlatAppearance.BorderSize = 0;
             btnEmitir.Click += BtnEmitir_Click;
 
-            Panel pnlSpacer = new Panel { Dock = DockStyle.Top, Height = 8 };
+            Panel pnlSpacer = new Panel { Dock = DockStyle.Top, Height = 6 };
 
             btnCancelar = new Button
             {
                 Text = "✕ Cancelar",
                 Dock = DockStyle.Top,
-                Height = 40,
+                Height = 36,
                 BackColor = Color.FromArgb(241, 245, 249),
                 ForeColor = Color.FromArgb(71, 85, 105),
                 FlatStyle = FlatStyle.Flat,
-                Font = new Font("Segoe UI", 9.5F, FontStyle.Bold),
+                Font = new Font("Segoe UI", 9F, FontStyle.Bold),
                 Cursor = Cursors.Hand
             };
             btnCancelar.FlatAppearance.BorderColor = Color.FromArgb(226, 232, 240);
@@ -271,6 +333,7 @@ namespace SISTEMAACTUALIZADO.Modals
             pnlMain.Controls.Add(pnlBotones);
             pnlMain.Controls.Add(pnlTotalCard);
             pnlMain.Controls.Add(pnlCardMotivo);
+            pnlMain.Controls.Add(pnlDetalleParcialContainer);
             pnlMain.Controls.Add(pnlMontoNDContainer);
             pnlMain.Controls.Add(pnlCardCausas);
             pnlMain.Controls.Add(pnlCardTipo);
@@ -279,6 +342,114 @@ namespace SISTEMAACTUALIZADO.Modals
 
             this.Controls.Add(pnlMain);
             this.CancelButton = btnCancelar;
+        }
+
+        private void ConfigurarColumnasGrillaParcial()
+        {
+            dgvItemsDevolucion.Columns.Clear();
+            dgvItemsDevolucion.AutoGenerateColumns = false;
+
+            // Manejo preventivo del error nativo de DataGridView
+            dgvItemsDevolucion.DataError += (s, e) => { e.Cancel = true; };
+
+            // 1. PRODUCTO
+            dgvItemsDevolucion.Columns.Add(new DataGridViewTextBoxColumn
+            {
+                Name = "NombreProducto",
+                DataPropertyName = "NombreProducto",
+                HeaderText = "PRODUCTO",
+                ReadOnly = true,
+                FillWeight = 42
+            });
+
+            // 2. CANTIDAD COMPRADA
+            dgvItemsDevolucion.Columns.Add(new DataGridViewTextBoxColumn
+            {
+                Name = "CantOriginalStr",
+                HeaderText = "COMPRADO",
+                ReadOnly = true,
+                FillWeight = 20,
+                DefaultCellStyle = { Alignment = DataGridViewContentAlignment.MiddleCenter }
+            });
+
+            // 3. CANTIDAD A DEVOLVER (EDITABLE)
+            var colDevolver = new DataGridViewTextBoxColumn
+            {
+                Name = "CantidadADevolver",
+                DataPropertyName = "CantidadADevolver",
+                HeaderText = "DEVOLVER",
+                FillWeight = 18,
+                ValueType = typeof(int)
+            };
+            colDevolver.DefaultCellStyle.Alignment = DataGridViewContentAlignment.MiddleCenter;
+            colDevolver.DefaultCellStyle.ForeColor = Color.FromArgb(220, 38, 38);
+            colDevolver.DefaultCellStyle.Font = new Font("Segoe UI", 9F, FontStyle.Bold);
+            dgvItemsDevolucion.Columns.Add(colDevolver);
+
+            // 4. TOTAL REBAJA
+            var colSub = new DataGridViewTextBoxColumn
+            {
+                Name = "SubtotalADevolver",
+                DataPropertyName = "SubtotalADevolver",
+                HeaderText = "TOTAL REBAJA",
+                ReadOnly = true,
+                FillWeight = 20,
+                ValueType = typeof(decimal)
+            };
+            colSub.DefaultCellStyle.FormatProvider = new System.Globalization.CultureInfo("es-CL");
+            colSub.DefaultCellStyle.Format = "$ #,##0";
+            colSub.DefaultCellStyle.Alignment = DataGridViewContentAlignment.MiddleRight;
+            colSub.DefaultCellStyle.Font = new Font("Segoe UI", 8.5F, FontStyle.Bold);
+            dgvItemsDevolucion.Columns.Add(colSub);
+
+            // Formato de texto para unidades / gramos
+            dgvItemsDevolucion.CellFormatting += (s, e) =>
+            {
+                if (e.RowIndex < 0 || e.RowIndex >= _itemsVentaOriginal.Count) return;
+                var item = _itemsVentaOriginal[e.RowIndex];
+
+                if (dgvItemsDevolucion.Columns[e.ColumnIndex].Name == "CantOriginalStr")
+                {
+                    e.Value = item.EsPesable ? $"{item.CantidadOriginal} g" : $"{item.CantidadOriginal} un";
+                    e.FormattingApplied = true;
+                }
+            };
+
+            // Validación al terminar de escribir la cantidad
+            dgvItemsDevolucion.CellEndEdit += (s, e) =>
+            {
+                if (e.RowIndex < 0 || e.RowIndex >= _itemsVentaOriginal.Count) return;
+                var item = _itemsVentaOriginal[e.RowIndex];
+
+                string valStr = dgvItemsDevolucion.Rows[e.RowIndex].Cells["CantidadADevolver"].Value?.ToString() ?? "0";
+                if (!int.TryParse(valStr, out int cantDev) || cantDev < 0)
+                {
+                    item.CantidadADevolver = 0;
+                }
+                else if (cantDev > item.CantidadOriginal)
+                {
+                    MessageBox.Show(
+                        $"La cantidad a devolver no puede superar lo comprado ({item.CantidadOriginal} {(item.EsPesable ? "g" : "un")}).",
+                        "Límite Excedido",
+                        MessageBoxButtons.OK,
+                        MessageBoxIcon.Warning
+                    );
+                    item.CantidadADevolver = item.CantidadOriginal;
+                }
+                else
+                {
+                    item.CantidadADevolver = cantDev;
+                }
+
+                dgvItemsDevolucion.Refresh();
+                RecalcularTotalParcial();
+            };
+        }
+
+        private void RecalcularTotalParcial()
+        {
+            decimal sumaParcial = _itemsVentaOriginal.Sum(i => i.SubtotalADevolver);
+            lblTotalAfectado.Text = $"MONTO NOTA DE CRÉDITO: -{MonedaHelper.Formatear(sumaParcial, conSigno: true)} (Ajuste Parcial)";
         }
 
         private void ConfigurarEstadoInicial()
@@ -312,15 +483,10 @@ namespace SISTEMAACTUALIZADO.Modals
                 btnTipoND.FlatAppearance.BorderSize = 1;
 
                 pnlMontoNDContainer.Visible = false;
-                decimal total = _documentosSeleccionados.Sum(d => d.Total);
-                lblTotalAfectado.Text = $"MONTO NOTA DE CRÉDITO: -{MonedaHelper.Formatear(total, conSigno: true)}";
-                lblTotalAfectado.ForeColor = Color.FromArgb(220, 38, 38);
 
                 btnEmitir.Text = "⚡ EMITIR NOTA DE CRÉDITO (61)";
                 btnEmitir.BackColor = Color.FromArgb(220, 38, 38);
-                txtMotivo.Text = "Devolución de mercadería / Anulación de venta";
 
-                // En Nota de Crédito se habilitan las 3 causas
                 btnCausa1.Visible = true;
                 btnCausa2.Visible = true;
                 btnCausa3.Visible = true;
@@ -338,6 +504,7 @@ namespace SISTEMAACTUALIZADO.Modals
                 btnTipoNC.FlatAppearance.BorderColor = Color.FromArgb(226, 232, 240);
                 btnTipoNC.FlatAppearance.BorderSize = 1;
 
+                pnlDetalleParcialContainer.Visible = false;
                 pnlMontoNDContainer.Visible = true;
                 txtMontoND.Focus();
                 decimal monto = MonedaHelper.Limpiar(txtMontoND.Text);
@@ -348,7 +515,6 @@ namespace SISTEMAACTUALIZADO.Modals
                 btnEmitir.BackColor = Color.FromArgb(124, 58, 237);
                 txtMotivo.Text = "Recargo por flete y transporte a local";
 
-                // En Nota de Débito solo aplica Modificación de Montos (Código 3)
                 btnCausa1.Visible = false;
                 btnCausa2.Visible = false;
                 btnCausa3.Visible = true;
@@ -363,8 +529,8 @@ namespace SISTEMAACTUALIZADO.Modals
             {
                 Text = texto,
                 Dock = DockStyle.Top,
-                Height = 38,
-                Margin = new Padding(0, 0, 0, 6),
+                Height = 36,
+                Margin = new Padding(0, 0, 0, 4),
                 FlatStyle = FlatStyle.Flat,
                 Font = new Font("Segoe UI", 8.5F, FontStyle.Bold),
                 TextAlign = ContentAlignment.MiddleLeft,
@@ -400,6 +566,45 @@ namespace SISTEMAACTUALIZADO.Modals
                     btns[i].FlatAppearance.BorderSize = 1;
                 }
             }
+
+            if (_esNotaCredito)
+            {
+                decimal totalOriginal = _documentosSeleccionados.Sum(d => d.Total);
+
+                switch (_codigoCausaSeleccionado)
+                {
+                    case 1:
+                        pnlDetalleParcialContainer.Visible = false;
+                        lblTotalAfectado.Text = $"MONTO NOTA DE CRÉDITO: -{MonedaHelper.Formatear(totalOriginal, conSigno: true)}";
+                        lblTotalAfectado.ForeColor = Color.FromArgb(220, 38, 38);
+                        txtMotivo.Text = "Devolución de mercadería / Anulación de venta";
+                        break;
+
+                    case 2:
+                        pnlDetalleParcialContainer.Visible = false;
+                        lblTotalAfectado.Text = "MONTO NOTA DE CRÉDITO: $ 0 (Documento Aclaratorio)";
+                        lblTotalAfectado.ForeColor = Color.FromArgb(2, 132, 199);
+                        txtMotivo.Text = "Corrige texto: Donde dice '...' debe decir '...'";
+                        break;
+
+                    case 3:
+                        if (_documentosSeleccionados.Count > 1)
+                        {
+                            MessageBox.Show("La devolución parcial de ítems debe emitirse sobre un único documento.", "Aviso", MessageBoxButtons.OK, MessageBoxIcon.Information);
+                            _codigoCausaSeleccionado = 1;
+                            ActualizarEstiloCausas();
+                            return;
+                        }
+
+                        pnlDetalleParcialContainer.Visible = true;
+                        dgvItemsDevolucion.DataSource = null;
+                        dgvItemsDevolucion.DataSource = _itemsVentaOriginal;
+                        RecalcularTotalParcial();
+                        lblTotalAfectado.ForeColor = Color.FromArgb(234, 88, 12);
+                        txtMotivo.Text = "Devolución parcial de mercadería";
+                        break;
+                }
+            }
         }
 
         private void BtnEmitir_Click(object? sender, EventArgs e)
@@ -416,19 +621,46 @@ namespace SISTEMAACTUALIZADO.Modals
 
             if (_esNotaCredito)
             {
-                var ids = _documentosSeleccionados.Select(d => d.idTve).ToList();
-                var res = NotaCreditoService.EmitirNotaCredito(ids, motivo, _codigoCausaSeleccionado, operador);
-
-                if (res.Exito)
+                if (_codigoCausaSeleccionado == 3)
                 {
-                    MessageBox.Show(res.Mensaje, "Nota de Crédito Emitida", MessageBoxButtons.OK, MessageBoxIcon.Information);
-                    DocumentoEmitido = true;
-                    this.DialogResult = DialogResult.OK;
-                    this.Close();
+                    var itemsValidos = _itemsVentaOriginal.Where(i => i.CantidadADevolver > 0).ToList();
+                    if (itemsValidos.Count == 0)
+                    {
+                        MessageBox.Show("Debe ingresar la cantidad a devolver en al menos un producto.", "Validación", MessageBoxButtons.OK, MessageBoxIcon.Warning);
+                        return;
+                    }
+
+                    int idVenta = _documentosSeleccionados[0].idTve;
+                    var resParcial = NotaCreditoService.EmitirNotaCreditoParcial(idVenta, itemsValidos, motivo, operador);
+
+                    if (resParcial.Exito)
+                    {
+                        MessageBox.Show(resParcial.Mensaje, "Nota de Crédito Emitida", MessageBoxButtons.OK, MessageBoxIcon.Information);
+                        DocumentoEmitido = true;
+                        this.DialogResult = DialogResult.OK;
+                        this.Close();
+                    }
+                    else
+                    {
+                        MessageBox.Show(resParcial.Mensaje, "Atención", MessageBoxButtons.OK, MessageBoxIcon.Warning);
+                    }
                 }
                 else
                 {
-                    MessageBox.Show(res.Mensaje, "Atención", MessageBoxButtons.OK, MessageBoxIcon.Warning);
+                    var ids = _documentosSeleccionados.Select(d => d.idTve).ToList();
+                    var res = NotaCreditoService.EmitirNotaCredito(ids, motivo, _codigoCausaSeleccionado, operador);
+
+                    if (res.Exito)
+                    {
+                        MessageBox.Show(res.Mensaje, "Nota de Crédito Emitida", MessageBoxButtons.OK, MessageBoxIcon.Information);
+                        DocumentoEmitido = true;
+                        this.DialogResult = DialogResult.OK;
+                        this.Close();
+                    }
+                    else
+                    {
+                        MessageBox.Show(res.Mensaje, "Atención", MessageBoxButtons.OK, MessageBoxIcon.Warning);
+                    }
                 }
             }
             else
@@ -456,6 +688,23 @@ namespace SISTEMAACTUALIZADO.Modals
                     MessageBox.Show(res.Mensaje, "Atención", MessageBoxButtons.OK, MessageBoxIcon.Warning);
                 }
             }
+        }
+
+        private void ConfigurarEstiloTablaParcial(DataGridView dgv)
+        {
+            dgv.EnableHeadersVisualStyles = false;
+            dgv.ColumnHeadersDefaultCellStyle.BackColor = Color.FromArgb(30, 41, 59);
+            dgv.ColumnHeadersDefaultCellStyle.ForeColor = Color.White;
+            dgv.ColumnHeadersDefaultCellStyle.Font = new Font("Segoe UI", 8F, FontStyle.Bold);
+            dgv.ColumnHeadersDefaultCellStyle.SelectionBackColor = Color.FromArgb(30, 41, 59);
+            dgv.ColumnHeadersDefaultCellStyle.SelectionForeColor = Color.White;
+            dgv.ColumnHeadersHeight = 26;
+
+            dgv.DefaultCellStyle.Font = new Font("Segoe UI", 8.5F);
+            dgv.DefaultCellStyle.ForeColor = Color.FromArgb(15, 23, 42);
+            dgv.DefaultCellStyle.SelectionBackColor = Color.FromArgb(254, 243, 199);
+            dgv.DefaultCellStyle.SelectionForeColor = Color.FromArgb(146, 64, 14);
+            dgv.GridColor = Color.FromArgb(226, 232, 240);
         }
 
         private Panel CrearTarjetaRedondeada(int alto)
