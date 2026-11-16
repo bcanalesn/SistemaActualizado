@@ -321,28 +321,55 @@ namespace SISTEMAACTUALIZADO.Modals
                     nuevaReserva, 
                     abono, 
                     vendedor, 
-                    operadorSesion // 👈 4° parámetro para UserDTE
+                    operadorSesion
                 );
 
                 ReservaCreada = resultado.Reserva;
                 NroTicketAbonoGenerado = resultado.NroTicketAbono;
 
                 string nombreMostrado = ObtenerPropiedadCliente(_cliente, "RazonSocial", "Nombres", "Nombre");
-                if (string.IsNullOrWhiteSpace(nombreMostrado)) nombreMostrado = "Cliente";
-
-                string mensajeExito = $"¡Reserva N° {ReservaCreada.CodigoReserva} registrada con éxito!\n\n" +
-                                      $"• Cliente: {nombreMostrado}\n" +
-                                      $"• Entrega: {ReservaCreada.FechaEntregaPactada:dd/MM/yyyy HH:mm}\n" +
-                                      $"• Total: {MonedaHelper.Formatear(ReservaCreada.TotalPedido, conSigno: true)}";
+                if (string.IsNullOrWhiteSpace(nombreMostrado)) nombreMostrado = "Cliente General";
 
                 if (NroTicketAbonoGenerado > 0)
                 {
-                    mensajeExito += $"\n\n🎟️ TICKET DE ABONO GENERADO: N° {NroTicketAbonoGenerado}\n" +
-                                    $"Monto a cobrar en Caja: {MonedaHelper.Formatear(abono, conSigno: true)}\n" +
-                                    $"(El ticket ya está disponible en Control de Caja para ser cobrado).";
-                }
+                    // 1. Armar el ítem del abono para que salga impreso en el voucher térmico
+                    var itemsTicketAbono = new List<DetalleCarrito>
+                    {
+                        new DetalleCarrito
+                        {
+                            ProductoID = 0,
+                            Nombre = $"Anticipo / Abono Pedido {ReservaCreada.CodigoReserva}",
+                            Cantidad = 1,
+                            PrecioUnitario = abono,
+                            EsPesable = false
+                        }
+                    };
 
-                MessageBox.Show(mensajeExito, "Reserva Registrada", MessageBoxButtons.OK, MessageBoxIcon.Information);
+                    // 2. Abrir el mismo modal de Pre-Venta Registrada (imprime en automático y permite reimprimir)
+                    using (var modalPreVenta = new FormPreVentaModal(
+                        NroTicketAbonoGenerado,
+                        vendedor,
+                        nombreMostrado,
+                        abono,
+                        itemsTicketAbono,
+                        autoImprimir: true))
+                    {
+                        modalPreVenta.ShowDialog(this);
+                    }
+                }
+                else
+                {
+                    // Si la reserva se creó sin abono inicial ($0), imprimir el comprobante de encargo
+                    var printService = new TicketPrintService();
+                    printService.ImprimirComprobanteReserva(ReservaCreada, null, vendedor);
+
+                    string mensajeSinAbono = $"¡Reserva N° {ReservaCreada.CodigoReserva} registrada con éxito!\n\n" +
+                                           $"• Cliente: {nombreMostrado}\n" +
+                                           $"• Entrega: {ReservaCreada.FechaEntregaPactada:dd/MM/yyyy HH:mm}\n" +
+                                           $"• Total: {MonedaHelper.Formatear(ReservaCreada.TotalPedido, conSigno: true)}";
+
+                    MessageBox.Show(mensajeSinAbono, "Reserva Registrada", MessageBoxButtons.OK, MessageBoxIcon.Information);
+                }
 
                 this.DialogResult = DialogResult.OK;
                 this.Close();

@@ -398,7 +398,7 @@ namespace SISTEMAACTUALIZADO.Modals
                     Cantidad = d.Cantidad
                 }).ToList();
 
-                decimal pagoConHistorico = _venta.Total + _venta.Vuelto;
+                decimal pagoConHistorico = (_venta.iddocDTE == 61 || isNC) ? 0m : (_venta.Total + _venta.Vuelto);
 
                 FormTicketModal formTicket = new FormTicketModal(_venta, itemsEjemplo, pagoConHistorico, _venta.Vuelto);
                 formTicket.ShowDialog(this);

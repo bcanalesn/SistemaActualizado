@@ -234,6 +234,9 @@ namespace SISTEMAACTUALIZADO.Services
             g.DrawLine(penDash, 15, y, width - 15, y);
             y += 8;
 
+            bool esNotaCredito = venta.iddocDTE == 61 || 
+                                 (venta.Documento != null && venta.Documento.Contains("Crédito", StringComparison.OrdinalIgnoreCase));
+
             foreach (var item in items)
             {
                 string desc = item.Nombre.Length > 19 ? item.Nombre.Substring(0, 19) : item.Nombre;
@@ -251,8 +254,11 @@ namespace SISTEMAACTUALIZADO.Services
                     textoCantidad = $"{item.Cantidad,2} x";
                 }
 
+                // Si es Nota de Crédito y el monto del ítem es mayor a 0, lo mostramos con signo negativo
+                decimal subtotalLinea = (esNotaCredito && item.Subtotal > 0) ? -item.Subtotal : item.Subtotal;
+
                 g.DrawString($"{textoCantidad,-6} {desc}", fontSub, brushText, 15, y);
-                g.DrawString(MonedaHelper.Formatear(item.Subtotal, conSigno: true), fontSub, brushText, width - 85, y);
+                g.DrawString(MonedaHelper.Formatear(subtotalLinea, conSigno: true), fontSub, brushText, width - 85, y);
                 y += 18;
             }
 
@@ -281,11 +287,21 @@ namespace SISTEMAACTUALIZADO.Services
                 y += 20;
             }
 
-            g.DrawString("TOTAL A PAGAR:", fontTitle, brushText, 90, y);
-            g.DrawString(MonedaHelper.Formatear(venta.Total, conSigno: true), fontTitle, brushText, width - 110, y); 
+            // Etiqueta dinámica: "TOTAL:" para Nota de Crédito, "TOTAL A PAGAR:" para el resto
+            if (esNotaCredito)
+            {
+                g.DrawString("TOTAL:", fontTitle, brushText, 145, y);
+                g.DrawString(MonedaHelper.Formatear(venta.Total, conSigno: true), fontTitle, brushText, width - 110, y);
+            }
+            else
+            {
+                g.DrawString("TOTAL A PAGAR:", fontTitle, brushText, 90, y);
+                g.DrawString(MonedaHelper.Formatear(venta.Total, conSigno: true), fontTitle, brushText, width - 110, y);
+            }
             y += 28;
 
-            if (pagoCon > 0)
+            // El detalle de Pago y Vuelto no corresponde en Notas de Crédito
+            if (!esNotaCredito && pagoCon > 0)
             {
                 g.DrawLine(penDash, 15, y, width - 15, y); 
                 y += 10;

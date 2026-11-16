@@ -562,17 +562,31 @@ namespace SISTEMAACTUALIZADO
                         usuarioSesion
                     );
 
-                    MessageBox.Show(
-                        $"¡Ticket N° {nroTicket} generado con éxito!\n\n" +
-                        $"Monto a cobrar en Caja: {MonedaHelper.Formatear(monto, conSigno: true)}\n" +
-                        "Pase al cliente a Caja para que realice el pago.",
-                        "Ticket Enviado a Caja",
-                        MessageBoxButtons.OK,
-                        MessageBoxIcon.Information
-                    );
+                    var itemsAbono = new List<DetalleCarrito>
+                    {
+                        new DetalleCarrito
+                        {
+                            ProductoID = 0,
+                            Nombre = $"Abono Parcial Pedido {_reservaSeleccionada.CodigoReserva}",
+                            Cantidad = 1,
+                            PrecioUnitario = monto,
+                            EsPesable = false
+                        }
+                    };
 
                     modalAbono.DialogResult = DialogResult.OK;
                     modalAbono.Close();
+
+                    using (var modalPreVenta = new FormPreVentaModal(
+                        nroTicket,
+                        vendedorOriginal,
+                        _reservaSeleccionada.NombreCliente,
+                        monto,
+                        itemsAbono,
+                        autoImprimir: true))
+                    {
+                        modalPreVenta.ShowDialog(this);
+                    }
                 }
                 catch (Exception ex)
                 {
@@ -614,14 +628,30 @@ namespace SISTEMAACTUALIZADO
                     _usuarioActual.NombreUsuario
                 );
 
-                MessageBox.Show(
-                    $"¡TICKET N° {nroTicket} GENERADO CON ÉXITO!\n\n" +
-                    $"Monto por pagar en Caja: {MonedaHelper.Formatear(saldo, conSigno: true)}\n" +
-                    "Pase al cliente a Caja para procesar el cobro y entrega.",
-                    "Ticket Enviado a Caja",
-                    MessageBoxButtons.OK,
-                    MessageBoxIcon.Information
-                );
+                var detalles = _reservaService.ObtenerDetallesReserva(_reservaSeleccionada.IdReserva);
+                var itemsLiquidacion = detalles.Select(d => new DetalleCarrito
+                {
+                    ProductoID = d.ProductoID,
+                    Nombre = d.NombreProducto,
+                    Cantidad = d.Cantidad,
+                    PrecioUnitario = d.PrecioUnitario,
+                    EsPesable = d.EsPesable
+                }).ToList();
+
+                string vendedorTicket = !string.IsNullOrWhiteSpace(_reservaSeleccionada.UsuarioRegistro)
+                    ? _reservaSeleccionada.UsuarioRegistro
+                    : _usuarioActual.NombreUsuario;
+
+                using (var modalPreVenta = new FormPreVentaModal(
+                    nroTicket,
+                    vendedorTicket,
+                    _reservaSeleccionada.NombreCliente,
+                    saldo,
+                    itemsLiquidacion,
+                    autoImprimir: true))
+                {
+                    modalPreVenta.ShowDialog(this);
+                }
 
                 CargarReservas();
             }
